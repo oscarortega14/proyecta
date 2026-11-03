@@ -16,6 +16,8 @@ data class Theme(
     val image: String? = null,
     /** Fondo incluido en el programa (dibujado, sin archivos), ej. "luz". Ver BUILTINS. */
     val builtin: String? = "luz",
+    /** Movimiento suave en los fondos incluidos (destellos, partículas…). Apagar si el PC es lento. */
+    val animate: Boolean = true,
     /** Cuánto oscurecer el fondo de imagen para que se lea la letra (0 = nada, 0.8 = casi negro). */
     val dim: Float = 0.3f,
     val textColor: String = "#FFFFFF",
@@ -45,6 +47,7 @@ data class Theme(
             "noche" to "Noche estrellada",
             "oceano" to "Océano",
             "calvario" to "Calvario",
+            "destellos" to "Destellos",
         )
 
         val TEXT_COLORS: List<Pair<String, String>> = listOf(

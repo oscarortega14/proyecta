@@ -191,6 +191,10 @@ fun BackgroundsWindow(
                             }
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Animación de los fondos incluidos", modifier = Modifier.weight(1f))
+                            Switch(theme.animate, { v -> themes.update { it.copy(animate = v) } })
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("Sombra detrás de la letra", modifier = Modifier.weight(1f))
                             Switch(theme.shadow, { v -> themes.update { it.copy(shadow = v) } })
                         }

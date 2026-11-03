@@ -47,13 +47,16 @@ class RenderPreviewTest {
         }
         // Los fondos incluidos, con letra encima (como se verían en el videobeam).
         for ((key, _) in Theme.BUILTINS) {
-            ImageComposeScene(1280, 720, Density(1f)) { ProjectorScreen(song, look = Look(Theme(builtin = key))) }.use { scene ->
-                File(outDir, "fondo-$key.png").writeBytes(scene.render(0).encodeToData(EncodedImageFormat.PNG)!!.bytes)
+            // dos instantes de la animación, para ver que se mueve
+            for (t in listOf(0f, 4f)) {
+                ImageComposeScene(1280, 720, Density(1f)) { ProjectorScreen(song, look = Look(Theme(builtin = key), frozenTime = t)) }.use { scene ->
+                    File(outDir, "fondo-$key-t${t.toInt()}.png").writeBytes(scene.render(0).encodeToData(EncodedImageFormat.PNG)!!.bytes)
+                }
             }
         }
         for ((name, pair) in cases) {
             val (state, theme) = pair
-            val look = Look(theme) { bg }
+            val look = Look(theme, backgroundFile = { bg })
             ImageComposeScene(1280, 720, Density(1f)) { ProjectorScreen(state, look = look) }.use { scene ->
                 scene.render(0)
                 val png = scene.render(100_000_000).encodeToData(EncodedImageFormat.PNG)!!.bytes

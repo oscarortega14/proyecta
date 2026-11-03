@@ -46,7 +46,7 @@ fun main() {
         var editing by remember { mutableStateOf<EditRequest?>(null) }
         var backgroundsOpen by remember { mutableStateOf(false) }
         val theme by themes.theme.collectAsState()
-        val look = Look(theme) { name -> library.backgroundFile(name) }
+        val look = Look(theme, backgroundFile = { name -> library.backgroundFile(name) })
 
         ProvideLook(look) {
         Window(

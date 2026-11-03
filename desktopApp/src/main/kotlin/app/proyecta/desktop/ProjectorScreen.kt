@@ -47,7 +47,12 @@ import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
 /** Tema actual y cómo encontrar el archivo de una imagen de fondo. */
-data class Look(val theme: Theme = Theme(), val backgroundFile: (String) -> File? = { null })
+data class Look(
+    val theme: Theme = Theme(),
+    val backgroundFile: (String) -> File? = { null },
+    /** Si no es null, la animación queda fija en este instante (pruebas y miniaturas). */
+    val frozenTime: Float? = null,
+)
 
 val LocalLook = staticCompositionLocalOf { Look() }
 
@@ -68,7 +73,7 @@ fun ProjectorScreen(state: PresentationState, modifier: Modifier = Modifier, loo
     BoxWithConstraints(modifier.fillMaxSize().background(Color.Black)) {
         val slide = state.current
         if (!state.blank) {
-            Background(theme, image)
+            Background(theme, image, look.frozenTime)
             when {
                 seconds != null && seconds > 0 -> Countdown(state.countdownText, seconds, theme, maxWidth, maxHeight)
                 state.logo -> if (logo != null) Logo(logo, maxHeight)
@@ -145,7 +150,7 @@ private fun AlertBar(text: String, height: Dp) {
 }
 
 @Composable
-private fun Background(theme: Theme, image: ImageBitmap?) {
+private fun Background(theme: Theme, image: ImageBitmap?, frozenTime: Float?) {
     val top = hexColor(theme.color)
     val bottom = theme.color2?.let(::hexColor)
     val fill = if (bottom != null) Modifier.background(Brush.verticalGradient(listOf(top, bottom))) else Modifier.background(top)
@@ -154,7 +159,11 @@ private fun Background(theme: Theme, image: ImageBitmap?) {
     val builtin = theme.builtin?.takeIf { BuiltinBackgrounds.has(it) }
     when {
         image != null -> Image(image, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-        builtin != null -> BuiltinBackground(builtin)
+        builtin != null -> {
+            val animated = theme.animate && frozenTime == null
+            val clock = rememberAnimationTime(animated)
+            BuiltinBackground(builtin, time = if (frozenTime != null) androidx.compose.runtime.mutableStateOf(frozenTime) else clock)
+        }
     }
     if (image != null || builtin != null) {
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = theme.dim)))
