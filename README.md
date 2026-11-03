@@ -1,0 +1,87 @@
+# Proyecta
+
+Programa para proyectar letras de canciones y la Biblia en la iglesia, con control remoto desde celulares y tablets en la misma red Wi-Fi.
+
+| Módulo | Qué es | Tecnología |
+|---|---|---|
+| `shared/` | Modelos, protocolo, lector de canciones, búsqueda en la Biblia | Kotlin Multiplatform (JVM + Android) |
+| `desktopApp/` | Ventana del operador + ventana de proyección + servidor para los remotos | Compose Desktop + Ktor (WebSocket) |
+| `androidApp/` | Control remoto (Android 7 o superior) | Jetpack Compose + Ktor client |
+
+## Cómo funciona
+
+```
+ Tablet / celular  ──WebSocket ws://IP:8765/ws──▶  Computador (Proyecta)  ──▶  Videobeam
+   (androidApp)        órdenes: siguiente,              (desktopApp)           (2.º monitor)
+                       canción, cita bíblica…
+                  ◀── estado actual y biblioteca ──
+```
+
+El computador es la única fuente de verdad (`Presenter`). La ventana del operador y todos los remotos mandan las mismas órdenes (`ClientMessage`) y reciben el mismo estado (`ServerMessage.State`), así que siempre están sincronizados.
+
+## Biblioteca
+
+Proyecta crea la carpeta `Proyecta` en la carpeta personal del usuario (en Windows: `C:\Users\<usuario>\Proyecta`).
+
+### Canciones: `Proyecta/canciones/*.txt`
+
+```
+# Título de la canción
+
+Primera estrofa, línea 1
+Primera estrofa, línea 2
+
+Coro:
+Línea del coro
+Línea del coro
+```
+
+- La línea con `#` es el título (si falta, se usa el nombre del archivo).
+- Cada bloque separado por una línea en blanco es una diapositiva.
+- Si la primera línea de un bloque termina en `:` (ej. `Coro:`), es la etiqueta.
+- Acepta archivos guardados en UTF-8 o en ANSI (Bloc de notas).
+
+### Biblia: `Proyecta/biblia/`
+
+Se usa el primer archivo `.txt` o `.json` de la carpeta (orden alfabético).
+
+**Recomendado:** la Reina-Valera 1909 (dominio público) de eBible.org en formato VPL
+(`https://ebible.org/Scriptures/spaRV1909_vpl.zip`): copia `spaRV1909_vpl.txt` a la carpeta,
+por ejemplo como `Reina-Valera 1909.txt`. Cualquier Biblia VPL de eBible.org con los 66 libros sirve.
+
+También acepta JSON:
+
+```json
+{"name": "Reina-Valera 1909", "books": [{"name": "Génesis", "chapters": [["En el principio…", "…"]]}]}
+```
+
+o una lista de 66 libros en orden canónico: `[{"abbrev": "gn", "chapters": [[…]]}, …]`.
+
+Ojo con los derechos de autor: la RVR1960, NVI, NTV, etc. tienen licencia. La **Reina-Valera 1909** es de dominio público.
+
+Citas aceptadas: `Juan 3:16`, `jn 3 16`, `Sal 23`, `1 Co 13:4-7`, `Génesis 1`.
+
+## Uso
+
+- Doble monitor: la proyección se abre a pantalla completa en el segundo monitor (el videobeam).
+- Teclado y clickers de presentación: **Av Pág / Re Pág** para avanzar o retroceder, **Ctrl+B** pantalla negra.
+- En la tablet, escribe la dirección IP que muestra el computador (abajo a la derecha).
+- El firewall de Windows debe permitir el puerto 8765 en la red local. En una PowerShell de administrador:
+  ```powershell
+  Set-NetConnectionProfile -Name "<nombre del Wi-Fi>" -NetworkCategory Private
+  New-NetFirewallRule -DisplayName "Proyecta (control remoto)" -Direction Inbound -Protocol TCP -LocalPort 8765 -RemoteAddress LocalSubnet -Profile Private -Action Allow
+  ```
+- No pongas el código del programa en una carpeta llamada `Proyecta` dentro de la carpeta personal: Windows no distingue mayúsculas y se mezclaría con la biblioteca.
+
+## Compilar
+
+Requisitos: JDK 17. Para Android, además el SDK de Android (`scripts/setup-wsl.sh` lo instala en WSL/Ubuntu).
+
+```bash
+./gradlew test                                  # pruebas
+PROYECTA_VPL=/ruta/spaRV1909_vpl.txt ./gradlew :desktopApp:test   # incluye la Biblia real
+./gradlew :desktopApp:run                       # abrir el programa de escritorio
+./gradlew :androidApp:assembleRelease           # APK del control remoto
+adb install -r androidApp/build/outputs/apk/release/androidApp-release.apk
+./gradlew :desktopApp:packageMsi                # instalador para Windows (ejecutar en Windows)
+```
