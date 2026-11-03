@@ -75,6 +75,13 @@ El botón "+ Orden" del editor la agrega con las secciones existentes.
 
 ## Funciones
 
+- **Logo de la iglesia** (tecla `L` o botón "Logo"): pantalla de espera con el logo sobre el fondo. Se elige en
+  "Fondos y letra…" con "Usar de logo" (mejor un PNG con fondo transparente).
+- **Alertas**: aviso en una franja roja abajo, sin tapar la letra (se desplaza si es largo).
+- **Cuenta regresiva**: "Comenzamos en 05:00" en el videobeam y en la vista de escenario.
+- **Buscar en la Biblia por frase**: escribe palabras ("amó Dios mundo") en vez de una cita y presiona "Buscar".
+- **Atajos de teclado**: → ↓ Espacio siguiente · ← ↑ anterior · `C` coro · `1`–`9` secciones · `B` negro ·
+  `L` logo · `N` siguiente de la lista · `Esc` mostrar letra (o salir de un campo de texto) · Av Pág / Re Pág (clickers).
 - **Fondos y letra** (botón "Fondos y letra…"): fondos de color o degradado incluidos, o tus propias imágenes
   `.jpg`/`.png` en `Proyecta/fondos` (mejor 1920×1080); oscurecer la imagen, color y tamaño de la letra, sombra.
   Se guarda en `Proyecta/tema.json`. Fondo propio por canción con la línea `Fondo: archivo.jpg` debajo del título
@@ -114,5 +121,6 @@ PROYECTA_RENDER_DIR=/tmp/out PROYECTA_BG=/ruta/fondo.png ./gradlew :desktopApp:t
 ./gradlew :desktopApp:run                       # abrir el programa de escritorio
 ./gradlew :androidApp:assembleRelease           # APK del control remoto
 adb install -r androidApp/build/outputs/apk/release/androidApp-release.apk
-./gradlew :desktopApp:packageMsi                # instalador para Windows (ejecutar en Windows)
+./gradlew :desktopApp:packageMsi                # instalador para Windows (ejecutar en Windows; descarga WiX solo)
+# -> desktopApp/build/compose/binaries/main/msi/Proyecta-<versión>.msi (incluye Java: no hace falta instalarlo)
 ```

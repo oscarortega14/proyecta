@@ -53,6 +53,7 @@
   <button data-tab="songs">Canciones</button>
   <button data-tab="bible">Biblia</button>
   <button data-tab="plan">Lista</button>
+  <button data-tab="more">Más</button>
 </nav>
 <main>
   <section id="live" class="tab on">
@@ -68,12 +69,37 @@
     <p class="muted" id="bibleName"></p>
     <input id="ref" type="text" placeholder="Cita (ej. Juan 3:16, Sal 23, 1 Co 13:4-7)" enterkeyhint="go">
     <button class="btn wide" id="showRef">Mostrar en pantalla</button>
+    <button class="btn outline wide" id="searchRef">Buscar frase</button>
     <button class="btn outline wide" id="addRef">Agregar a la lista</button>
+    <p class="muted" id="hitsInfo"></p>
+    <div id="hits"></div>
   </section>
   <section id="plan" class="tab">
     <div class="row"><h2 style="flex:1">Lista del culto</h2><button class="btn small" id="planNext">Siguiente ▶</button></div>
     <div id="planList"></div>
     <p class="muted" id="planEmpty">La lista está vacía. Agrega canciones con "+" o citas desde Biblia.</p>
+  </section>
+  <section id="more" class="tab">
+    <button class="btn wide" id="logo">Mostrar logo</button>
+    <hr>
+    <h2>Alerta en pantalla</h2>
+    <input id="alertText" type="text" placeholder="Ej. Se busca al dueño del carro ABC123" enterkeyhint="send">
+    <div class="row" style="margin-top:8px">
+      <button class="btn" id="sendAlert" style="flex:1">Mostrar</button>
+      <button class="btn outline" id="clearAlert">Quitar</button>
+    </div>
+    <p class="muted" id="curAlert"></p>
+    <hr>
+    <h2>Cuenta regresiva</h2>
+    <div class="row">
+      <input id="cdMin" type="text" inputmode="numeric" value="5" style="width:80px">
+      <input id="cdText" type="text" value="Comenzamos en">
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button class="btn" id="cdStart" style="flex:1">Iniciar</button>
+      <button class="btn outline" id="cdStop">Detener</button>
+    </div>
+    <p class="muted" id="cdNow"></p>
     <hr>
     <h2>Mensaje al escenario</h2>
     <p class="muted">Lo ven los músicos en la vista de escenario; no sale en el videobeam.</p>
@@ -137,6 +163,32 @@ function renderLive() {
   $("blank").classList.toggle("on", st.blank);
   $("blank").textContent = st.blank ? "Mostrar" : "Negro";
   $("curMsg").textContent = st.stageMessage ? "En escenario: " + st.stageMessage : "";
+  $("curAlert").textContent = st.alert ? "En pantalla: " + st.alert : "";
+  $("logo").textContent = st.logo ? "Quitar logo" : "Mostrar logo";
+  renderCountdown();
+}
+
+function renderCountdown() {
+  const left = P.countdownSeconds(S.state);
+  $("cdNow").textContent = left == null ? "" : (left > 0 ? "Faltan " + P.formatClock(left) : "Terminó");
+}
+setInterval(renderCountdown, 500);
+
+function renderHits(m) {
+  $("hitsInfo").textContent = m.total === 0 ? "Sin resultados para «" + m.query + "»"
+    : m.total + " resultados" + (m.total > m.hits.length ? " (primeros " + m.hits.length + ")" : "");
+  const box = $("hits"); box.replaceChildren();
+  m.hits.forEach((h) => {
+    const row = P.el("div", "item");
+    const t = P.el("div", "t");
+    t.appendChild(P.el("b", null, h.reference));
+    const sm = P.el("small", null, h.text); sm.style.whiteSpace = "normal"; t.appendChild(sm);
+    t.onclick = () => { P.send("bible", { reference: h.reference }); showTab("live"); };
+    const add = P.el("button", "icon", "+");
+    add.onclick = () => { P.send("plan_add_bible", { reference: h.reference }); toast("Agregada a la lista"); };
+    row.append(t, add);
+    box.appendChild(row);
+  });
 }
 
 function renderSongs() {
@@ -184,6 +236,14 @@ $("showRef").onclick = showRef;
 $("ref").onkeydown = (e) => { if (e.key === "Enter") showRef(); };
 $("addRef").onclick = () => { if ($("ref").value.trim()) { P.send("plan_add_bible", { reference: $("ref").value.trim() }); toast("Agregada a la lista"); } };
 $("planNext").onclick = () => P.send("plan_next");
+$("searchRef").onclick = () => { if ($("ref").value.trim()) P.send("bible_search", { query: $("ref").value.trim() }); };
+$("logo").onclick = () => P.send("logo", { show: !S.state.logo });
+const sendAlert = () => { if ($("alertText").value.trim()) P.send("alert", { text: $("alertText").value }); };
+$("sendAlert").onclick = sendAlert;
+$("alertText").onkeydown = (e) => { if (e.key === "Enter") sendAlert(); };
+$("clearAlert").onclick = () => { $("alertText").value = ""; P.send("alert", { text: "" }); };
+$("cdStart").onclick = () => { const m = parseInt($("cdMin").value, 10); if (m > 0) P.send("countdown_start", { seconds: m * 60, text: $("cdText").value }); };
+$("cdStop").onclick = () => P.send("countdown_stop");
 const sendMsg = () => P.send("stage_message", { text: $("msg").value });
 $("sendMsg").onclick = sendMsg;
 $("msg").onkeydown = (e) => { if (e.key === "Enter") sendMsg(); };
@@ -193,6 +253,7 @@ P.on("status", renderStatus);
 P.on("state", renderLive);
 P.on("library", renderSongs);
 P.on("plan", renderPlan);
+P.on("bibleResults", renderHits);
 P.on("error", toast);
 P.connect();
 </script>

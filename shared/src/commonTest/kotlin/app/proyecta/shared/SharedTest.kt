@@ -216,6 +216,55 @@ class ThemeAndBackgroundTest {
     }
 }
 
+class SearchAndCountdownTest {
+    private val bible = Bible(
+        "T",
+        listOf(
+            Bible.Book("Génesis", listOf(listOf("En el principio crió Dios los cielos y la tierra."))),
+            Bible.Book("Juan", listOf(
+                listOf("En el principio era el Verbo"),
+                listOf("", "Porque de tal manera amó Dios al mundo", "Dios es amor y manera de vivir"),
+            )),
+        ),
+    )
+
+    @Test
+    fun searchesPhrasesIgnoringAccentsExactFirst() {
+        val (hits, total) = bible.search("manera AMO dios")
+        assertEquals(2, total)
+        assertEquals(listOf("Juan 2:2", "Juan 2:3"), hits.map { it.reference })
+        val (exact, _) = bible.search("dios manera")  // palabras sueltas: orden bíblico
+        assertEquals(listOf("Juan 2:2", "Juan 2:3"), exact.map { it.reference })
+        assertEquals("Juan 2:3", bible.search("de vivir").first.single().reference)
+        assertEquals(2, bible.search("en el principio").second)
+        assertEquals(0, bible.search("  a ").second)  // palabras de 1 letra no cuentan
+        assertEquals(1, bible.search("principio", limit = 1).first.size)
+    }
+
+    @Test
+    fun countdownAndClock() {
+        val st = PresentationState(countdownEnd = 10_000)
+        assertEquals(10, st.countdownSeconds(0))
+        assertEquals(1, st.countdownSeconds(9_500))
+        assertEquals(0, st.countdownSeconds(20_000))
+        assertNull(PresentationState().countdownSeconds(0))
+        assertEquals("02:05", formatClock(125))
+        assertEquals("1:02:05", formatClock(3725))
+        assertEquals("00:00", formatClock(0))
+    }
+
+    @Test
+    fun newMessagesRoundTrip() {
+        val msgs = listOf(
+            ClientMessage.ShowLogo(true), ClientMessage.SetAlert("Carro ABC"), ClientMessage.StartCountdown(300, "Comenzamos en"),
+            ClientMessage.StopCountdown, ClientMessage.BibleSearch("amó Dios"),
+        )
+        for (m in msgs) assertEquals(m, decodeClientMessage(m.encode()))
+        val r = ServerMessage.BibleResults("x", listOf(BibleHit("Juan 3:16", "Porque")), 7)
+        assertEquals(r, decodeServerMessage(r.encode()))
+    }
+}
+
 class ProtocolTest {
     @Test
     fun roundTripsPlanAndStageMessages() {

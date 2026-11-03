@@ -53,7 +53,7 @@ fun main() {
             onCloseRequest = { server.stop(); exitApplication() },
             title = "Proyecta — Operador",
             state = rememberWindowState(size = DpSize(1440.dp, 820.dp)),
-            onPreviewKeyEvent = { handleKey(it, presenter) },
+            onPreviewKeyEvent = { handleShortcut(it, commands) },
         ) {
             MaterialTheme(colorScheme = darkColorScheme()) {
                 OperatorScreen(
@@ -70,6 +70,7 @@ fun main() {
                     onOpenFolder = { runCatching { Desktop.getDesktop().open(library.baseDir) } },
                     onEdit = { id -> editing = EditRequest(id) },
                     onOpenBackgrounds = { backgroundsOpen = true },
+                    searchBible = { q -> library.bible?.search(q) },
                 )
             }
         }
@@ -83,22 +84,12 @@ fun main() {
         }
 
         if (projectorOn) {
-            ProjectorWindow(state, onClose = { projectorOn = false }, onKey = { handleKey(it, presenter) })
+            ProjectorWindow(state, onClose = { projectorOn = false }, onKey = { handleShortcut(it, commands) })
         }
         } // ProvideLook
     }
 }
 
-/** Atajos pensados para los "clickers" de presentación, que envían Av Pág / Re Pág. */
-private fun handleKey(e: KeyEvent, presenter: Presenter): Boolean {
-    if (e.type != KeyEventType.KeyDown) return false
-    return when {
-        e.key == Key.PageDown -> { presenter.handle(ClientMessage.Next); true }
-        e.key == Key.PageUp -> { presenter.handle(ClientMessage.Prev); true }
-        e.isCtrlPressed && e.key == Key.B -> { presenter.handle(ClientMessage.SetBlank(!presenter.state.value.blank)); true }
-        else -> false
-    }
-}
 
 /**
  * Si hay un segundo monitor (el videobeam), la ventana ocupa toda esa pantalla sin bordes.

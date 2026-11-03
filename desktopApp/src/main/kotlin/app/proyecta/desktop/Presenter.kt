@@ -11,7 +11,11 @@ import kotlinx.coroutines.flow.update
  * Única fuente de verdad de lo que se proyecta. La ventana de operador y los
  * remotos mandan las mismas órdenes (ClientMessage); todos ven el mismo estado.
  */
-class Presenter(private val library: Library) {
+class Presenter(
+    private val library: Library,
+    /** Reloj del PC (inyectable para las pruebas de la cuenta regresiva). */
+    private val clock: () -> Long = System::currentTimeMillis,
+) {
     private val _state = MutableStateFlow(PresentationState())
     val state: StateFlow<PresentationState> = _state.asStateFlow()
 
@@ -24,6 +28,10 @@ class Presenter(private val library: Library) {
         is ClientMessage.SetBlank -> { _state.update { it.copy(blank = msg.blank) }; null }
         is ClientMessage.ShowBible -> showBible(msg.reference)
         is ClientMessage.StageMessage -> { _state.update { it.copy(stageMessage = msg.text.trim()) }; null }
+        is ClientMessage.ShowLogo -> { _state.update { it.copy(logo = msg.show, blank = if (msg.show) false else it.blank) }; null }
+        is ClientMessage.SetAlert -> { _state.update { it.copy(alert = msg.text.trim()) }; null }
+        is ClientMessage.StartCountdown -> startCountdown(msg.seconds, msg.text)
+        ClientMessage.StopCountdown -> { _state.update { it.copy(countdownEnd = null, countdownText = "") }; null }
         // Las órdenes de la lista del culto las atiende ServicePlan (ver Commands).
         else -> "Orden no soportada aquí"
     }
@@ -31,9 +39,11 @@ class Presenter(private val library: Library) {
     private fun selectSong(id: String): String? {
         val song = library.song(id) ?: return "Canción no encontrada (¿se borró el archivo?)"
         _state.update {
-            PresentationState(
-                song.title, song.slides, if (song.slides.isEmpty()) -1 else 0, blank = it.blank,
-                songId = song.id, stageMessage = it.stageMessage, background = song.background,
+            it.keepingOverlays(
+                PresentationState(
+                    song.title, song.slides, if (song.slides.isEmpty()) -1 else 0,
+                    songId = song.id, background = song.background,
+                ),
             )
         }
         return null
@@ -63,7 +73,26 @@ class Presenter(private val library: Library) {
         } catch (e: IllegalArgumentException) {
             return e.message
         }
-        _state.update { PresentationState(passage.title, passage.slides, 0, blank = it.blank, isBible = true, stageMessage = it.stageMessage) }
+        _state.update { it.keepingOverlays(PresentationState(passage.title, passage.slides, 0, isBible = true)) }
         return null
     }
+
+    private fun startCountdown(seconds: Int, text: String): String? {
+        if (seconds !in 1..(24 * 3600)) return "La cuenta regresiva debe ser de 1 segundo a 24 horas"
+        _state.update { it.copy(countdownEnd = clock() + seconds * 1000L, countdownText = text.trim(), logo = false, blank = false) }
+        return null
+    }
+
+    /**
+     * Al mostrar otra canción o cita: se sale del logo, pero se conservan la pantalla negra,
+     * el mensaje al escenario, la alerta y la cuenta regresiva.
+     */
+    private fun PresentationState.keepingOverlays(new: PresentationState) = new.copy(
+        blank = blank,
+        stageMessage = stageMessage,
+        alert = alert,
+        countdownEnd = countdownEnd,
+        countdownText = countdownText,
+        logo = false,
+    )
 }

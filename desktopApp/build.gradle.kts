@@ -31,11 +31,19 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Deb)
             packageName = "Proyecta"
-            packageVersion = "1.0.0"
+            packageVersion = "1.1.0"
+            description = "Proyección de canciones y Biblia con control remoto"
+            vendor = "Proyecta"
+            copyright = "MIT License"
+            // Se incluye el entorno Java completo: el PC de la iglesia no necesita instalar nada más.
+            includeAllModules = true
             windows {
                 menuGroup = "Proyecta"
                 dirChooser = true
                 shortcut = true
+                perUserInstall = false
+                // Fijo para siempre: así una versión nueva reemplaza a la anterior al instalarse.
+                upgradeUuid = "7f0c7a52-3b1e-4c58-9f0e-2b6f3a9d8e41"
             }
         }
     }

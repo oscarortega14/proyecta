@@ -1,5 +1,6 @@
 package app.proyecta.desktop
 
+import app.proyecta.shared.ClientMessage
 import app.proyecta.shared.DEFAULT_PORT
 import app.proyecta.shared.ServerMessage
 import app.proyecta.shared.WS_PATH
@@ -61,12 +62,17 @@ class RemoteServer(
                     launch {
                         commands.plan.state.collect { p -> send(Frame.Text(ServerMessage.Plan(p).encode())) }
                     }
-                    presenter.state.collect { s -> send(Frame.Text(ServerMessage.State(s).encode())) }
+                    presenter.state.collect { s -> send(Frame.Text(ServerMessage.State(s, System.currentTimeMillis()).encode())) }
                 }
                 try {
                     for (frame in incoming) {
                         if (frame !is Frame.Text) continue
                         val msg = runCatching { decodeClientMessage(frame.readText()) }.getOrNull() ?: continue
+                        if (msg is ClientMessage.BibleSearch) {
+                            // La respuesta va solo a quien buscó.
+                            send(Frame.Text(bibleSearch(library, msg.query).encode()))
+                            continue
+                        }
                         commands.handle(msg)?.let { err -> send(Frame.Text(ServerMessage.Error(err).encode())) }
                     }
                 } finally {
@@ -77,6 +83,12 @@ class RemoteServer(
     }
 
     companion object {
+        fun bibleSearch(library: Library, query: String): ServerMessage {
+            val bible = library.bible ?: return ServerMessage.Error("No hay Biblia cargada")
+            val (hits, total) = bible.search(query)
+            return ServerMessage.BibleResults(query, hits, total)
+        }
+
         /** Direcciones IPv4 de la red local de este equipo (las que se escriben en la tablet). */
         fun localAddresses(): List<String> = runCatching {
             NetworkInterface.getNetworkInterfaces().toList()

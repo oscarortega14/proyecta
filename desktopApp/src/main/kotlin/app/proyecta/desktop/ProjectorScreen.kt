@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
@@ -54,11 +56,85 @@ fun ProjectorScreen(state: PresentationState, modifier: Modifier = Modifier, loo
     val imageName = state.background ?: theme.image
     val image = rememberBackground(imageName?.let(look.backgroundFile))
 
+    val logo = rememberBackground(theme.logo?.let(look.backgroundFile))
+    val now = rememberClock(active = state.countdownEnd != null)
+    val seconds = state.countdownSeconds(now)
+
     BoxWithConstraints(modifier.fillMaxSize().background(Color.Black)) {
         val slide = state.current
         if (!state.blank) {
             Background(theme, image)
-            if (slide != null) SlideText(state, slide.text, slide.label, theme, maxWidth, maxHeight)
+            when {
+                seconds != null && seconds > 0 -> Countdown(state.countdownText, seconds, theme, maxWidth, maxHeight)
+                state.logo -> if (logo != null) Logo(logo, maxHeight)
+                slide != null -> {
+                    // Con alerta, la letra deja libre la franja de abajo.
+                    val w = maxWidth
+                    val h = maxHeight
+                    val bottom = if (state.alert.isNotEmpty()) alertBarHeight(h) else 0.dp
+                    Box(Modifier.fillMaxSize().padding(bottom = bottom)) {
+                        SlideText(state, slide.text, slide.label, theme, w, h - bottom)
+                    }
+                }
+            }
+            if (state.alert.isNotEmpty()) AlertBar(state.alert, maxHeight)
+        }
+    }
+}
+
+/** Hora actual que se actualiza 4 veces por segundo mientras [active]. */
+@Composable
+private fun rememberClock(active: Boolean): Long {
+    val now by produceState(System.currentTimeMillis(), active) {
+        while (active) { value = System.currentTimeMillis(); kotlinx.coroutines.delay(250) }
+    }
+    return now
+}
+
+@Composable
+private fun Countdown(text: String, seconds: Long, theme: Theme, width: Dp, height: Dp) {
+    val color = hexColor(theme.textColor)
+    val shadow = if (theme.shadow) Shadow(Color.Black.copy(alpha = 0.9f), Offset(2f, 3f), blurRadius = 12f) else null
+    val clockSize = (height.value * 0.32f).coerceAtMost(width.value * 0.22f)
+    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+        if (text.isNotEmpty()) {
+            Text(text, style = TextStyle(color = color, fontSize = (clockSize * 0.28f).sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, shadow = shadow))
+        }
+        Text(
+            app.proyecta.shared.formatClock(seconds),
+            style = TextStyle(color = color, fontSize = clockSize.sp, fontWeight = FontWeight.Bold, shadow = shadow,
+                fontFeatureSettings = "tnum"),
+        )
+    }
+}
+
+@Composable
+private fun Logo(logo: ImageBitmap, height: Dp) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Image(logo, contentDescription = "Logo", modifier = Modifier.height(height * 0.55f), contentScale = ContentScale.Fit)
+    }
+}
+
+private fun alertFontSize(height: Dp) = (height.value * 0.055f).coerceIn(12f, 60f)
+
+/** Alto de la franja de alerta: letra + relleno arriba y abajo. */
+internal fun alertBarHeight(height: Dp): Dp = (alertFontSize(height) * 1.35f + alertFontSize(height) * 0.7f).dp
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+private fun AlertBar(text: String, height: Dp) {
+    val size = alertFontSize(height)
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+        Box(
+            Modifier.fillMaxWidth().background(Color(0xE6B71C1C)).padding(vertical = (size * 0.35f).dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text,
+                maxLines = 1,
+                modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE).padding(horizontal = (size * 0.6f).dp),
+                style = TextStyle(color = Color.White, fontSize = size.sp, fontWeight = FontWeight.SemiBold),
+            )
         }
     }
 }

@@ -36,6 +36,9 @@ class RenderPreviewTest {
             "3-imagen" to (song to Theme(image = "bg", dim = 0.35f)),
             "4-imagen-crema-biblia" to (verse to Theme(image = "bg", dim = 0.5f, textColor = "#FFF4D6")),
             "5-letra-pequena-sin-sombra" to (song to Theme.PRESETS[2].second.copy(fontScale = 0.7f, shadow = false)),
+            "6-cuenta-regresiva" to (song.copy(countdownEnd = System.currentTimeMillis() + 300_000, countdownText = "Comenzamos en") to Theme(image = "bg")),
+            "7-logo" to (song.copy(logo = true) to Theme(image = "bg", logo = "bg")),
+            "8-alerta" to (song.copy(alert = "Se busca al dueño del carro de placas ABC123, favor acercarse a la entrada") to Theme.PRESETS[1].second),
         )
         for ((name, pair) in cases) {
             val (state, theme) = pair

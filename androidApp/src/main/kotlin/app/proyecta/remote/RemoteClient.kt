@@ -53,6 +53,13 @@ class RemoteClient(private val scope: CoroutineScope) {
     private val _songs = MutableStateFlow<List<SongSummary>>(emptyList())
     val songs: StateFlow<List<SongSummary>> = _songs.asStateFlow()
 
+    private val _bibleResults = MutableStateFlow<ServerMessage.BibleResults?>(null)
+    val bibleResults: StateFlow<ServerMessage.BibleResults?> = _bibleResults.asStateFlow()
+
+    /** Hora del PC - hora de la tablet, para mostrar bien la cuenta regresiva. */
+    @Volatile var serverOffset: Long = 0
+        private set
+
     private val _plan = MutableStateFlow(ServicePlanState())
     val plan: StateFlow<ServicePlanState> = _plan.asStateFlow()
 
@@ -102,7 +109,11 @@ class RemoteClient(private val scope: CoroutineScope) {
     private fun onMessage(m: ServerMessage) {
         when (m) {
             is ServerMessage.Library -> { _songs.value = m.songs; _bibleName.value = m.bibleName }
-            is ServerMessage.State -> _state.value = m.state
+            is ServerMessage.State -> {
+                if (m.serverNow > 0) serverOffset = m.serverNow - System.currentTimeMillis()
+                _state.value = m.state
+            }
+            is ServerMessage.BibleResults -> _bibleResults.value = m
             is ServerMessage.Plan -> _plan.value = m.plan
             is ServerMessage.Error -> _errors.tryEmit(m.message)
         }

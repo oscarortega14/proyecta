@@ -20,6 +20,8 @@ data class Theme(
     /** Multiplica el tamaño automático de la letra (0.6 a 1.4). */
     val fontScale: Float = 1f,
     val shadow: Boolean = true,
+    /** Logo de la iglesia para la pantalla de espera: archivo dentro de Proyecta/fondos. */
+    val logo: String? = null,
 ) {
     companion object {
         /** Fondos de color incluidos (no necesitan archivos). */
@@ -48,6 +50,7 @@ data class Theme(
         color = if (isColor(color)) color else "#000000",
         color2 = color2?.takeIf { isColor(it) },
         image = image?.takeIf { it.isNotBlank() },
+        logo = logo?.takeIf { it.isNotBlank() },
         dim = dim.coerceIn(0f, 0.85f),
         textColor = if (isColor(textColor)) textColor else "#FFFFFF",
         fontScale = fontScale.coerceIn(0.6f, 1.4f),

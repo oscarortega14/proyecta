@@ -60,6 +60,7 @@ import app.proyecta.shared.ClientMessage
 import app.proyecta.shared.PresentationState
 import app.proyecta.shared.SongSummary
 import app.proyecta.shared.search
+import app.proyecta.shared.ServerMessage
 import app.proyecta.shared.ServicePlanState
 import app.proyecta.shared.PlanKind
 import androidx.compose.ui.platform.LocalContext
@@ -112,6 +113,7 @@ private fun RemoteApp(client: RemoteClient, savedHost: String, onConnect: (Strin
     val songs by client.songs.collectAsState()
     val bibleName by client.bibleName.collectAsState()
     val plan by client.plan.collectAsState()
+    val bibleResults by client.bibleResults.collectAsState()
     var editingHost by rememberSaveable { mutableStateOf(savedHost.isEmpty()) }
     var tab by rememberSaveable { mutableIntStateOf(0) }
 
@@ -122,7 +124,7 @@ private fun RemoteApp(client: RemoteClient, savedHost: String, onConnect: (Strin
             ConnectForm(savedHost) { host -> editingHost = false; onConnect(host) }
         } else {
             TabRow(selectedTabIndex = tab) {
-                listOf("En pantalla", "Canciones", "Biblia", "Lista").forEachIndexed { i, title ->
+                listOf("En pantalla", "Canciones", "Biblia", "Lista", "Más").forEachIndexed { i, title ->
                     Tab(selected = tab == i, onClick = { tab = i }, text = { Text(title) })
                 }
             }
@@ -132,10 +134,15 @@ private fun RemoteApp(client: RemoteClient, savedHost: String, onConnect: (Strin
                     1 -> SongsTab(songs, onAdd = { id -> client.send(ClientMessage.PlanAddSong(id)) }) { id ->
                         client.send(ClientMessage.SelectSong(id)); tab = 0
                     }
-                    2 -> BibleTab(bibleName, onAdd = { ref -> client.send(ClientMessage.PlanAddBible(ref)) }) { ref ->
+                    2 -> BibleTab(
+                        bibleName, bibleResults,
+                        onSearch = { q -> client.send(ClientMessage.BibleSearch(q)) },
+                        onAdd = { ref -> client.send(ClientMessage.PlanAddBible(ref)) },
+                    ) { ref ->
                         client.send(ClientMessage.ShowBible(ref)); tab = 0
                     }
                     3 -> PlanTab(plan, state.stageMessage, client::send) { tab = 0 }
+                    4 -> MoreTab(state, client.serverOffset, client::send)
                 }
             }
             Controls(state, client::send)
@@ -246,15 +253,21 @@ private fun SongsTab(songs: List<SongSummary>, onAdd: (String) -> Unit, onSelect
 }
 
 @Composable
-private fun BibleTab(bibleName: String?, onAdd: (String) -> Unit, onShow: (String) -> Unit) {
+private fun BibleTab(
+    bibleName: String?,
+    results: ServerMessage.BibleResults?,
+    onSearch: (String) -> Unit,
+    onAdd: (String) -> Unit,
+    onShow: (String) -> Unit,
+) {
     val context = LocalContext.current
     var ref by rememberSaveable { mutableStateOf("") }
     val show = { if (ref.isNotBlank()) onShow(ref.trim()) }
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) { item {
         Text(bibleName ?: "El computador no tiene Biblia cargada", color = MaterialTheme.colorScheme.onSurfaceVariant)
         OutlinedTextField(
             ref, { ref = it },
-            label = { Text("Cita (ej. Juan 3:16, Sal 23, 1 Co 13:4-7)") },
+            label = { Text("Cita o frase (ej. Juan 3:16 · amó Dios)") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
@@ -270,7 +283,27 @@ private fun BibleTab(bibleName: String?, onAdd: (String) -> Unit, onShow: (Strin
             },
             modifier = Modifier.fillMaxWidth(),
         ) { Text("Agregar a la lista") }
+        OutlinedButton({ if (ref.isNotBlank()) onSearch(ref.trim()) }, Modifier.fillMaxWidth()) { Text("Buscar frase") }
+        results?.let { r ->
+            Text(
+                if (r.total == 0) "Sin resultados para «${r.query}»"
+                else "${r.total} resultados" + if (r.total > r.hits.size) " (primeros ${r.hits.size})" else "",
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
     }
+    items(results?.hits.orEmpty(), key = { it.reference }) { hit ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f).clickable { onShow(hit.reference) }.padding(vertical = 6.dp)) {
+                Text(hit.reference, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.primary)
+                Text(hit.text, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            }
+            OutlinedButton({
+                onAdd(hit.reference)
+                Toast.makeText(context, "Agregada a la lista", Toast.LENGTH_SHORT).show()
+            }) { Text("+") }
+        }
+    } }
 }
 
 @Composable
@@ -340,6 +373,64 @@ private fun PlanTab(plan: ServicePlanState, stageMessage: String, send: (ClientM
                     OutlinedButton({ msg = ""; send(ClientMessage.StageMessage("")) }) { Text("Borrar") }
                 }
                 if (stageMessage.isNotEmpty()) Text("En escenario: $stageMessage", color = MaterialTheme.colorScheme.primary)
+            }
+        }
+    }
+}
+
+@Composable
+private fun MoreTab(state: PresentationState, serverOffset: Long, send: (ClientMessage) -> Unit) {
+    var alert by rememberSaveable { mutableStateOf("") }
+    var minutes by rememberSaveable { mutableStateOf("5") }
+    var cdText by rememberSaveable { mutableStateOf("Comenzamos en") }
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(state.countdownEnd) {
+        while (state.countdownEnd != null) { now = System.currentTimeMillis(); kotlinx.coroutines.delay(500) }
+    }
+    val left = state.countdownSeconds(now + serverOffset)
+
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item {
+            Button({ send(ClientMessage.ShowLogo(!state.logo)) }, Modifier.fillMaxWidth().height(56.dp)) {
+                Text(if (state.logo) "Quitar logo" else "Mostrar logo de la iglesia", fontSize = 17.sp)
+            }
+        }
+        item {
+            Text("Alerta en pantalla", style = MaterialTheme.typography.titleMedium)
+            OutlinedTextField(
+                alert, { alert = it }, placeholder = { Text("Ej. Se busca al dueño del carro ABC123") },
+                singleLine = true, modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(onSend = { if (alert.isNotBlank()) send(ClientMessage.SetAlert(alert)) }),
+            )
+            Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button({ send(ClientMessage.SetAlert(alert)) }, Modifier.weight(1f), enabled = alert.isNotBlank()) { Text("Mostrar") }
+                OutlinedButton({ alert = ""; send(ClientMessage.SetAlert("")) }, enabled = state.alert.isNotEmpty()) { Text("Quitar") }
+            }
+            if (state.alert.isNotEmpty()) Text("En pantalla: ${state.alert}", color = MaterialTheme.colorScheme.primary)
+        }
+        item {
+            Text("Cuenta regresiva", style = MaterialTheme.typography.titleMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    minutes, { v -> minutes = v.filter { it.isDigit() }.take(3) }, label = { Text("Min.") },
+                    singleLine = true, modifier = Modifier.weight(0.35f),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                )
+                OutlinedTextField(cdText, { cdText = it }, label = { Text("Texto") }, singleLine = true, modifier = Modifier.weight(1f))
+            }
+            Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    { send(ClientMessage.StartCountdown((minutes.toIntOrNull() ?: 0) * 60, cdText)) },
+                    Modifier.weight(1f), enabled = (minutes.toIntOrNull() ?: 0) > 0,
+                ) { Text("Iniciar") }
+                OutlinedButton({ send(ClientMessage.StopCountdown) }, enabled = state.countdownEnd != null) { Text("Detener") }
+            }
+            if (left != null) {
+                Text(
+                    if (left > 0) "Faltan ${app.proyecta.shared.formatClock(left)}" else "Terminó",
+                    style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary,
+                )
             }
         }
     }

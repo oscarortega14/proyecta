@@ -17,12 +17,16 @@
   #current { flex:3; display:flex; align-items:center; justify-content:center; text-align:center; white-space:pre-line; font-weight:600; line-height:1.2; }
   #next { flex:1.4; display:flex; align-items:center; justify-content:center; text-align:center; white-space:pre-line; color:#8a8a8a; border-top:2px solid #333; line-height:1.2; }
   #nextLbl { color:#555; font-size:2.4vh; text-transform:uppercase; letter-spacing:.1em; }
+  #cd { display:none; text-align:center; font-size:12vh; font-weight:700; font-variant-numeric:tabular-nums; color:#80deea; }
+  #alert { display:none; background:#b71c1c; color:#fff; font-size:3.5vh; text-align:center; padding:.6vh 1vw; border-radius:8px; }
   #status { position:fixed; right:1vw; bottom:1vh; color:#c62828; font-size:2vh; }
 </style>
 </head>
 <body>
 <div id="top"><span id="title"></span><span id="section"></span><span id="badge">NEGRO</span><span id="clock"></span></div>
 <div id="msg"></div>
+<div id="alert"></div>
+<div id="cd"></div>
 <div id="current"></div>
 <div id="nextLbl">Sigue</div>
 <div id="next"></div>
@@ -54,11 +58,22 @@ function render() {
   $("nextLbl").style.visibility = next ? "visible" : "hidden";
   $("msg").textContent = st.stageMessage || "";
   $("msg").style.display = st.stageMessage ? "block" : "none";
+  $("alert").textContent = st.alert ? "Alerta en pantalla: " + st.alert : "";
+  $("alert").style.display = st.alert ? "block" : "none";
+  renderCountdown();
   fit($("current"), 9);
   fit($("next"), 5);
 }
 
+function renderCountdown() {
+  const left = P.countdownSeconds(S.state);
+  const on = left != null && left > 0;
+  $("cd").style.display = on ? "block" : "none";
+  if (on) $("cd").textContent = (S.state.countdownText ? S.state.countdownText + " " : "") + P.formatClock(left);
+}
+
 function tick() {
+  renderCountdown();
   const d = new Date();
   $("clock").textContent = d.toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
 }

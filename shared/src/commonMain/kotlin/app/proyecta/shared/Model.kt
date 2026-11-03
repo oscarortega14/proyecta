@@ -31,7 +31,18 @@ data class PresentationState(
     val stageMessage: String = "",
     /** Fondo propio de la canción en pantalla (archivo en Proyecta/fondos), si tiene. */
     val background: String? = null,
+    /** Pantalla de espera: fondo + logo de la iglesia en vez de la letra. */
+    val logo: Boolean = false,
+    /** Aviso en una franja abajo ("" = sin aviso). Sale encima de la letra, no la reemplaza. */
+    val alert: String = "",
+    /** Cuenta regresiva activa: termina en este instante (milisegundos de época del PC), o null. */
+    val countdownEnd: Long? = null,
+    /** Texto sobre la cuenta regresiva, ej. "Comenzamos en". */
+    val countdownText: String = "",
 ) {
+    /** Segundos que faltan de la cuenta regresiva (0 si terminó), o null si no hay. */
+    fun countdownSeconds(now: Long): Long? = countdownEnd?.let { ((it - now + 999) / 1000).coerceAtLeast(0) }
+
     val current: Slide? get() = slides.getOrNull(index)
 
     /** Secciones para saltar rápido (Coro, Pregón 1…). Vacío para la Biblia. */
@@ -93,3 +104,16 @@ data class Song(
 ) {
     fun summary() = SongSummary(id, title, slides.firstOrNull()?.text?.lineSequence()?.firstOrNull().orEmpty())
 }
+
+/** 125 -> "02:05"; 3725 -> "1:02:05". */
+fun formatClock(totalSeconds: Long): String {
+    val h = totalSeconds / 3600
+    val m = (totalSeconds % 3600) / 60
+    val sec = totalSeconds % 60
+    fun two(n: Long) = n.toString().padStart(2, '0')
+    return if (h > 0) "$h:${two(m)}:${two(sec)}" else "${two(m)}:${two(sec)}"
+}
+
+/** Un resultado de búsqueda en la Biblia. */
+@Serializable
+data class BibleHit(val reference: String, val text: String)

@@ -71,6 +71,31 @@ class Bible(val name: String, val books: List<Book>) {
         return Passage(title, slides)
     }
 
+    /** Índice de búsqueda (texto normalizado de cada versículo), se arma la primera vez. */
+    private val searchIndex: List<Pair<BibleHit, String>> by lazy {
+        books.flatMap { book ->
+            book.chapters.flatMapIndexed { c, verses ->
+                verses.mapIndexedNotNull { v, text ->
+                    text.trim().takeIf { it.isNotEmpty() }?.let { BibleHit("${book.name} ${c + 1}:${v + 1}", it) to normalizeText(it) }
+                }
+            }
+        }
+    }
+
+    /**
+     * Busca versículos que contengan todas las palabras (sin importar tildes ni mayúsculas).
+     * Primero los que tienen la frase exacta, luego el resto en orden bíblico.
+     * Devuelve hasta [limit] resultados y el total encontrado.
+     */
+    fun search(query: String, limit: Int = 50): Pair<List<BibleHit>, Int> {
+        val phrase = normalizeText(query).split(' ').filter { it.isNotBlank() }.joinToString(" ")
+        val words = phrase.split(' ').filter { it.length >= 2 }
+        if (words.isEmpty()) return emptyList<BibleHit>() to 0
+        val matches = searchIndex.filter { (_, norm) -> words.all { it in norm } }
+        val (exact, rest) = matches.partition { (_, norm) -> phrase in norm }
+        return (exact + rest).take(limit).map { it.first } to matches.size
+    }
+
     fun findBook(query: String): Int? {
         val q = normalizeKey(query)
         if (q.isEmpty()) return null

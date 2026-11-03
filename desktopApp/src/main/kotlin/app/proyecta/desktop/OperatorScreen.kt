@@ -46,6 +46,16 @@ import androidx.compose.ui.unit.dp
 import app.proyecta.shared.ClientMessage
 import app.proyecta.shared.PresentationState
 import app.proyecta.shared.search
+import app.proyecta.shared.BibleReference
+import app.proyecta.shared.BibleHit
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import app.proyecta.shared.ServicePlanState
 import app.proyecta.shared.PlanKind
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -67,14 +77,24 @@ fun OperatorScreen(
     onOpenFolder: () -> Unit,
     onEdit: (songId: String?) -> Unit,
     onOpenBackgrounds: () -> Unit,
+    searchBible: (String) -> Pair<List<BibleHit>, Int>?,
 ) {
     var message by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(message) { if (message != null) { delay(5000); message = null } }
     val send: (ClientMessage) -> Unit = { m -> message = onCommand(m) }
 
-    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    val focusManager = LocalFocusManager.current
+    Surface(
+        Modifier.fillMaxSize().onPreviewKeyEvent {
+            // Esc saca el foco del campo de texto para que vuelvan a funcionar los atajos.
+            if (it.type == KeyEventType.KeyDown && it.key == Key.Escape && Typing.active) {
+                focusManager.clearFocus(); Typing.active = false; true
+            } else false
+        },
+        color = MaterialTheme.colorScheme.background,
+    ) {
         Row(Modifier.fillMaxSize().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            LibraryPanel(catalog, Modifier.width(300.dp).fillMaxHeight(), send, onReload, onOpenFolder, onEdit)
+            LibraryPanel(catalog, Modifier.width(300.dp).fillMaxHeight(), send, onReload, onOpenFolder, onEdit, searchBible)
             PlanPanel(plan, Modifier.width(250.dp).fillMaxHeight(), send)
             SlidesPanel(state, Modifier.weight(1f).fillMaxHeight(), send, onEdit)
             ControlPanel(
@@ -93,10 +113,19 @@ private fun LibraryPanel(
     onReload: () -> Unit,
     onOpenFolder: () -> Unit,
     onEdit: (songId: String?) -> Unit,
+    searchBible: (String) -> Pair<List<BibleHit>, Int>?,
 ) {
     var query by remember { mutableStateOf("") }
     var reference by remember { mutableStateOf("") }
+    var bibleHits by remember { mutableStateOf<Pair<List<BibleHit>, Int>?>(null) }
     val results = remember(query, catalog) { catalog.songs.search(query) }
+    val focusManager = LocalFocusManager.current
+    // Al proyectar algo, el foco sale del campo para que las flechas vuelvan a mover la letra.
+    val present: (ClientMessage) -> Unit = { m -> send(m); focusManager.clearFocus(); Typing.active = false }
+    val showOrSearch = {
+        if (BibleReference.parse(reference) != null) present(ClientMessage.ShowBible(reference))
+        else bibleHits = searchBible(reference)
+    }
 
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Biblia", style = MaterialTheme.typography.titleMedium)
@@ -107,18 +136,21 @@ private fun LibraryPanel(
         )
         OutlinedTextField(
             reference, { reference = it },
-            label = { Text("Cita (ej. Juan 3:16)") },
+            label = { Text("Cita o frase (ej. Juan 3:16 · amó Dios)") },
             singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().marksTyping(),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
-            keyboardActions = KeyboardActions(onGo = { send(ClientMessage.ShowBible(reference)) }),
+            keyboardActions = KeyboardActions(onGo = { showOrSearch() }),
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button({ send(ClientMessage.ShowBible(reference)) }, Modifier.weight(1f), enabled = reference.isNotBlank()) {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Button({ present(ClientMessage.ShowBible(reference)) }, Modifier.weight(1f), enabled = reference.isNotBlank(), contentPadding = PaddingValues(6.dp)) {
                 Text("Mostrar")
             }
-            OutlinedButton({ send(ClientMessage.PlanAddBible(reference)) }, Modifier.weight(1f), enabled = reference.isNotBlank()) {
-                Text("+ A la lista")
+            OutlinedButton({ bibleHits = searchBible(reference) }, Modifier.weight(1f), enabled = reference.isNotBlank(), contentPadding = PaddingValues(6.dp)) {
+                Text("Buscar")
+            }
+            OutlinedButton({ send(ClientMessage.PlanAddBible(reference)) }, Modifier.weight(1f), enabled = reference.isNotBlank(), contentPadding = PaddingValues(6.dp)) {
+                Text("+ Lista")
             }
         }
 
@@ -127,11 +159,28 @@ private fun LibraryPanel(
             Text("Canciones (${catalog.songs.size})", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             TextButton({ onEdit(null) }) { Text("+ Nueva") }
         }
-        OutlinedTextField(query, { query = it }, label = { Text("Buscar") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(query, { query = it }, label = { Text("Buscar") }, singleLine = true, modifier = Modifier.fillMaxWidth().marksTyping())
+        bibleHits?.let { (hits, total) ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    if (total == 0) "La Biblia: sin resultados" else "La Biblia: $total resultados" + if (total > hits.size) " (primeros ${hits.size})" else "",
+                    style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f),
+                )
+                TextButton({ bibleHits = null }) { Text("✕") }
+            }
+        }
         LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
-            items(results, key = { it.id }) { song ->
+            bibleHits?.let { (hits, _) ->
+                items(hits, key = { "b:" + it.reference }) { hit ->
+                    Column(Modifier.fillMaxWidth().clickable { present(ClientMessage.ShowBible(hit.reference)) }.padding(vertical = 6.dp, horizontal = 4.dp)) {
+                        Text(hit.reference, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.primary)
+                        Text(hit.text, style = MaterialTheme.typography.bodySmall, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
+            if (bibleHits == null) items(results, key = { it.id }) { song ->
                 Row(
-                    Modifier.fillMaxWidth().clickable { send(ClientMessage.SelectSong(song.id)) }.padding(start = 4.dp),
+                    Modifier.fillMaxWidth().clickable { present(ClientMessage.SelectSong(song.id)) }.padding(start = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
@@ -207,7 +256,7 @@ private fun ControlPanel(
     send: (ClientMessage) -> Unit,
     onOpenBackgrounds: () -> Unit,
 ) {
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("En pantalla", style = MaterialTheme.typography.titleMedium)
         Surface(Modifier.fillMaxWidth().aspectRatio(16f / 9f), shape = MaterialTheme.shapes.small) {
             ProjectorScreen(state)
@@ -216,23 +265,32 @@ private fun ControlPanel(
             Button({ send(ClientMessage.Prev) }, Modifier.weight(1f)) { Text("◀ Anterior") }
             Button({ send(ClientMessage.Next) }, Modifier.weight(1f)) { Text("Siguiente ▶") }
         }
-        OutlinedButton({ send(ClientMessage.SetBlank(!state.blank)) }, Modifier.fillMaxWidth()) {
-            Text(if (state.blank) "Mostrar texto" else "Pantalla negra")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton({ send(ClientMessage.SetBlank(!state.blank)) }, Modifier.weight(1f)) {
+                Text(if (state.blank) "Mostrar" else "Negro (B)")
+            }
+            OutlinedButton({ send(ClientMessage.ShowLogo(!state.logo)) }, Modifier.weight(1f)) {
+                Text(if (state.logo) "Quitar logo" else "Logo (L)")
+            }
         }
         OutlinedButton(onOpenBackgrounds, Modifier.fillMaxWidth()) { Text("Fondos y letra…") }
         OutlinedButton(onToggleProjector, Modifier.fillMaxWidth()) {
             Text(if (projectorOn) "Cerrar ventana de proyección" else "Abrir ventana de proyección")
         }
         Text(
-            "Teclado: Re Pág / Av Pág para moverse, Ctrl+B pantalla negra",
+            SHORTCUTS_HELP,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        Spacer(Modifier.weight(1f))
         if (message != null) {
             Text(message, color = MaterialTheme.colorScheme.error)
         }
+        HorizontalDivider()
+        AlertBox(state.alert, send)
+        HorizontalDivider()
+        CountdownBox(state, send)
+        HorizontalDivider()
         StageMessageBox(state.stageMessage, send)
         HorizontalDivider()
         Text("Control remoto", style = MaterialTheme.typography.titleMedium)
@@ -326,7 +384,7 @@ private fun StageMessageBox(current: String, send: (ClientMessage) -> Unit) {
         text, { text = it },
         placeholder = { Text("Ej. Repetir coro") },
         singleLine = true,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().marksTyping(),
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
         keyboardActions = KeyboardActions(onSend = { send(ClientMessage.StageMessage(text)) }),
     )
@@ -335,4 +393,48 @@ private fun StageMessageBox(current: String, send: (ClientMessage) -> Unit) {
         OutlinedButton({ text = ""; send(ClientMessage.StageMessage("")) }, enabled = current.isNotEmpty()) { Text("Borrar") }
     }
     if (current.isNotEmpty()) Text("En escenario: $current", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+}
+
+/** Aviso en una franja abajo del videobeam (ej. "Se busca al dueño del carro ABC123"). */
+@Composable
+private fun AlertBox(current: String, send: (ClientMessage) -> Unit) {
+    var text by remember { mutableStateOf("") }
+    Text("Alerta en pantalla", style = MaterialTheme.typography.titleSmall)
+    OutlinedTextField(
+        text, { text = it },
+        placeholder = { Text("Ej. Se busca al dueño del carro ABC123") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth().marksTyping(),
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+        keyboardActions = KeyboardActions(onSend = { send(ClientMessage.SetAlert(text)) }),
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button({ send(ClientMessage.SetAlert(text)) }, Modifier.weight(1f), enabled = text.isNotBlank()) { Text("Mostrar") }
+        OutlinedButton({ send(ClientMessage.SetAlert("")) }, enabled = current.isNotEmpty()) { Text("Quitar") }
+    }
+    if (current.isNotEmpty()) Text("En pantalla: $current", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+}
+
+/** Cuenta regresiva en el videobeam (ej. "Comenzamos en 05:00"). */
+@Composable
+private fun CountdownBox(state: PresentationState, send: (ClientMessage) -> Unit) {
+    var minutes by remember { mutableStateOf("5") }
+    var text by remember { mutableStateOf("Comenzamos en") }
+    val running = state.countdownEnd != null && (state.countdownEnd ?: 0) > System.currentTimeMillis()
+    Text("Cuenta regresiva", style = MaterialTheme.typography.titleSmall)
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+            minutes, { v -> minutes = v.filter { it.isDigit() }.take(3) },
+            label = { Text("Min.") }, singleLine = true, modifier = Modifier.width(80.dp).marksTyping(),
+        )
+        OutlinedTextField(text, { text = it }, label = { Text("Texto") }, singleLine = true, modifier = Modifier.weight(1f).marksTyping())
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(
+            { send(ClientMessage.StartCountdown((minutes.toIntOrNull() ?: 0) * 60, text)) },
+            Modifier.weight(1f),
+            enabled = (minutes.toIntOrNull() ?: 0) > 0,
+        ) { Text(if (running) "Reiniciar" else "Iniciar") }
+        OutlinedButton({ send(ClientMessage.StopCountdown) }, enabled = state.countdownEnd != null) { Text("Detener") }
+    }
 }

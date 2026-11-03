@@ -130,12 +130,17 @@ fun BackgroundsWindow(
                                     val bmp = rememberBackground(library.backgroundFile(name))
                                     if (bmp != null) Image(bmp, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                                 }
-                                if (songId != null) {
-                                    TextButton({ setSongBackground(name) }, Modifier.fillMaxWidth()) {
-                                        Text(
-                                            if (state.background == name) "✓ De esta canción" else "Solo esta canción",
-                                            style = MaterialTheme.typography.labelSmall,
-                                        )
+                                Row {
+                                    TextButton({ themes.update { it.copy(logo = if (it.logo == name) null else name) } }, Modifier.weight(1f)) {
+                                        Text(if (theme.logo == name) "✓ Logo" else "Usar de logo", style = MaterialTheme.typography.labelSmall)
+                                    }
+                                    if (songId != null) {
+                                        TextButton({ setSongBackground(name) }, Modifier.weight(1f)) {
+                                            Text(
+                                                if (state.background == name) "✓ Canción" else "Solo canción",
+                                                style = MaterialTheme.typography.labelSmall,
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -157,6 +162,12 @@ fun BackgroundsWindow(
                             OutlinedButton({ setSongBackground(null) }) { Text("Quitar el fondo propio de la canción") }
                         }
 
+                        Text(
+                            theme.logo?.let { "Logo de la iglesia: $it (pantalla de espera, tecla L)" }
+                                ?: "Logo: elige una imagen con \"Usar de logo\" (mejor un PNG con fondo transparente)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                         LabeledSlider("Oscurecer la imagen", theme.dim, 0f..0.85f, enabled = theme.image != null || state.background != null) { v ->
                             themes.update { it.copy(dim = v) }
                         }

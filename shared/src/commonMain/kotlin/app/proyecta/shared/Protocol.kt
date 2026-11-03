@@ -55,6 +55,24 @@ sealed interface ClientMessage {
     /** Mensaje para la vista de escenario ("" lo borra). No se ve en el videobeam. */
     @Serializable @SerialName("stage_message")
     data class StageMessage(val text: String) : ClientMessage
+
+    /** Pantalla de espera con el logo (true) o volver a la letra (false). */
+    @Serializable @SerialName("logo")
+    data class ShowLogo(val show: Boolean) : ClientMessage
+
+    /** Aviso en la franja de abajo; "" lo quita. */
+    @Serializable @SerialName("alert")
+    data class SetAlert(val text: String) : ClientMessage
+
+    @Serializable @SerialName("countdown_start")
+    data class StartCountdown(val seconds: Int, val text: String = "") : ClientMessage
+
+    @Serializable @SerialName("countdown_stop")
+    data object StopCountdown : ClientMessage
+
+    /** Buscar una frase en la Biblia; responde con ServerMessage.BibleResults. */
+    @Serializable @SerialName("bible_search")
+    data class BibleSearch(val query: String) : ClientMessage
 }
 
 @Serializable
@@ -74,7 +92,14 @@ sealed interface ServerMessage {
     data class Library(val songs: List<SongSummary>, val bibleName: String? = null) : ServerMessage
 
     @Serializable @SerialName("state")
-    data class State(val state: PresentationState) : ServerMessage
+    data class State(
+        val state: PresentationState,
+        /** Hora del PC al enviar, para que los remotos corrijan la diferencia de reloj en la cuenta regresiva. */
+        val serverNow: Long = 0,
+    ) : ServerMessage
+
+    @Serializable @SerialName("bible_results")
+    data class BibleResults(val query: String, val hits: List<BibleHit>, val total: Int = hits.size) : ServerMessage
 
     @Serializable @SerialName("plan")
     data class Plan(val plan: ServicePlanState) : ServerMessage
