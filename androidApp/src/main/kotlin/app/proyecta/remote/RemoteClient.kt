@@ -4,6 +4,7 @@ import app.proyecta.shared.ClientMessage
 import app.proyecta.shared.DEFAULT_PORT
 import app.proyecta.shared.PresentationState
 import app.proyecta.shared.ServerMessage
+import app.proyecta.shared.ServicePlanState
 import app.proyecta.shared.SongSummary
 import app.proyecta.shared.WS_PATH
 import app.proyecta.shared.decodeServerMessage
@@ -52,6 +53,9 @@ class RemoteClient(private val scope: CoroutineScope) {
     private val _songs = MutableStateFlow<List<SongSummary>>(emptyList())
     val songs: StateFlow<List<SongSummary>> = _songs.asStateFlow()
 
+    private val _plan = MutableStateFlow(ServicePlanState())
+    val plan: StateFlow<ServicePlanState> = _plan.asStateFlow()
+
     private val _bibleName = MutableStateFlow<String?>(null)
     val bibleName: StateFlow<String?> = _bibleName.asStateFlow()
 
@@ -99,6 +103,7 @@ class RemoteClient(private val scope: CoroutineScope) {
         when (m) {
             is ServerMessage.Library -> { _songs.value = m.songs; _bibleName.value = m.bibleName }
             is ServerMessage.State -> _state.value = m.state
+            is ServerMessage.Plan -> _plan.value = m.plan
             is ServerMessage.Error -> _errors.tryEmit(m.message)
         }
     }

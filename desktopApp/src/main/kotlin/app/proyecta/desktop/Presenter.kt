@@ -23,12 +23,15 @@ class Presenter(private val library: Library) {
         ClientMessage.Prev -> { _state.update { s -> s.copy(index = (s.index - 1).coerceAtLeast(if (s.slides.isEmpty()) -1 else 0)) }; null }
         is ClientMessage.SetBlank -> { _state.update { it.copy(blank = msg.blank) }; null }
         is ClientMessage.ShowBible -> showBible(msg.reference)
+        is ClientMessage.StageMessage -> { _state.update { it.copy(stageMessage = msg.text.trim()) }; null }
+        // Las órdenes de la lista del culto las atiende ServicePlan (ver Commands).
+        else -> "Orden no soportada aquí"
     }
 
     private fun selectSong(id: String): String? {
         val song = library.song(id) ?: return "Canción no encontrada (¿se borró el archivo?)"
         _state.update {
-            PresentationState(song.title, song.slides, if (song.slides.isEmpty()) -1 else 0, blank = it.blank, songId = song.id)
+            PresentationState(song.title, song.slides, if (song.slides.isEmpty()) -1 else 0, blank = it.blank, songId = song.id, stageMessage = it.stageMessage)
         }
         return null
     }
@@ -57,7 +60,7 @@ class Presenter(private val library: Library) {
         } catch (e: IllegalArgumentException) {
             return e.message
         }
-        _state.update { PresentationState(passage.title, passage.slides, 0, blank = it.blank, isBible = true) }
+        _state.update { PresentationState(passage.title, passage.slides, 0, blank = it.blank, isBible = true, stageMessage = it.stageMessage) }
         return null
     }
 }

@@ -152,7 +152,67 @@ class SectionsTest {
     }
 }
 
+class SongOrderTest {
+    private val text = """
+        # Alabad
+        Orden: Inicio, Coro, Pregón 1, coro, Puente
+
+        estrofa a
+        estrofa b
+
+        Coro:
+        coro a
+
+        coro b
+
+        Pregón 1:
+        p1
+    """.trimIndent()
+
+    @Test
+    fun expandsTheOrderRepeatingSections() {
+        val song = SongParser.parse("x", text)
+        assertEquals(
+            listOf("estrofa a\nestrofa b", "coro a", "coro b", "p1", "coro a", "coro b"),
+            song.slides.map { it.text },
+        )
+        assertEquals(listOf("Inicio", "Coro", "", "Pregón 1", "Coro", ""), song.slides.map { it.label })
+        assertEquals(listOf("Puente"), song.unknownOrder)
+    }
+
+    @Test
+    fun withoutOrderNothingChanges() {
+        val song = SongParser.parse("x", text.lines().filterNot { it.startsWith("Orden") }.joinToString("\n"))
+        assertEquals(4, song.slides.size)
+        assertEquals(emptyList(), song.unknownOrder)
+    }
+
+    @Test
+    fun jumpsGoToTheNextOccurrence() {
+        val st = PresentationState("A", SongParser.parse("x", text).slides, index = 0)
+        assertEquals(listOf("Inicio", "Coro", "Pregón 1"), st.sectionLabels)
+        assertEquals(1, st.jumpTarget("Coro"))
+        assertEquals(4, st.copy(index = 2).jumpTarget("Coro"))  // en el primer coro -> el segundo
+        assertEquals(1, st.copy(index = 5).jumpTarget("Coro"))  // en el último -> vuelve al primero
+        assertEquals(null, st.jumpTarget("Puente"))
+        assertEquals("coro b", st.copy(index = 1).next?.text)
+    }
+}
+
 class ProtocolTest {
+    @Test
+    fun roundTripsPlanAndStageMessages() {
+        val msgs = listOf(
+            ClientMessage.PlanAddSong("a"), ClientMessage.PlanAddBible("Juan 3:16"), ClientMessage.PlanRemove(1),
+            ClientMessage.PlanMove(0, 2), ClientMessage.PlanGo(1), ClientMessage.PlanNext, ClientMessage.PlanClear,
+            ClientMessage.StageMessage("2 minutos"),
+        )
+        for (m in msgs) assertEquals(m, decodeClientMessage(m.encode()))
+        val plan = ServerMessage.Plan(ServicePlanState(listOf(PlanItem(PlanKind.SONG, "a", "A")), 0))
+        assertEquals(plan, decodeServerMessage(plan.encode()))
+        assertTrue(plan.encode().contains("\"kind\":\"SONG\""))
+    }
+
     @Test
     fun roundTripsMessages() {
         val msgs = listOf(

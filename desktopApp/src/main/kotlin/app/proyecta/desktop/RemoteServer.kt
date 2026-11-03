@@ -10,8 +10,7 @@ import io.ktor.server.application.install
 import io.ktor.server.cio.CIO
 import io.ktor.server.engine.EmbeddedServer
 import io.ktor.server.engine.embeddedServer
-import io.ktor.server.response.respondText
-import io.ktor.server.routing.get
+import io.ktor.server.http.content.staticResources
 import io.ktor.server.routing.routing
 import io.ktor.server.websocket.WebSockets
 import io.ktor.server.websocket.pingPeriod
@@ -26,10 +25,11 @@ import kotlin.time.Duration.Companion.seconds
 
 /** Servidor WebSocket para los controles remotos (celulares y tablets en la misma red). */
 class RemoteServer(
-    private val presenter: Presenter,
+    private val commands: Commands,
     private val library: Library,
     val port: Int = DEFAULT_PORT,
 ) {
+    private val presenter get() = commands.presenter
     private var engine: EmbeddedServer<*, *>? = null
 
     fun start() {
@@ -47,7 +47,8 @@ class RemoteServer(
             timeout = 30.seconds
         }
         routing {
-            get("/") { call.respondText("Proyecta funcionando. Conecta el control remoto a este equipo.") }
+            // Páginas web: control remoto (/), vista de escenario y letras para OBS.
+            staticResources("/", "web", index = "index.html")
 
             webSocket(WS_PATH) {
                 // Envía biblioteca y estado al conectarse, y luego cada vez que cambien.
@@ -57,13 +58,16 @@ class RemoteServer(
                             send(Frame.Text(ServerMessage.Library(c.songs, c.bibleName).encode()))
                         }
                     }
+                    launch {
+                        commands.plan.state.collect { p -> send(Frame.Text(ServerMessage.Plan(p).encode())) }
+                    }
                     presenter.state.collect { s -> send(Frame.Text(ServerMessage.State(s).encode())) }
                 }
                 try {
                     for (frame in incoming) {
                         if (frame !is Frame.Text) continue
                         val msg = runCatching { decodeClientMessage(frame.readText()) }.getOrNull() ?: continue
-                        presenter.handle(msg)?.let { err -> send(Frame.Text(ServerMessage.Error(err).encode())) }
+                        commands.handle(msg)?.let { err -> send(Frame.Text(ServerMessage.Error(err).encode())) }
                     }
                 } finally {
                     pushJob.cancel()

@@ -61,6 +61,32 @@ Ojo con los derechos de autor: la RVR1960, NVI, NTV, etc. tienen licencia. La **
 
 Citas aceptadas: `Juan 3:16`, `jn 3 16`, `Sal 23`, `1 Co 13:4-7`, `Génesis 1`.
 
+### Orden de canción (opcional)
+
+Debajo del título, una línea `Orden:` arma la secuencia repitiendo secciones sin copiar el texto:
+
+```
+# Alabad a Jehová
+Orden: Inicio, Coro, Pregón 1, Coro, Pregón 2, Coro
+```
+
+`Inicio` es lo que va antes de la primera etiqueta. Con esto, "Siguiente" recorre la canción en ese orden.
+El botón "+ Orden" del editor la agrega con las secciones existentes.
+
+## Funciones
+
+- **Editor de canciones** con vista previa en vivo (botones "Editar" y "+ Nueva").
+- **Saltos por sección**: botones Coro · Pregón 1 · Puente… en el PC, la tablet y el control web.
+- **Lista del culto**: prepara el orden de canciones y lecturas ("+ Lista"); "Siguiente elemento ▶" pasa al próximo.
+  Se guarda en `Proyecta/lista-del-culto.json`.
+- **Control remoto web**: `http://IP:8765` en cualquier celular o tablet (Android o iPhone), sin instalar nada.
+- **Vista de escenario**: `http://IP:8765/escenario.html` — estrofa actual grande, la siguiente, la hora y
+  mensajes del operador ("Repetir coro") que no salen en el videobeam.
+- **Letras para transmisión (OBS)**: `http://IP:8765/obs.html` como "Fuente de navegador" (fondo transparente).
+  Parámetros: `?pos=bottom|center|top&size=44&bg=1` (bg=1 agrega una franja oscura detrás del texto).
+
+Cualquiera conectado a la misma red puede controlar la proyección: úsalo en la red de la iglesia, no en una red pública.
+
 ## Uso
 
 - Doble monitor: la proyección se abre a pantalla completa en el segundo monitor (el videobeam).

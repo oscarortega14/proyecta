@@ -29,8 +29,9 @@ import java.io.File
 
 fun main() {
     val library = Library(File(System.getProperty("user.home"), "Proyecta")).also { it.reload() }
-    val presenter = Presenter(library)
-    val server = RemoteServer(presenter, library)
+    val commands = Commands.create(library)
+    val presenter = commands.presenter
+    val server = RemoteServer(commands, library)
     val serverError = runCatching { server.start() }.exceptionOrNull()?.let {
         "No pude abrir el puerto ${server.port} para el control remoto: ${it.message}"
     }
@@ -39,25 +40,27 @@ fun main() {
     application {
         val state by presenter.state.collectAsState()
         val catalog by library.catalog.collectAsState()
+        val plan by commands.plan.state.collectAsState()
         var projectorOn by remember { mutableStateOf(true) }
         var editing by remember { mutableStateOf<EditRequest?>(null) }
 
         Window(
             onCloseRequest = { server.stop(); exitApplication() },
             title = "Proyecta — Operador",
-            state = rememberWindowState(size = DpSize(1280.dp, 780.dp)),
+            state = rememberWindowState(size = DpSize(1440.dp, 820.dp)),
             onPreviewKeyEvent = { handleKey(it, presenter) },
         ) {
             MaterialTheme(colorScheme = darkColorScheme()) {
                 OperatorScreen(
                     state = state,
                     catalog = catalog,
+                    plan = plan,
                     addresses = addresses,
                     port = server.port,
                     serverError = serverError,
                     projectorOn = projectorOn,
                     onToggleProjector = { projectorOn = !projectorOn },
-                    onCommand = presenter::handle,
+                    onCommand = commands::handle,
                     onReload = { library.reload() },
                     onOpenFolder = { runCatching { Desktop.getDesktop().open(library.baseDir) } },
                     onEdit = { id -> editing = EditRequest(id) },

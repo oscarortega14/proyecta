@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Proyecta · OBS</title>
+<!--
+  Fuente de navegador para OBS (fondo transparente).
+  Parámetros opcionales en la URL:
+    pos=bottom|center|top   posición del texto (por defecto bottom)
+    size=44                 tamaño de letra en px (por defecto 44)
+    bg=1                    franja oscura detrás del texto para que se lea sobre cualquier video
+-->
+<style>
+  html, body { margin:0; height:100%; background:transparent; overflow:hidden; font-family:system-ui, -apple-system, Roboto, sans-serif; }
+  #wrap { position:absolute; left:0; right:0; padding:0 6vw; display:flex; justify-content:center; transition:opacity .25s; }
+  #wrap.bottom { bottom:6vh; } #wrap.top { top:6vh; } #wrap.center { top:50%; transform:translateY(-50%); }
+  #box { color:#fff; text-align:center; white-space:pre-line; font-weight:700; line-height:1.25;
+         text-shadow:0 0 6px #000, 0 2px 4px #000, 2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000; }
+  #box.bg { background:rgba(0,0,0,.55); padding:.4em .8em; border-radius:.3em; }
+  #ref { display:block; font-size:.6em; font-weight:500; opacity:.9; margin-top:.3em; }
+  .hidden { opacity:0; }
+</style>
+</head>
+<body>
+<div id="wrap" class="hidden"><div id="box"></div></div>
+<script src="proyecta.js"></script>
+<script>
+"use strict";
+const P = Proyecta, S = P.S;
+const params = new URLSearchParams(location.search);
+const wrap = document.getElementById("wrap"), box = document.getElementById("box");
+wrap.classList.add(["top", "center"].includes(params.get("pos")) ? params.get("pos") : "bottom");
+box.style.fontSize = (parseInt(params.get("size"), 10) || 44) + "px";
+if (params.get("bg") === "1") box.classList.add("bg");
+
+function render() {
+  const st = S.state, cur = st.slides[st.index];
+  const visible = S.connected && cur && !st.blank;
+  wrap.classList.toggle("hidden", !visible);
+  if (!visible) return;
+  box.replaceChildren(document.createTextNode(cur.text));
+  if (st.isBible && cur.label) box.appendChild(P.el("span", null, cur.label)).id = "ref";
+}
+P.on("state", render);
+P.on("status", render);
+P.connect();
+</script>
+</body>
+</html>

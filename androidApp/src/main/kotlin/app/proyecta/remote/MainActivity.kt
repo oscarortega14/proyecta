@@ -60,6 +60,10 @@ import app.proyecta.shared.ClientMessage
 import app.proyecta.shared.PresentationState
 import app.proyecta.shared.SongSummary
 import app.proyecta.shared.search
+import app.proyecta.shared.ServicePlanState
+import app.proyecta.shared.PlanKind
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material3.TextButton
 
 class MainActivity : ComponentActivity() {
     private lateinit var client: RemoteClient
@@ -107,6 +111,7 @@ private fun RemoteApp(client: RemoteClient, savedHost: String, onConnect: (Strin
     val state by client.state.collectAsState()
     val songs by client.songs.collectAsState()
     val bibleName by client.bibleName.collectAsState()
+    val plan by client.plan.collectAsState()
     var editingHost by rememberSaveable { mutableStateOf(savedHost.isEmpty()) }
     var tab by rememberSaveable { mutableIntStateOf(0) }
 
@@ -117,15 +122,20 @@ private fun RemoteApp(client: RemoteClient, savedHost: String, onConnect: (Strin
             ConnectForm(savedHost) { host -> editingHost = false; onConnect(host) }
         } else {
             TabRow(selectedTabIndex = tab) {
-                listOf("En pantalla", "Canciones", "Biblia").forEachIndexed { i, title ->
+                listOf("En pantalla", "Canciones", "Biblia", "Lista").forEachIndexed { i, title ->
                     Tab(selected = tab == i, onClick = { tab = i }, text = { Text(title) })
                 }
             }
             Column(Modifier.weight(1f).fillMaxWidth().padding(12.dp)) {
                 when (tab) {
                     0 -> LiveTab(state, client::send)
-                    1 -> SongsTab(songs) { id -> client.send(ClientMessage.SelectSong(id)); tab = 0 }
-                    2 -> BibleTab(bibleName) { ref -> client.send(ClientMessage.ShowBible(ref)); tab = 0 }
+                    1 -> SongsTab(songs, onAdd = { id -> client.send(ClientMessage.PlanAddSong(id)) }) { id ->
+                        client.send(ClientMessage.SelectSong(id)); tab = 0
+                    }
+                    2 -> BibleTab(bibleName, onAdd = { ref -> client.send(ClientMessage.PlanAddBible(ref)) }) { ref ->
+                        client.send(ClientMessage.ShowBible(ref)); tab = 0
+                    }
+                    3 -> PlanTab(plan, state.stageMessage, client::send) { tab = 0 }
                 }
             }
             Controls(state, client::send)
@@ -178,15 +188,15 @@ private fun LiveTab(state: PresentationState, send: (ClientMessage) -> Unit) {
         style = MaterialTheme.typography.titleLarge,
         modifier = Modifier.padding(bottom = 8.dp),
     )
-    val sections = state.sections
-    if (sections.isNotEmpty()) {
-        val current = state.currentSection
+    val labels = state.sectionLabels
+    if (labels.isNotEmpty()) {
+        val current = state.currentLabel
         LazyRow(Modifier.padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            itemsIndexed(sections) { i, section ->
+            items(labels) { label ->
                 FilterChip(
-                    selected = i == current,
-                    onClick = { send(ClientMessage.GoTo(section.start)) },
-                    label = { Text(section.label, fontSize = 16.sp) },
+                    selected = label == current,
+                    onClick = { state.jumpTarget(label)?.let { send(ClientMessage.GoTo(it)) } },
+                    label = { Text(label, fontSize = 16.sp) },
                     modifier = Modifier.height(44.dp),
                 )
             }
@@ -214,22 +224,30 @@ private fun LiveTab(state: PresentationState, send: (ClientMessage) -> Unit) {
 }
 
 @Composable
-private fun SongsTab(songs: List<SongSummary>, onSelect: (String) -> Unit) {
+private fun SongsTab(songs: List<SongSummary>, onAdd: (String) -> Unit, onSelect: (String) -> Unit) {
+    val context = LocalContext.current
     var query by rememberSaveable { mutableStateOf("") }
     val results = remember(query, songs) { songs.search(query) }
     OutlinedTextField(query, { query = it }, label = { Text("Buscar canción") }, singleLine = true, modifier = Modifier.fillMaxWidth())
     LazyColumn(Modifier.padding(top = 8.dp)) {
         items(results, key = { it.id }) { song ->
-            Column(Modifier.fillMaxWidth().clickable { onSelect(song.id) }.padding(vertical = 10.dp)) {
-                Text(song.title, fontWeight = FontWeight.Medium, fontSize = 18.sp)
-                Text(song.firstLine, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f).clickable { onSelect(song.id) }.padding(vertical = 10.dp)) {
+                    Text(song.title, fontWeight = FontWeight.Medium, fontSize = 18.sp)
+                    Text(song.firstLine, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                OutlinedButton({
+                    onAdd(song.id)
+                    Toast.makeText(context, "Agregada a la lista", Toast.LENGTH_SHORT).show()
+                }) { Text("+", fontSize = 20.sp) }
             }
         }
     }
 }
 
 @Composable
-private fun BibleTab(bibleName: String?, onShow: (String) -> Unit) {
+private fun BibleTab(bibleName: String?, onAdd: (String) -> Unit, onShow: (String) -> Unit) {
+    val context = LocalContext.current
     var ref by rememberSaveable { mutableStateOf("") }
     val show = { if (ref.isNotBlank()) onShow(ref.trim()) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -243,6 +261,15 @@ private fun BibleTab(bibleName: String?, onShow: (String) -> Unit) {
             keyboardActions = KeyboardActions(onGo = { show() }),
         )
         Button(onClick = show, modifier = Modifier.fillMaxWidth()) { Text("Mostrar en pantalla") }
+        OutlinedButton(
+            onClick = {
+                if (ref.isNotBlank()) {
+                    onAdd(ref.trim())
+                    Toast.makeText(context, "Agregada a la lista", Toast.LENGTH_SHORT).show()
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text("Agregar a la lista") }
     }
 }
 
@@ -256,5 +283,64 @@ private fun Controls(state: PresentationState, send: (ClientMessage) -> Unit) {
             colors = if (state.blank) ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.errorContainer) else ButtonDefaults.outlinedButtonColors(),
         ) { Text(if (state.blank) "Mostrar" else "Negro", fontSize = 18.sp) }
         Button({ send(ClientMessage.Next) }, Modifier.weight(1.6f).height(72.dp)) { Text("▶", fontSize = 26.sp) }
+    }
+}
+
+@Composable
+private fun PlanTab(plan: ServicePlanState, stageMessage: String, send: (ClientMessage) -> Unit, onPlayed: () -> Unit) {
+    var msg by rememberSaveable { mutableStateOf("") }
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Lista del culto", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                Button({ send(ClientMessage.PlanNext); onPlayed() }, enabled = plan.current < plan.items.lastIndex) {
+                    Text("Siguiente ▶")
+                }
+            }
+            if (plan.items.isEmpty()) {
+                Text(
+                    "Vacía. Agrega canciones con \"+\" o citas desde Biblia.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 8.dp),
+                )
+            }
+        }
+        itemsIndexed(plan.items) { i, item ->
+            val selected = i == plan.current
+            Card(
+                Modifier.fillMaxWidth().clickable { send(ClientMessage.PlanGo(i)); onPlayed() },
+                colors = CardDefaults.cardColors(
+                    containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                ),
+            ) {
+                Row(Modifier.padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f).padding(vertical = 10.dp)) {
+                        Text("${i + 1}. ${item.title}", fontSize = 17.sp, fontWeight = FontWeight.Medium)
+                        Text(if (item.kind == PlanKind.BIBLE) "Lectura" else "Canción", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    TextButton({ send(ClientMessage.PlanMove(i, i - 1)) }, enabled = i > 0) { Text("▲") }
+                    TextButton({ send(ClientMessage.PlanMove(i, i + 1)) }, enabled = i < plan.items.lastIndex) { Text("▼") }
+                    TextButton({ send(ClientMessage.PlanRemove(i)) }) { Text("✕") }
+                }
+            }
+        }
+        item {
+            Column(Modifier.padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Mensaje al escenario", style = MaterialTheme.typography.titleMedium)
+                OutlinedTextField(
+                    msg, { msg = it },
+                    placeholder = { Text("Ej. Repetir coro · 2 minutos") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                    keyboardActions = KeyboardActions(onSend = { send(ClientMessage.StageMessage(msg)) }),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button({ send(ClientMessage.StageMessage(msg)) }, Modifier.weight(1f)) { Text("Enviar") }
+                    OutlinedButton({ msg = ""; send(ClientMessage.StageMessage("")) }) { Text("Borrar") }
+                }
+                if (stageMessage.isNotEmpty()) Text("En escenario: $stageMessage", color = MaterialTheme.colorScheme.primary)
+            }
+        }
     }
 }

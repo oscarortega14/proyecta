@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#16141a">
+<title>Proyecta · Control remoto</title>
+<style>
+  :root { --bg:#16141a; --card:#2a2730; --text:#ece6f0; --muted:#a59fb0; --accent:#cdbdff; --accent-bg:#4f378b; --danger:#f2b8b5; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--text); font:16px/1.35 system-ui, -apple-system, Roboto, sans-serif; }
+  body { display:flex; flex-direction:column; }
+  header { display:flex; align-items:center; gap:8px; padding:8px 12px; font-size:14px; color:var(--muted); }
+  header .dot { width:10px; height:10px; border-radius:50%; background:#e46962; }
+  header.ok .dot { background:#6dd58c; }
+  nav { display:flex; border-bottom:1px solid #3a3640; }
+  nav button { flex:1; padding:12px 4px; background:none; border:0; color:var(--muted); font-size:15px; border-bottom:3px solid transparent; }
+  nav button.on { color:var(--accent); border-bottom-color:var(--accent); }
+  main { flex:1; overflow:auto; padding:12px; }
+  .tab { display:none; } .tab.on { display:block; }
+  h2 { margin:0 0 8px; font-size:20px; font-weight:500; }
+  .chips { display:flex; gap:8px; overflow-x:auto; padding-bottom:8px; }
+  .chip { flex:none; padding:10px 14px; border-radius:10px; border:1px solid #5a5560; background:none; color:var(--text); font-size:15px; }
+  .chip.on { background:var(--accent-bg); border-color:var(--accent); }
+  .slide { background:var(--card); border-radius:12px; padding:12px; margin-bottom:8px; white-space:pre-line; border:2px solid transparent; }
+  .slide.on { background:var(--accent-bg); border-color:var(--accent); }
+  .slide .lbl { color:var(--accent); font-size:13px; font-weight:600; display:block; }
+  input[type=text], input[type=search] { width:100%; padding:12px; font-size:16px; border-radius:10px; border:1px solid #5a5560; background:#1e1c22; color:var(--text); }
+  .row { display:flex; gap:8px; align-items:center; }
+  .item { display:flex; align-items:center; gap:8px; padding:10px 0; border-bottom:1px solid #2e2b33; }
+  .item .t { flex:1; min-width:0; }
+  .item .t b { display:block; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .item .t small { color:var(--muted); display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .item.on .t b { color:var(--accent); }
+  .btn { padding:12px 16px; border-radius:22px; border:0; background:var(--accent); color:#21005d; font-size:16px; font-weight:600; }
+  .btn.outline { background:none; border:1px solid #5a5560; color:var(--text); }
+  .btn.small { padding:8px 12px; font-size:14px; }
+  .btn.wide { width:100%; margin-top:8px; }
+  .icon { padding:8px 10px; border-radius:8px; border:1px solid #5a5560; background:none; color:var(--text); font-size:15px; }
+  footer { display:flex; gap:10px; padding:10px 12px; border-top:1px solid #3a3640; }
+  footer .btn { flex:1; height:64px; font-size:26px; border-radius:16px; }
+  footer .blank { flex:1; font-size:17px; }
+  footer .blank.on { background:#8c1d18; color:#fff; border-color:#8c1d18; }
+  .muted { color:var(--muted); font-size:14px; }
+  #toast { position:fixed; left:12px; right:12px; bottom:96px; background:#601410; color:#fff; padding:12px; border-radius:10px; display:none; }
+  hr { border:0; border-top:1px solid #3a3640; margin:16px 0; }
+</style>
+</head>
+<body>
+<header id="status"><span class="dot"></span><span id="statusText">Conectando…</span></header>
+<nav>
+  <button data-tab="live" class="on">En pantalla</button>
+  <button data-tab="songs">Canciones</button>
+  <button data-tab="bible">Biblia</button>
+  <button data-tab="plan">Lista</button>
+</nav>
+<main>
+  <section id="live" class="tab on">
+    <h2 id="title">Nada en pantalla</h2>
+    <div class="chips" id="chips"></div>
+    <div id="slides"></div>
+  </section>
+  <section id="songs" class="tab">
+    <input id="q" type="search" placeholder="Buscar canción">
+    <div id="songList"></div>
+  </section>
+  <section id="bible" class="tab">
+    <p class="muted" id="bibleName"></p>
+    <input id="ref" type="text" placeholder="Cita (ej. Juan 3:16, Sal 23, 1 Co 13:4-7)" enterkeyhint="go">
+    <button class="btn wide" id="showRef">Mostrar en pantalla</button>
+    <button class="btn outline wide" id="addRef">Agregar a la lista</button>
+  </section>
+  <section id="plan" class="tab">
+    <div class="row"><h2 style="flex:1">Lista del culto</h2><button class="btn small" id="planNext">Siguiente ▶</button></div>
+    <div id="planList"></div>
+    <p class="muted" id="planEmpty">La lista está vacía. Agrega canciones con "+" o citas desde Biblia.</p>
+    <hr>
+    <h2>Mensaje al escenario</h2>
+    <p class="muted">Lo ven los músicos en la vista de escenario; no sale en el videobeam.</p>
+    <input id="msg" type="text" placeholder="Ej. Repetir coro · 2 minutos" enterkeyhint="send">
+    <div class="row" style="margin-top:8px">
+      <button class="btn" id="sendMsg" style="flex:1">Enviar</button>
+      <button class="btn outline" id="clearMsg">Borrar</button>
+    </div>
+    <p class="muted" id="curMsg"></p>
+  </section>
+</main>
+<footer>
+  <button class="btn" id="prev" aria-label="Anterior">◀</button>
+  <button class="btn outline blank" id="blank">Negro</button>
+  <button class="btn" id="next" aria-label="Siguiente" style="flex:1.6">▶</button>
+</footer>
+<div id="toast"></div>
+
+<script src="proyecta.js"></script>
+<script>
+"use strict";
+const P = Proyecta, S = P.S, $ = (id) => document.getElementById(id);
+
+function showTab(name) {
+  document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("on", b.dataset.tab === name));
+  document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("on", t.id === name));
+}
+document.querySelectorAll("nav button").forEach((b) => b.onclick = () => showTab(b.dataset.tab));
+
+let toastTimer;
+function toast(text) {
+  const t = $("toast"); t.textContent = text; t.style.display = "block";
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.style.display = "none", 4000);
+}
+
+function renderStatus() {
+  $("status").classList.toggle("ok", S.connected);
+  $("statusText").textContent = S.connected ? "Conectado a " + location.hostname : "Sin conexión — reintentando…";
+}
+
+function renderLive() {
+  const st = S.state;
+  $("title").textContent = st.title || "Nada en pantalla";
+  const chips = $("chips"); chips.replaceChildren();
+  const cur = P.sections(st)[P.currentSection(st)];
+  P.uniqueLabels(st).forEach((label) => {
+    const c = P.el("button", "chip" + (cur && cur.label === label ? " on" : ""), label);
+    c.onclick = () => { const t = P.jumpTarget(S.state, label); if (t !== null) P.send("goto", { index: t }); };
+    chips.appendChild(c);
+  });
+  const box = $("slides"); box.replaceChildren();
+  st.slides.forEach((s, i) => {
+    const d = P.el("div", "slide" + (i === st.index ? " on" : ""));
+    if (s.label) d.appendChild(P.el("span", "lbl", s.label));
+    d.appendChild(document.createTextNode(s.text));
+    d.onclick = () => P.send("goto", { index: i });
+    box.appendChild(d);
+  });
+  const on = box.children[st.index];
+  if (on) on.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  $("blank").classList.toggle("on", st.blank);
+  $("blank").textContent = st.blank ? "Mostrar" : "Negro";
+  $("curMsg").textContent = st.stageMessage ? "En escenario: " + st.stageMessage : "";
+}
+
+function renderSongs() {
+  const list = $("songList"); list.replaceChildren();
+  P.searchSongs($("q").value).forEach((song) => {
+    const row = P.el("div", "item");
+    const t = P.el("div", "t");
+    t.appendChild(P.el("b", null, song.title));
+    t.appendChild(P.el("small", null, song.firstLine));
+    t.onclick = () => { P.send("select_song", { id: song.id }); showTab("live"); };
+    const add = P.el("button", "icon", "+");
+    add.title = "Agregar a la lista";
+    add.onclick = () => { P.send("plan_add_song", { id: song.id }); toast("Agregada a la lista: " + song.title); };
+    row.append(t, add);
+    list.appendChild(row);
+  });
+  $("bibleName").textContent = S.bibleName || "El computador no tiene Biblia cargada";
+}
+
+function renderPlan() {
+  const list = $("planList"); list.replaceChildren();
+  const items = S.plan.items;
+  $("planEmpty").style.display = items.length ? "none" : "block";
+  items.forEach((it, i) => {
+    const row = P.el("div", "item" + (i === S.plan.current ? " on" : ""));
+    const t = P.el("div", "t");
+    t.appendChild(P.el("b", null, (i + 1) + ". " + it.title));
+    t.appendChild(P.el("small", null, it.kind === "BIBLE" ? "Lectura" : "Canción"));
+    t.onclick = () => { P.send("plan_go", { index: i }); showTab("live"); };
+    const up = P.el("button", "icon", "▲"); up.onclick = () => P.send("plan_move", { from: i, to: i - 1 });
+    const down = P.el("button", "icon", "▼"); down.onclick = () => P.send("plan_move", { from: i, to: i + 1 });
+    const del = P.el("button", "icon", "✕"); del.onclick = () => P.send("plan_remove", { index: i });
+    up.disabled = i === 0; down.disabled = i === items.length - 1;
+    row.append(t, up, down, del);
+    list.appendChild(row);
+  });
+}
+
+$("prev").onclick = () => P.send("prev");
+$("next").onclick = () => P.send("next");
+$("blank").onclick = () => P.send("blank", { blank: !S.state.blank });
+$("q").oninput = renderSongs;
+const showRef = () => { if ($("ref").value.trim()) { P.send("bible", { reference: $("ref").value.trim() }); showTab("live"); } };
+$("showRef").onclick = showRef;
+$("ref").onkeydown = (e) => { if (e.key === "Enter") showRef(); };
+$("addRef").onclick = () => { if ($("ref").value.trim()) { P.send("plan_add_bible", { reference: $("ref").value.trim() }); toast("Agregada a la lista"); } };
+$("planNext").onclick = () => P.send("plan_next");
+const sendMsg = () => P.send("stage_message", { text: $("msg").value });
+$("sendMsg").onclick = sendMsg;
+$("msg").onkeydown = (e) => { if (e.key === "Enter") sendMsg(); };
+$("clearMsg").onclick = () => { $("msg").value = ""; P.send("stage_message", { text: "" }); };
+
+P.on("status", renderStatus);
+P.on("state", renderLive);
+P.on("library", renderSongs);
+P.on("plan", renderPlan);
+P.on("error", toast);
+P.connect();
+</script>
+</body>
+</html>

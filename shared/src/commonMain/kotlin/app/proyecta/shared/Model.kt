@@ -27,6 +27,8 @@ data class PresentationState(
     val isBible: Boolean = false,
     /** Id (nombre de archivo) de la canción en pantalla; null si es Biblia o nada. */
     val songId: String? = null,
+    /** Mensaje del operador para la vista de escenario (no sale en el videobeam). */
+    val stageMessage: String = "",
 ) {
     val current: Slide? get() = slides.getOrNull(index)
 
@@ -35,6 +37,26 @@ data class PresentationState(
 
     /** Posición en [sections] de la sección que contiene la diapositiva actual, o -1. */
     val currentSection: Int get() = sections.indexOfLast { it.start <= index }
+
+    /** Etiquetas sin repetir, en orden de aparición: los botones de salto. */
+    val sectionLabels: List<String> get() = sections.map { it.label }.distinct()
+
+    /** Etiqueta de la sección actual, o null. */
+    val currentLabel: String? get() = sections.getOrNull(currentSection)?.label
+
+    /**
+     * A dónde saltar al tocar [label]. Si la sección se repite (por la línea "Orden:"),
+     * va a la siguiente aparición después de la actual; si no hay más, a la primera.
+     */
+    fun jumpTarget(label: String): Int? {
+        val starts = sections.filter { it.label == label }.map { it.start }
+        if (starts.isEmpty()) return null
+        val here = sections.getOrNull(currentSection)?.start ?: -1
+        return starts.firstOrNull { it > here } ?: starts.first()
+    }
+
+    /** La diapositiva que sigue, para la vista de escenario. */
+    val next: Slide? get() = slides.getOrNull(index + 1)
 }
 
 /** Una sección de canción: empieza en la diapositiva [start] y sigue hasta la próxima etiqueta. */
@@ -62,6 +84,8 @@ data class Song(
     val id: String,
     val title: String,
     val slides: List<Slide>,
+    /** Nombres de la línea "Orden:" que no corresponden a ninguna sección. */
+    val unknownOrder: List<String> = emptyList(),
 ) {
     fun summary() = SongSummary(id, title, slides.firstOrNull()?.text?.lineSequence()?.firstOrNull().orEmpty())
 }

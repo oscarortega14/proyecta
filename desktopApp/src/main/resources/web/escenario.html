@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Proyecta · Escenario</title>
+<style>
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; background:#000; color:#fff; font-family:system-ui, -apple-system, Roboto, sans-serif; overflow:hidden; }
+  body { display:flex; flex-direction:column; padding:2vh 3vw; gap:1.5vh; }
+  #top { display:flex; align-items:baseline; gap:2vw; color:#aaa; font-size:3vh; }
+  #title { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #section { color:#ffd54f; font-weight:600; }
+  #clock { font-variant-numeric:tabular-nums; color:#fff; font-size:4.5vh; font-weight:600; }
+  #badge { display:none; background:#c62828; color:#fff; padding:0 1vw; border-radius:6px; font-size:2.6vh; }
+  #msg { display:none; background:#ffd54f; color:#000; font-size:5vh; font-weight:700; text-align:center; padding:1vh 2vw; border-radius:10px; }
+  #current { flex:3; display:flex; align-items:center; justify-content:center; text-align:center; white-space:pre-line; font-weight:600; line-height:1.2; }
+  #next { flex:1.4; display:flex; align-items:center; justify-content:center; text-align:center; white-space:pre-line; color:#8a8a8a; border-top:2px solid #333; line-height:1.2; }
+  #nextLbl { color:#555; font-size:2.4vh; text-transform:uppercase; letter-spacing:.1em; }
+  #status { position:fixed; right:1vw; bottom:1vh; color:#c62828; font-size:2vh; }
+</style>
+</head>
+<body>
+<div id="top"><span id="title"></span><span id="section"></span><span id="badge">NEGRO</span><span id="clock"></span></div>
+<div id="msg"></div>
+<div id="current"></div>
+<div id="nextLbl">Sigue</div>
+<div id="next"></div>
+<div id="status"></div>
+<script src="proyecta.js"></script>
+<script>
+"use strict";
+const P = Proyecta, S = P.S, $ = (id) => document.getElementById(id);
+
+// Ajusta el tamaño de letra para que el texto quepa en su caja.
+function fit(box, maxVh) {
+  let size = maxVh;
+  box.style.fontSize = size + "vh";
+  while (size > 2 && (box.scrollHeight > box.clientHeight || box.scrollWidth > box.clientWidth)) {
+    size -= 0.5; box.style.fontSize = size + "vh";
+  }
+}
+
+function render() {
+  const st = S.state;
+  const cur = st.slides[st.index];
+  const next = st.slides[st.index + 1];
+  $("title").textContent = st.title || "";
+  const sec = P.sections(st)[P.currentSection(st)];
+  $("section").textContent = st.isBible ? (cur ? cur.label : "") : (sec ? sec.label : "");
+  $("badge").style.display = st.blank ? "inline" : "none";
+  $("current").textContent = cur ? cur.text : "";
+  $("next").textContent = next ? next.text : "";
+  $("nextLbl").style.visibility = next ? "visible" : "hidden";
+  $("msg").textContent = st.stageMessage || "";
+  $("msg").style.display = st.stageMessage ? "block" : "none";
+  fit($("current"), 9);
+  fit($("next"), 5);
+}
+
+function tick() {
+  const d = new Date();
+  $("clock").textContent = d.toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
+}
+setInterval(tick, 1000); tick();
+window.addEventListener("resize", render);
+
+P.on("state", render);
+P.on("status", () => { $("status").textContent = S.connected ? "" : "Sin conexión con Proyecta…"; });
+P.connect();
+</script>
+</body>
+</html>

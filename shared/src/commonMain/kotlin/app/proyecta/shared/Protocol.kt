@@ -28,7 +28,44 @@ sealed interface ClientMessage {
 
     @Serializable @SerialName("bible")
     data class ShowBible(val reference: String) : ClientMessage
+
+    // --- Lista del culto ---
+    @Serializable @SerialName("plan_add_song")
+    data class PlanAddSong(val id: String) : ClientMessage
+
+    @Serializable @SerialName("plan_add_bible")
+    data class PlanAddBible(val reference: String) : ClientMessage
+
+    @Serializable @SerialName("plan_remove")
+    data class PlanRemove(val index: Int) : ClientMessage
+
+    @Serializable @SerialName("plan_move")
+    data class PlanMove(val from: Int, val to: Int) : ClientMessage
+
+    /** Proyecta el elemento [index] de la lista. */
+    @Serializable @SerialName("plan_go")
+    data class PlanGo(val index: Int) : ClientMessage
+
+    @Serializable @SerialName("plan_next")
+    data object PlanNext : ClientMessage
+
+    @Serializable @SerialName("plan_clear")
+    data object PlanClear : ClientMessage
+
+    /** Mensaje para la vista de escenario ("" lo borra). No se ve en el videobeam. */
+    @Serializable @SerialName("stage_message")
+    data class StageMessage(val text: String) : ClientMessage
 }
+
+@Serializable
+enum class PlanKind { SONG, BIBLE }
+
+/** Un elemento de la lista del culto: una canción (ref = id) o una cita (ref = referencia). */
+@Serializable
+data class PlanItem(val kind: PlanKind, val ref: String, val title: String)
+
+@Serializable
+data class ServicePlanState(val items: List<PlanItem> = emptyList(), val current: Int = -1)
 
 /** Mensajes que el escritorio envía a los remotos conectados. */
 @Serializable
@@ -38,6 +75,9 @@ sealed interface ServerMessage {
 
     @Serializable @SerialName("state")
     data class State(val state: PresentationState) : ServerMessage
+
+    @Serializable @SerialName("plan")
+    data class Plan(val plan: ServicePlanState) : ServerMessage
 
     @Serializable @SerialName("error")
     data class Error(val message: String) : ServerMessage

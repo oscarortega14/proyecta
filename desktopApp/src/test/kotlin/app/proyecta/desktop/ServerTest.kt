@@ -2,6 +2,10 @@ package app.proyecta.desktop
 
 import app.proyecta.shared.ClientMessage
 import app.proyecta.shared.ServerMessage
+import app.proyecta.shared.ServicePlanState
+import io.ktor.client.request.get
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.HttpStatusCode
 import app.proyecta.shared.WS_PATH
 import app.proyecta.shared.decodeServerMessage
 import app.proyecta.shared.encode
@@ -42,8 +46,9 @@ class ServerTest {
             """{"name":"Test","books":[{"name":"Juan","chapters":[["a","b","c"]]}]}""",
         )
         library = Library(dir).also { it.reload() }
-        presenter = Presenter(library)
-        server = RemoteServer(presenter, library, port).also { it.start() }
+        val commands = Commands.create(library)
+        presenter = commands.presenter
+        server = RemoteServer(commands, library, port).also { it.start() }
     }
 
     @AfterTest
@@ -73,11 +78,12 @@ class ServerTest {
                     }
                 }
 
-                // al conectar llegan biblioteca y estado (en cualquier orden)
-                val first = listOf(next(), next())
+                // al conectar llegan biblioteca, lista del culto y estado (en cualquier orden)
+                val first = listOf(next(), next(), next())
                 val lib = first.filterIsInstance<ServerMessage.Library>().single()
                 assertEquals(2, lib.songs.size)
                 assertNotNull(first.filterIsInstance<ServerMessage.State>().singleOrNull())
+                assertNotNull(first.filterIsInstance<ServerMessage.Plan>().singleOrNull())
 
                 send(Frame.Text(ClientMessage.SelectSong("b").encode()))
                 var s = nextState()
@@ -98,7 +104,34 @@ class ServerTest {
                 send(Frame.Text(ClientMessage.ShowBible("juan 9").encode()))
                 val err = next()
                 assertTrue(err is ServerMessage.Error && "capítulo" in err.message)
+
+                // lista del culto: agregar, ir al elemento y pasar al siguiente
+                suspend fun nextPlan(): ServicePlanState {
+                    while (true) { val m = next(); if (m is ServerMessage.Plan) return m.plan }
+                }
+                send(Frame.Text(ClientMessage.PlanAddSong("b").encode()))
+                assertEquals(1, nextPlan().items.size)
+                send(Frame.Text(ClientMessage.PlanAddBible("jn 1:1").encode()))
+                assertEquals(listOf("Beta", "Juan 1:1"), nextPlan().items.map { it.title })
+                send(Frame.Text(ClientMessage.PlanGo(0).encode()))
+                assertEquals("Beta", nextState().title)
+                send(Frame.Text(ClientMessage.PlanNext.encode()))
+                assertEquals("Juan 1:1", nextState().title)
+
+                send(Frame.Text(ClientMessage.StageMessage("  Repetir coro ").encode()))
+                assertEquals("Repetir coro", nextState().stageMessage)
             }
+        }
+        client.close()
+    }
+
+    @Test
+    fun servesTheWebPages() = runBlocking {
+        val client = HttpClient(CIO)
+        for ((path, marker) in listOf("/" to "Control remoto", "/escenario.html" to "Escenario", "/obs.html" to "OBS", "/proyecta.js" to "const Proyecta")) {
+            val r = client.get("http://127.0.0.1:$port$path")
+            assertEquals(HttpStatusCode.OK, r.status, path)
+            assertTrue(marker in r.bodyAsText(), path)
         }
         client.close()
     }

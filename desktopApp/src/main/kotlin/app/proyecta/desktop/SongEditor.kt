@@ -108,6 +108,7 @@ fun SongEditorWindow(
                         TextButton({ value = value.insertBlock("Pregón ${nextNumber(value.text, "Pregón")}:\n") }) { Text("+ Pregón") }
                         TextButton({ value = value.insertBlock("Puente:\n") }) { Text("+ Puente") }
                         TextButton({ value = value.insertBlock("") }) { Text("+ Nueva diapositiva") }
+                        TextButton({ value = value.withOrderLine() }) { Text("+ Orden") }
                         Spacer(Modifier.weight(1f))
                         if (songId != null) {
                             OutlinedButton(
@@ -126,11 +127,12 @@ fun SongEditorWindow(
                             modifier = Modifier.weight(1f).fillMaxHeight(),
                             textStyle = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 15.sp),
                         )
-                        Preview(preview.title, preview.slides, Modifier.width(400.dp).fillMaxHeight())
+                        Preview(preview.title, preview.slides, preview.unknownOrder, Modifier.width(400.dp).fillMaxHeight())
                     }
                     Text(
                         "Formato: la primera línea es \"# Título\". Una línea en blanco separa diapositivas. " +
-                            "\"Coro:\", \"Pregón 1:\"… al inicio de un bloque crean una sección para saltar rápido.",
+                            "\"Coro:\", \"Pregón 1:\"… al inicio de un bloque crean una sección para saltar rápido. " +
+                            "\"Orden: Inicio, Coro, Pregón 1, Coro\" (debajo del título) repite secciones al avanzar.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -164,12 +166,19 @@ fun SongEditorWindow(
 }
 
 @Composable
-private fun Preview(title: String, slides: List<app.proyecta.shared.Slide>, modifier: Modifier) {
+private fun Preview(title: String, slides: List<app.proyecta.shared.Slide>, unknownOrder: List<String>, modifier: Modifier) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(title, style = MaterialTheme.typography.titleMedium)
+        if (unknownOrder.isNotEmpty()) {
+            Text(
+                "En \"Orden:\" no existen: " + unknownOrder.joinToString(", "),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
         val sections = slides.sections()
         Text(
-            "${slides.size} diapositivas" + if (sections.isNotEmpty()) " · secciones: " + sections.joinToString(" · ") { it.label } else "",
+            "${slides.size} diapositivas" + if (sections.isNotEmpty()) " · secciones: " + sections.map { it.label }.distinct().joinToString(" · ") else "",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -211,4 +220,16 @@ internal fun TextFieldValue.insertBlock(snippet: String): TextFieldValue {
 internal fun nextNumber(text: String, label: String): Int {
     val rx = Regex("""^\s*${Regex.escape(label)}\s+(\d+)\s*:""", setOf(RegexOption.MULTILINE, RegexOption.IGNORE_CASE))
     return (rx.findAll(text).maxOfOrNull { it.groupValues[1].toInt() } ?: 0) + 1
+}
+
+/** Agrega (si falta) una línea "Orden:" debajo del título con las secciones actuales. */
+internal fun TextFieldValue.withOrderLine(): TextFieldValue {
+    if (text.lineSequence().any { it.trim().startsWith("Orden", ignoreCase = true) && it.contains(':') }) return this
+    val labels = SongParser.parse("x", text).slides.sections().map { it.label }.distinct()
+    val line = "Orden: " + labels.ifEmpty { listOf("Inicio") }.joinToString(", ")
+    val lines = text.split('\n').toMutableList()
+    val titleAt = lines.indexOfFirst { it.trimStart().startsWith("#") }
+    lines.add(titleAt + 1, line)
+    val newText = lines.joinToString("\n")
+    return TextFieldValue(newText, TextRange(newText.length))
 }
