@@ -99,10 +99,16 @@ fun BackgroundsWindow(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
+                        header("Fondos incluidos")
+                        items(Theme.BUILTINS) { (key, name) ->
+                            Tile(name, theme.image == null && theme.builtin == key, onClick = { themes.update { it.copy(builtin = key, image = null) } }) {
+                                BuiltinBackground(key)
+                            }
+                        }
                         header("Colores")
                         items(Theme.PRESETS) { (name, preset) ->
-                            val selected = theme.image == null && theme.color == preset.color && theme.color2 == preset.color2
-                            Tile(name, selected, onClick = { themes.update { it.copy(color = preset.color, color2 = preset.color2, image = null) } }) {
+                            val selected = theme.image == null && theme.builtin == null && theme.color == preset.color && theme.color2 == preset.color2
+                            Tile(name, selected, onClick = { themes.update { it.copy(color = preset.color, color2 = preset.color2, image = null, builtin = null) } }) {
                                 val top = hexColor(preset.color)
                                 val bottom = preset.color2?.let(::hexColor) ?: top
                                 Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(top, bottom))))
@@ -168,7 +174,7 @@ fun BackgroundsWindow(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        LabeledSlider("Oscurecer la imagen", theme.dim, 0f..0.85f, enabled = theme.image != null || state.background != null) { v ->
+                        LabeledSlider("Oscurecer el fondo", theme.dim, 0f..0.85f, enabled = theme.image != null || theme.builtin != null || state.background != null) { v ->
                             themes.update { it.copy(dim = v) }
                         }
                         LabeledSlider("Tamaño de la letra", theme.fontScale, 0.6f..1.4f) { v -> themes.update { it.copy(fontScale = v) } }

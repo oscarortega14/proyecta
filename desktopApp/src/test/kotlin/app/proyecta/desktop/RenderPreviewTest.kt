@@ -31,7 +31,7 @@ class RenderPreviewTest {
         val verse = PresentationState("Juan 3:16", listOf(Slide("Juan 3:16", "Porque de tal manera amó Dios al mundo, que ha dado á su Hijo unigénito, para que todo aquel que en él cree, no se pierda, mas tenga vida eterna.")), 0, isBible = true)
 
         val cases = listOf(
-            "1-negro" to (song to Theme()),
+            "1-negro" to (song to Theme(builtin = null)),
             "2-azul-noche" to (song to Theme.PRESETS[1].second),
             "3-imagen" to (song to Theme(image = "bg", dim = 0.35f)),
             "4-imagen-crema-biblia" to (verse to Theme(image = "bg", dim = 0.5f, textColor = "#FFF4D6")),
@@ -42,8 +42,14 @@ class RenderPreviewTest {
         )
         // El caso reportado: ventana de proyección de ~1180x630 con palabras largas al final.
         val reported = PresentationState("A", listOf(Slide("Pregón 3", "Con la fe en Jesucristo tengo el poder\nUn poder como ninguno, tesoro invaluable")), 0)
-        ImageComposeScene(1180, 630, Density(1.25f)) { ProjectorScreen(reported, look = Look(Theme())) }.use { scene ->
+        ImageComposeScene(1180, 630, Density(1.25f)) { ProjectorScreen(reported, look = Look(Theme(builtin = null))) }.use { scene ->
             File(outDir, "9-caso-reportado.png").writeBytes(scene.render(0).encodeToData(EncodedImageFormat.PNG)!!.bytes)
+        }
+        // Los fondos incluidos, con letra encima (como se verían en el videobeam).
+        for ((key, _) in Theme.BUILTINS) {
+            ImageComposeScene(1280, 720, Density(1f)) { ProjectorScreen(song, look = Look(Theme(builtin = key))) }.use { scene ->
+                File(outDir, "fondo-$key.png").writeBytes(scene.render(0).encodeToData(EncodedImageFormat.PNG)!!.bytes)
+            }
         }
         for ((name, pair) in cases) {
             val (state, theme) = pair

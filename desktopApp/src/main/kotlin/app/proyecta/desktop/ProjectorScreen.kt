@@ -150,8 +150,13 @@ private fun Background(theme: Theme, image: ImageBitmap?) {
     val bottom = theme.color2?.let(::hexColor)
     val fill = if (bottom != null) Modifier.background(Brush.verticalGradient(listOf(top, bottom))) else Modifier.background(top)
     Box(Modifier.fillMaxSize().then(fill))
-    if (image != null) {
-        Image(image, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+    // Prioridad: imagen (de la canción o del tema) > fondo incluido > color/degradado.
+    val builtin = theme.builtin?.takeIf { BuiltinBackgrounds.has(it) }
+    when {
+        image != null -> Image(image, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        builtin != null -> BuiltinBackground(builtin)
+    }
+    if (image != null || builtin != null) {
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = theme.dim)))
     }
 }

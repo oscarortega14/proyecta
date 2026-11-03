@@ -213,6 +213,12 @@ class ThemeAndBackgroundTest {
         val t = Theme(color = "rojo", color2 = "#12", image = " ", dim = 3f, textColor = "#ffffff", fontScale = 9f).sanitized()
         assertEquals(Theme(color = "#000000", color2 = null, image = null, dim = 0.85f, textColor = "#ffffff", fontScale = 1.4f), t)
         assertTrue(Theme.PRESETS.all { it.second == it.second.sanitized() })
+        assertEquals("luz", Theme().builtin)                       // el predeterminado ya no es negro
+        assertNull(Theme(builtin = "no-existe").sanitized().builtin)
+        assertTrue(Theme.PRESETS.all { it.second.builtin == null })
+        assertEquals(Theme.BUILTINS.size, Theme.BUILTINS.map { it.first }.toSet().size)
+        // un tema guardado antes de existir "builtin" toma el fondo incluido predeterminado
+        assertEquals("luz", ProtocolJson.decodeFromString(Theme.serializer(), "{\"color\":\"#000000\"}").builtin)
     }
 }
 

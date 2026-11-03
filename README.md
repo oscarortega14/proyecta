@@ -82,6 +82,8 @@ El botón "+ Orden" del editor la agrega con las secciones existentes.
 - **Buscar en la Biblia por frase**: escribe palabras ("amó Dios mundo") en vez de una cita y presiona "Buscar".
 - **Atajos de teclado**: → ↓ Espacio siguiente · ← ↑ anterior · `C` coro · `1`–`9` secciones · `B` negro ·
   `L` logo · `N` siguiente de la lista · `Esc` mostrar letra (o salir de un campo de texto) · Av Pág / Re Pág (clickers).
+- **Fondos incluidos** (dibujados por el programa, sin archivos ni licencias): Luz celestial (predeterminado),
+  Aurora, Bokeh dorado, Atardecer, Noche estrellada, Océano y Calvario.
 - **Fondos y letra** (botón "Fondos y letra…"): fondos de color o degradado incluidos, o tus propias imágenes
   `.jpg`/`.png` en `Proyecta/fondos` (mejor 1920×1080); oscurecer la imagen, color y tamaño de la letra, sombra.
   Se guarda en `Proyecta/tema.json`. Fondo propio por canción con la línea `Fondo: archivo.jpg` debajo del título
