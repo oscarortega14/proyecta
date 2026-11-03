@@ -28,6 +28,12 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.runtime.remember
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -39,7 +45,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.math.ceil
 
 /** Tema actual y cómo encontrar el archivo de una imagen de fondo. */
 data class Look(val theme: Theme = Theme(), val backgroundFile: (String) -> File? = { null })
@@ -155,10 +160,16 @@ private fun Background(theme: Theme, image: ImageBitmap?) {
 private fun SlideText(state: PresentationState, text: String, label: String, theme: Theme, width: Dp, height: Dp) {
     val pad = width * 0.05f
     val showLabel = state.isBible && label.isNotEmpty()
-    // fontScale > 1 solo sube el tope (si el texto cabe); < 1 achica lo calculado.
-    val size = fitFontSize(text, width - pad * 2, height - pad * 2, showLabel, maxSize = 110f * theme.fontScale.coerceAtLeast(1f)) *
-        theme.fontScale.coerceAtMost(1f)
     val color = hexColor(theme.textColor)
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val availW = with(density) { (width - pad * 2).roundToPx() }.coerceAtLeast(1)
+    val availH = with(density) { (height - pad * 2).roundToPx() }.coerceAtLeast(1)
+    // fontScale > 1 solo sube el tope (si el texto cabe); < 1 achica lo calculado.
+    val maxSize = 110f * theme.fontScale.coerceAtLeast(1f)
+    val size = remember(text, label, showLabel, availW, availH, maxSize, density) {
+        fitFontSizeMeasured(measurer, density, text, if (showLabel) label else null, availW, availH, maxSize)
+    } * theme.fontScale.coerceAtMost(1f)
     val shadow = if (theme.shadow) Shadow(Color.Black.copy(alpha = 0.9f), Offset(2f, 3f), blurRadius = size / 5) else null
 
     Column(
@@ -166,42 +177,60 @@ private fun SlideText(state: PresentationState, text: String, label: String, the
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(
-            text,
-            style = TextStyle(
-                color = color,
-                fontSize = size.sp,
-                lineHeight = (size * 1.2f).sp,
-                fontWeight = FontWeight.SemiBold,
-                textAlign = TextAlign.Center,
-                shadow = shadow,
-            ),
-        )
+        Text(text, style = slideStyle(size).copy(color = color, shadow = shadow))
         if (showLabel) {
-            Spacer(Modifier.height((size * 0.4f).dp))
-            Text(
-                label,
-                style = TextStyle(color = color.copy(alpha = 0.75f), fontSize = (size * 0.55f).sp, textAlign = TextAlign.Center, shadow = shadow),
-            )
+            Spacer(Modifier.height(with(density) { (size * LABEL_GAP).sp.toDp() }))
+            Text(label, style = labelStyle(size).copy(color = color.copy(alpha = 0.75f), shadow = shadow))
         }
     }
 }
 
+private const val LABEL_GAP = 0.4f
+
+internal fun slideStyle(size: Float) = TextStyle(
+    fontSize = size.sp,
+    lineHeight = (size * 1.2f).sp,
+    fontWeight = FontWeight.SemiBold,
+    textAlign = TextAlign.Center,
+)
+
+internal fun labelStyle(size: Float) = TextStyle(fontSize = (size * 0.55f).sp, textAlign = TextAlign.Center)
+
 /**
- * Tamaño de letra más grande con el que el texto cabe en el área.
- * Estimación: un carácter mide ~0.55 del tamaño de la fuente y una línea 1.2.
+ * El tamaño de letra más grande (en sp) con el que el texto cabe de verdad en [widthPx]×[heightPx].
+ * Mide con el mismo motor que dibuja, así que el corte por palabras está incluido. Además
+ * exige que ninguna palabra sea más ancha que el área, para no partir palabras a la mitad.
  */
-internal fun fitFontSize(text: String, width: Dp, height: Dp, withLabel: Boolean, maxSize: Float = 110f): Float {
-    val lines = text.split('\n')
-    var size = (height.value / 3f).coerceAtMost(maxSize)
-    while (size > 10f) {
-        val charsPerLine = (width.value / (size * 0.55f)).coerceAtLeast(1f)
-        val wrapped = lines.sumOf { ceil(it.length.coerceAtLeast(1) / charsPerLine).toInt() }
-        val needed = wrapped * size * 1.2f + if (withLabel) size * 1.1f else 0f
-        if (needed <= height.value) return size
-        size -= 2f
+internal fun fitFontSizeMeasured(
+    measurer: TextMeasurer,
+    density: Density,
+    text: String,
+    label: String?,
+    widthPx: Int,
+    heightPx: Int,
+    maxSize: Float = 110f,
+    minSize: Float = 8f,
+): Float {
+    val longestWords = text.split(Regex("\\s+")).filter { it.isNotEmpty() }.sortedByDescending { it.length }.take(3)
+    val unbounded = Constraints()
+    fun fits(sp: Float): Boolean {
+        val style = slideStyle(sp)
+        if (longestWords.any { measurer.measure(it, style, constraints = unbounded, density = density).size.width > widthPx }) return false
+        var h = measurer.measure(text, style, constraints = Constraints(maxWidth = widthPx), density = density).size.height
+        if (label != null) {
+            h += measurer.measure(label, labelStyle(sp), constraints = Constraints(maxWidth = widthPx), density = density).size.height
+            h += with(density) { (sp * LABEL_GAP).sp.roundToPx() }
+        }
+        return h <= heightPx
     }
-    return 10f
+    if (fits(maxSize)) return maxSize
+    var lo = minSize
+    var hi = maxSize
+    repeat(12) {
+        val mid = (lo + hi) / 2
+        if (fits(mid)) lo = mid else hi = mid
+    }
+    return lo
 }
 
 /** "#RRGGBB" -> Color (negro si está mal escrito). */

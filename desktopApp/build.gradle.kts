@@ -31,7 +31,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Deb)
             packageName = "Proyecta"
-            packageVersion = "1.1.0"
+            packageVersion = "1.1.1"
             description = "Proyección de canciones y Biblia con control remoto"
             vendor = "Proyecta"
             copyright = "MIT License"

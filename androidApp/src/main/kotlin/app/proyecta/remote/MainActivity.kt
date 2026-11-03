@@ -32,7 +32,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
@@ -60,6 +59,8 @@ import app.proyecta.shared.ClientMessage
 import app.proyecta.shared.PresentationState
 import app.proyecta.shared.SongSummary
 import app.proyecta.shared.search
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.material3.ScrollableTabRow
 import app.proyecta.shared.ServerMessage
 import app.proyecta.shared.ServicePlanState
 import app.proyecta.shared.PlanKind
@@ -123,9 +124,10 @@ private fun RemoteApp(client: RemoteClient, savedHost: String, onConnect: (Strin
         if (editingHost) {
             ConnectForm(savedHost) { host -> editingHost = false; onConnect(host) }
         } else {
-            TabRow(selectedTabIndex = tab) {
+            // Desplazable: en celulares angostos las pestañas no parten las palabras.
+            ScrollableTabRow(selectedTabIndex = tab, edgePadding = 0.dp) {
                 listOf("En pantalla", "Canciones", "Biblia", "Lista", "Más").forEachIndexed { i, title ->
-                    Tab(selected = tab == i, onClick = { tab = i }, text = { Text(title) })
+                    Tab(selected = tab == i, onClick = { tab = i }, text = { Text(title, maxLines = 1, softWrap = false) })
                 }
             }
             Column(Modifier.weight(1f).fillMaxWidth().padding(12.dp)) {
@@ -314,7 +316,8 @@ private fun Controls(state: PresentationState, send: (ClientMessage) -> Unit) {
             { send(ClientMessage.SetBlank(!state.blank)) },
             Modifier.weight(1f).height(72.dp),
             colors = if (state.blank) ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.errorContainer) else ButtonDefaults.outlinedButtonColors(),
-        ) { Text(if (state.blank) "Mostrar" else "Negro", fontSize = 18.sp) }
+            contentPadding = PaddingValues(horizontal = 4.dp),
+        ) { Text(if (state.blank) "Mostrar" else "Negro", fontSize = 17.sp, maxLines = 1, softWrap = false) }
         Button({ send(ClientMessage.Next) }, Modifier.weight(1.6f).height(72.dp)) { Text("▶", fontSize = 26.sp) }
     }
 }

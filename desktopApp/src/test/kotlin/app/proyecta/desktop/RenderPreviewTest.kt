@@ -40,6 +40,11 @@ class RenderPreviewTest {
             "7-logo" to (song.copy(logo = true) to Theme(image = "bg", logo = "bg")),
             "8-alerta" to (song.copy(alert = "Se busca al dueño del carro de placas ABC123, favor acercarse a la entrada") to Theme.PRESETS[1].second),
         )
+        // El caso reportado: ventana de proyección de ~1180x630 con palabras largas al final.
+        val reported = PresentationState("A", listOf(Slide("Pregón 3", "Con la fe en Jesucristo tengo el poder\nUn poder como ninguno, tesoro invaluable")), 0)
+        ImageComposeScene(1180, 630, Density(1.25f)) { ProjectorScreen(reported, look = Look(Theme())) }.use { scene ->
+            File(outDir, "9-caso-reportado.png").writeBytes(scene.render(0).encodeToData(EncodedImageFormat.PNG)!!.bytes)
+        }
         for ((name, pair) in cases) {
             val (state, theme) = pair
             val look = Look(theme) { bg }
