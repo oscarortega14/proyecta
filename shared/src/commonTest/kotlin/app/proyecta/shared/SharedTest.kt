@@ -199,6 +199,23 @@ class SongOrderTest {
     }
 }
 
+class ThemeAndBackgroundTest {
+    @Test
+    fun readsTheFondoLine() {
+        val song = SongParser.parse("x", "# T\nFondo: montañas.jpg\nOrden: Coro, Coro\n\nCoro:\nla la\n")
+        assertEquals("montañas.jpg", song.background)
+        assertEquals(2, song.slides.size)
+        assertNull(SongParser.parse("x", "# T\n\nletra\n\nFondo: no es la línea\n").background)
+    }
+
+    @Test
+    fun sanitizesThemes() {
+        val t = Theme(color = "rojo", color2 = "#12", image = " ", dim = 3f, textColor = "#ffffff", fontScale = 9f).sanitized()
+        assertEquals(Theme(color = "#000000", color2 = null, image = null, dim = 0.85f, textColor = "#ffffff", fontScale = 1.4f), t)
+        assertTrue(Theme.PRESETS.all { it.second == it.second.sanitized() })
+    }
+}
+
 class ProtocolTest {
     @Test
     fun roundTripsPlanAndStageMessages() {

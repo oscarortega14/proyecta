@@ -1,0 +1,216 @@
+package app.proyecta.desktop
+
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.rememberWindowState
+import app.proyecta.shared.PresentationState
+import app.proyecta.shared.Slide
+import app.proyecta.shared.Theme
+import java.awt.Desktop
+import kotlin.math.roundToInt
+
+private val SAMPLE = PresentationState(
+    title = "Vista previa",
+    slides = listOf(Slide(text = "Cuán grande es Él\nCuán grande es Él")),
+    index = 0,
+)
+
+@Composable
+fun BackgroundsWindow(
+    library: Library,
+    themes: ThemeStore,
+    presenter: Presenter,
+    onClose: () -> Unit,
+) {
+    val theme by themes.theme.collectAsState()
+    val state by presenter.state.collectAsState()
+    var refresh by remember { mutableIntStateOf(0) }
+    val images = remember(refresh) { library.backgrounds() }
+    var message by remember { mutableStateOf<String?>(null) }
+    val songId = state.songId
+    val preview = if (state.current != null && !state.blank) state else SAMPLE
+
+    fun setSongBackground(name: String?) {
+        val id = songId ?: return
+        message = try {
+            val newId = library.setSongBackground(id, name)
+            presenter.songSaved(id, newId)
+            if (name == null) "Se quitó el fondo propio de «${state.title}»" else "«${state.title}» usa ahora $name"
+        } catch (e: Exception) {
+            "No pude cambiar la canción: ${e.message}"
+        }
+    }
+
+    Window(
+        onCloseRequest = onClose,
+        title = "Fondos y letra",
+        state = rememberWindowState(size = DpSize(1200.dp, 760.dp)),
+    ) {
+        MaterialTheme(colorScheme = darkColorScheme()) {
+            Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                Row(Modifier.fillMaxSize().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    // --- Elegir fondo ---
+                    LazyVerticalGrid(
+                        GridCells.Adaptive(150.dp),
+                        Modifier.weight(1f).fillMaxHeight(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        header("Colores")
+                        items(Theme.PRESETS) { (name, preset) ->
+                            val selected = theme.image == null && theme.color == preset.color && theme.color2 == preset.color2
+                            Tile(name, selected, onClick = { themes.update { it.copy(color = preset.color, color2 = preset.color2, image = null) } }) {
+                                val top = hexColor(preset.color)
+                                val bottom = preset.color2?.let(::hexColor) ?: top
+                                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(top, bottom))))
+                            }
+                        }
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Imágenes (${images.size})", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                                TextButton({ refresh++ }) { Text("Actualizar") }
+                                TextButton({ runCatching { Desktop.getDesktop().open(library.backgroundsDir) } }) { Text("Abrir carpeta de fondos") }
+                            }
+                        }
+                        if (images.isEmpty()) {
+                            item(span = { GridItemSpan(maxLineSpan) }) {
+                                Text(
+                                    "Copia fotos .jpg o .png en ${library.backgroundsDir.absolutePath} y presiona \"Actualizar\". " +
+                                        "Las de 1920×1080 se ven mejor.",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        items(images, key = { it }) { name ->
+                            Column {
+                                Tile(name, theme.image == name, onClick = { themes.update { it.copy(image = name) } }) {
+                                    val bmp = rememberBackground(library.backgroundFile(name))
+                                    if (bmp != null) Image(bmp, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                                }
+                                if (songId != null) {
+                                    TextButton({ setSongBackground(name) }, Modifier.fillMaxWidth()) {
+                                        Text(
+                                            if (state.background == name) "✓ De esta canción" else "Solo esta canción",
+                                            style = MaterialTheme.typography.labelSmall,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // --- Vista previa y letra ---
+                    Column(Modifier.width(440.dp).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("Vista previa", style = MaterialTheme.typography.titleMedium)
+                        Surface(Modifier.fillMaxWidth().aspectRatio(16f / 9f), shape = MaterialTheme.shapes.small) {
+                            ProjectorScreen(preview, look = LocalLook.current.copy(theme = theme))
+                        }
+                        if (state.background != null) {
+                            Text(
+                                "La canción en pantalla tiene su propio fondo: ${state.background}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            OutlinedButton({ setSongBackground(null) }) { Text("Quitar el fondo propio de la canción") }
+                        }
+
+                        LabeledSlider("Oscurecer la imagen", theme.dim, 0f..0.85f, enabled = theme.image != null || state.background != null) { v ->
+                            themes.update { it.copy(dim = v) }
+                        }
+                        LabeledSlider("Tamaño de la letra", theme.fontScale, 0.6f..1.4f) { v -> themes.update { it.copy(fontScale = v) } }
+
+                        Text("Color de la letra", style = MaterialTheme.typography.titleSmall)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            for ((name, hex) in Theme.TEXT_COLORS) {
+                                FilterChip(
+                                    selected = theme.textColor.equals(hex, ignoreCase = true),
+                                    onClick = { themes.update { it.copy(textColor = hex) } },
+                                    label = { Text(name) },
+                                    leadingIcon = { Box(Modifier.width(14.dp).aspectRatio(1f).clip(RoundedCornerShape(3.dp)).background(hexColor(hex))) },
+                                )
+                            }
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Sombra detrás de la letra", modifier = Modifier.weight(1f))
+                            Switch(theme.shadow, { v -> themes.update { it.copy(shadow = v) } })
+                        }
+                        message?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+                        Text(
+                            "Los cambios se ven al instante en el videobeam. \"Pantalla negra\" sigue siendo negro total.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun androidx.compose.foundation.lazy.grid.LazyGridScope.header(text: String) =
+    item(span = { GridItemSpan(maxLineSpan) }) { Text(text, style = MaterialTheme.typography.titleMedium) }
+
+@Composable
+private fun Tile(name: String, selected: Boolean, onClick: () -> Unit, content: @Composable () -> Unit) {
+    Column(Modifier.clickable(onClick = onClick)) {
+        Box(
+            Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(6.dp))
+                .border(
+                    if (selected) BorderStroke(3.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    RoundedCornerShape(6.dp),
+                ),
+        ) { content() }
+        Text(name, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
+    }
+}
+
+@Composable
+private fun LabeledSlider(label: String, value: Float, range: ClosedFloatingPointRange<Float>, enabled: Boolean = true, onChange: (Float) -> Unit) {
+    Column {
+        Text("$label: ${(value * 100).roundToInt()}%", style = MaterialTheme.typography.titleSmall)
+        Slider(value, onChange, valueRange = range, enabled = enabled)
+    }
+}

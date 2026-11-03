@@ -31,7 +31,10 @@ class Presenter(private val library: Library) {
     private fun selectSong(id: String): String? {
         val song = library.song(id) ?: return "Canción no encontrada (¿se borró el archivo?)"
         _state.update {
-            PresentationState(song.title, song.slides, if (song.slides.isEmpty()) -1 else 0, blank = it.blank, songId = song.id, stageMessage = it.stageMessage)
+            PresentationState(
+                song.title, song.slides, if (song.slides.isEmpty()) -1 else 0, blank = it.blank,
+                songId = song.id, stageMessage = it.stageMessage, background = song.background,
+            )
         }
         return null
     }
@@ -49,7 +52,7 @@ class Presenter(private val library: Library) {
                 song.slides.isEmpty() -> -1
                 else -> s.index.coerceIn(0, song.slides.lastIndex)
             }
-            s.copy(title = song.title, slides = song.slides, index = idx, songId = song.id)
+            s.copy(title = song.title, slides = song.slides, index = idx, songId = song.id, background = song.background)
         }
     }
 

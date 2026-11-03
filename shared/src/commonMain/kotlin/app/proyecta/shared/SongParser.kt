@@ -18,10 +18,13 @@ package app.proyecta.shared
  * - Opcional, antes de la primera estrofa: "Orden: Inicio, Coro, Pregón 1, Coro" arma la
  *   secuencia repitiendo secciones sin copiar el texto. "Inicio" es lo que va antes de la
  *   primera etiqueta. Los nombres que no existen se ignoran (y se reportan en unknownOrder).
+ * - Opcional, también antes de la primera estrofa: "Fondo: montañas.jpg" usa esa imagen
+ *   (de la carpeta Proyecta/fondos) solo para esta canción.
  */
 object SongParser {
     private const val MAX_LABEL = 30
     private val ORDER_LINE = Regex("""^orden\s*:(.*)$""", RegexOption.IGNORE_CASE)
+    private val BACKGROUND_LINE = Regex("""^fondo\s*:(.*)$""", RegexOption.IGNORE_CASE)
     const val START_LABEL = "Inicio"
 
     fun parse(id: String, text: String, fallbackTitle: String = id): Song {
@@ -30,6 +33,7 @@ object SongParser {
         val blocks = mutableListOf<List<String>>()
         var current = mutableListOf<String>()
         var order: List<String>? = null
+        var background: String? = null
 
         for (raw in text.removePrefix("﻿").replace("\r\n", "\n").replace('\r', '\n').split('\n')) {
             val line = raw.trim()
@@ -41,6 +45,11 @@ object SongParser {
             val orderMatch = ORDER_LINE.matchEntire(line)
             if (orderMatch != null && order == null && blocks.isEmpty() && current.isEmpty()) {
                 order = orderMatch.groupValues[1].split(',', ';').map { it.trim() }.filter { it.isNotEmpty() }
+                continue
+            }
+            val bgMatch = BACKGROUND_LINE.matchEntire(line)
+            if (bgMatch != null && background == null && blocks.isEmpty() && current.isEmpty()) {
+                background = bgMatch.groupValues[1].trim().ifEmpty { null }
                 continue
             }
             if (line.isEmpty()) {
@@ -59,8 +68,8 @@ object SongParser {
                 Slide(text = block.joinToString("\n"))
             }
         }
-        if (order.isNullOrEmpty()) return Song(id, title, slides)
-        return expand(id, title, slides, order)
+        val song = if (order.isNullOrEmpty()) Song(id, title, slides) else expand(id, title, slides, order)
+        return song.copy(background = background)
     }
 
     private fun expand(id: String, title: String, slides: List<Slide>, order: List<String>): Song {

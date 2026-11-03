@@ -66,6 +66,7 @@ fun OperatorScreen(
     onReload: () -> Unit,
     onOpenFolder: () -> Unit,
     onEdit: (songId: String?) -> Unit,
+    onOpenBackgrounds: () -> Unit,
 ) {
     var message by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(message) { if (message != null) { delay(5000); message = null } }
@@ -78,7 +79,7 @@ fun OperatorScreen(
             SlidesPanel(state, Modifier.weight(1f).fillMaxHeight(), send, onEdit)
             ControlPanel(
                 state, addresses, port, serverError ?: message, projectorOn, onToggleProjector,
-                Modifier.width(300.dp).fillMaxHeight(), send,
+                Modifier.width(300.dp).fillMaxHeight(), send, onOpenBackgrounds,
             )
         }
     }
@@ -204,6 +205,7 @@ private fun ControlPanel(
     onToggleProjector: () -> Unit,
     modifier: Modifier,
     send: (ClientMessage) -> Unit,
+    onOpenBackgrounds: () -> Unit,
 ) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("En pantalla", style = MaterialTheme.typography.titleMedium)
@@ -217,6 +219,7 @@ private fun ControlPanel(
         OutlinedButton({ send(ClientMessage.SetBlank(!state.blank)) }, Modifier.fillMaxWidth()) {
             Text(if (state.blank) "Mostrar texto" else "Pantalla negra")
         }
+        OutlinedButton(onOpenBackgrounds, Modifier.fillMaxWidth()) { Text("Fondos y letra…") }
         OutlinedButton(onToggleProjector, Modifier.fillMaxWidth()) {
             Text(if (projectorOn) "Cerrar ventana de proyección" else "Abrir ventana de proyección")
         }

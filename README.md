@@ -75,6 +75,10 @@ El botón "+ Orden" del editor la agrega con las secciones existentes.
 
 ## Funciones
 
+- **Fondos y letra** (botón "Fondos y letra…"): fondos de color o degradado incluidos, o tus propias imágenes
+  `.jpg`/`.png` en `Proyecta/fondos` (mejor 1920×1080); oscurecer la imagen, color y tamaño de la letra, sombra.
+  Se guarda en `Proyecta/tema.json`. Fondo propio por canción con la línea `Fondo: archivo.jpg` debajo del título
+  (o el botón "Solo esta canción").
 - **Editor de canciones** con vista previa en vivo (botones "Editar" y "+ Nueva").
 - **Saltos por sección**: botones Coro · Pregón 1 · Puente… en el PC, la tablet y el control web.
 - **Lista del culto**: prepara el orden de canciones y lecturas ("+ Lista"); "Siguiente elemento ▶" pasa al próximo.
@@ -106,6 +110,7 @@ Requisitos: JDK 17. Para Android, además el SDK de Android (`scripts/setup-wsl.
 ```bash
 ./gradlew test                                  # pruebas
 PROYECTA_VPL=/ruta/spaRV1909_vpl.txt ./gradlew :desktopApp:test   # incluye la Biblia real
+PROYECTA_RENDER_DIR=/tmp/out PROYECTA_BG=/ruta/fondo.png ./gradlew :desktopApp:test --tests '*RenderPreviewTest*'  # PNGs de la proyección
 ./gradlew :desktopApp:run                       # abrir el programa de escritorio
 ./gradlew :androidApp:assembleRelease           # APK del control remoto
 adb install -r androidApp/build/outputs/apk/release/androidApp-release.apk

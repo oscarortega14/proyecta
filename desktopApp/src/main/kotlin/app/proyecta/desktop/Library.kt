@@ -29,6 +29,7 @@ data class Catalog(
 class Library(val baseDir: File) {
     val songsDir = File(baseDir, "canciones")
     val bibleDir = File(baseDir, "biblia")
+    val backgroundsDir = File(baseDir, "fondos")
 
     @Volatile private var songs: Map<String, Song> = emptyMap()
     @Volatile var bible: Bible? = null
@@ -78,6 +79,31 @@ class Library(val baseDir: File) {
         return newId
     }
 
+    /** Imágenes disponibles en Proyecta/fondos (nombres de archivo, en orden alfabético). */
+    fun backgrounds(): List<String> {
+        backgroundsDir.mkdirs()
+        return backgroundsDir.listFiles { f -> f.isFile && f.extension.lowercase() in IMAGE_EXTENSIONS }
+            .orEmpty().map { it.name }.sortedBy { it.lowercase() }
+    }
+
+    fun backgroundFile(name: String): File? =
+        File(backgroundsDir, name).takeIf { it.isFile && it.parentFile == backgroundsDir }
+
+    /**
+     * Pone (o quita, con null) la línea "Fondo:" de una canción, justo debajo del título,
+     * conservando el resto del texto. Devuelve el id de la canción.
+     */
+    @Synchronized
+    fun setSongBackground(id: String, background: String?): String {
+        val text = rawText(id) ?: throw IllegalArgumentException("Canción no encontrada")
+        val lines = text.replace("\r\n", "\n").split('\n').filterNot { FONDO_LINE.matches(it.trim()) }.toMutableList()
+        if (background != null) {
+            val titleAt = lines.indexOfFirst { it.trimStart().startsWith("#") }
+            lines.add(titleAt + 1, "Fondo: $background")
+        }
+        return save(id, lines.joinToString("\n"))
+    }
+
     @Synchronized
     fun delete(id: String) {
         songFile(id).delete()
@@ -88,6 +114,7 @@ class Library(val baseDir: File) {
     fun reload() {
         songsDir.mkdirs()
         bibleDir.mkdirs()
+        backgroundsDir.mkdirs()
         if (songsDir.listFiles { f -> f.isSongFile() }.isNullOrEmpty()) writeExampleSong()
 
         val loaded = songsDir.listFiles { f -> f.isSongFile() }.orEmpty()
@@ -136,6 +163,8 @@ class Library(val baseDir: File) {
     }
 
     companion object {
+        val IMAGE_EXTENSIONS = setOf("jpg", "jpeg", "png", "webp", "bmp")
+        private val FONDO_LINE = Regex("""^fondo\s*:.*$""", RegexOption.IGNORE_CASE)
         private val FORBIDDEN = Regex("""[\\/:*?"<>|\u0000-\u001F]""")
 
         /** "Salmo 2:7" -> "Salmo 2-7": caracteres que Windows no permite en nombres de archivo. */

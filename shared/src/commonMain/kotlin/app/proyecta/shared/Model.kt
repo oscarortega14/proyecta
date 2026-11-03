@@ -29,6 +29,8 @@ data class PresentationState(
     val songId: String? = null,
     /** Mensaje del operador para la vista de escenario (no sale en el videobeam). */
     val stageMessage: String = "",
+    /** Fondo propio de la canción en pantalla (archivo en Proyecta/fondos), si tiene. */
+    val background: String? = null,
 ) {
     val current: Slide? get() = slides.getOrNull(index)
 
@@ -86,6 +88,8 @@ data class Song(
     val slides: List<Slide>,
     /** Nombres de la línea "Orden:" que no corresponden a ninguna sección. */
     val unknownOrder: List<String> = emptyList(),
+    /** Línea "Fondo:" de la canción: archivo en Proyecta/fondos. */
+    val background: String? = null,
 ) {
     fun summary() = SongSummary(id, title, slides.firstOrNull()?.text?.lineSequence()?.firstOrNull().orEmpty())
 }

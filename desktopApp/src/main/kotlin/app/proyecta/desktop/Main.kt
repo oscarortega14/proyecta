@@ -36,6 +36,7 @@ fun main() {
         "No pude abrir el puerto ${server.port} para el control remoto: ${it.message}"
     }
     val addresses = RemoteServer.localAddresses()
+    val themes = ThemeStore(File(library.baseDir, "tema.json"))
 
     application {
         val state by presenter.state.collectAsState()
@@ -43,7 +44,11 @@ fun main() {
         val plan by commands.plan.state.collectAsState()
         var projectorOn by remember { mutableStateOf(true) }
         var editing by remember { mutableStateOf<EditRequest?>(null) }
+        var backgroundsOpen by remember { mutableStateOf(false) }
+        val theme by themes.theme.collectAsState()
+        val look = Look(theme) { name -> library.backgroundFile(name) }
 
+        ProvideLook(look) {
         Window(
             onCloseRequest = { server.stop(); exitApplication() },
             title = "Proyecta — Operador",
@@ -64,8 +69,13 @@ fun main() {
                     onReload = { library.reload() },
                     onOpenFolder = { runCatching { Desktop.getDesktop().open(library.baseDir) } },
                     onEdit = { id -> editing = EditRequest(id) },
+                    onOpenBackgrounds = { backgroundsOpen = true },
                 )
             }
+        }
+
+        if (backgroundsOpen) {
+            BackgroundsWindow(library, themes, presenter, onClose = { backgroundsOpen = false })
         }
 
         editing?.let { req ->
@@ -75,6 +85,7 @@ fun main() {
         if (projectorOn) {
             ProjectorWindow(state, onClose = { projectorOn = false }, onKey = { handleKey(it, presenter) })
         }
+        } // ProvideLook
     }
 }
 
