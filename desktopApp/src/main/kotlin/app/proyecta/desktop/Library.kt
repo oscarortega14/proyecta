@@ -86,6 +86,13 @@ class Library(val baseDir: File) {
             .orEmpty().map { it.name }.sortedBy { it.lowercase() }
     }
 
+    /** Videos para fondo en Proyecta/fondos (se reproducen con VLC). */
+    fun videos(): List<String> {
+        backgroundsDir.mkdirs()
+        return backgroundsDir.listFiles { f -> f.isFile && isVideoFile(f.name) }
+            .orEmpty().map { it.name }.sortedBy { it.lowercase() }
+    }
+
     fun backgroundFile(name: String): File? =
         File(backgroundsDir, name).takeIf { it.isFile && it.parentFile == backgroundsDir }
 

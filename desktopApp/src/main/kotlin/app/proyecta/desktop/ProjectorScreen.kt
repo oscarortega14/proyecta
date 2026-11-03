@@ -64,7 +64,10 @@ fun ProvideLook(look: Look, content: @Composable () -> Unit) = CompositionLocalP
 fun ProjectorScreen(state: PresentationState, modifier: Modifier = Modifier, look: Look = LocalLook.current) {
     val theme = look.theme
     val imageName = state.background ?: theme.image
-    val image = rememberBackground(imageName?.let(look.backgroundFile))
+    val bgFile = imageName?.let(look.backgroundFile)
+    // Un video solo se usa si VLC está disponible; si no, se cae al fondo incluido o al color.
+    val video = bgFile?.takeIf { isVideoFile(it.name) && VideoBackgrounds.available }
+    val image = rememberBackground(bgFile?.takeIf { !isVideoFile(it.name) })
 
     val logo = rememberBackground(theme.logo?.let(look.backgroundFile))
     val now = rememberClock(active = state.countdownEnd != null)
@@ -73,7 +76,7 @@ fun ProjectorScreen(state: PresentationState, modifier: Modifier = Modifier, loo
     BoxWithConstraints(modifier.fillMaxSize().background(Color.Black)) {
         val slide = state.current
         if (!state.blank) {
-            Background(theme, image, look.frozenTime)
+            Background(theme, image, video, look.frozenTime)
             when {
                 seconds != null && seconds > 0 -> Countdown(state.countdownText, seconds, theme, maxWidth, maxHeight)
                 state.logo -> if (logo != null) Logo(logo, maxHeight)
@@ -150,14 +153,15 @@ private fun AlertBar(text: String, height: Dp) {
 }
 
 @Composable
-private fun Background(theme: Theme, image: ImageBitmap?, frozenTime: Float?) {
+private fun Background(theme: Theme, image: ImageBitmap?, video: File?, frozenTime: Float?) {
     val top = hexColor(theme.color)
     val bottom = theme.color2?.let(::hexColor)
     val fill = if (bottom != null) Modifier.background(Brush.verticalGradient(listOf(top, bottom))) else Modifier.background(top)
     Box(Modifier.fillMaxSize().then(fill))
-    // Prioridad: imagen (de la canción o del tema) > fondo incluido > color/degradado.
+    // Prioridad: video o imagen (de la canción o del tema) > fondo incluido > color/degradado.
     val builtin = theme.builtin?.takeIf { BuiltinBackgrounds.has(it) }
     when {
+        video != null -> VideoBackground(video)
         image != null -> Image(image, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
         builtin != null -> {
             val animated = theme.animate && frozenTime == null
@@ -165,7 +169,7 @@ private fun Background(theme: Theme, image: ImageBitmap?, frozenTime: Float?) {
             BuiltinBackground(builtin, time = if (frozenTime != null) androidx.compose.runtime.mutableStateOf(frozenTime) else clock)
         }
     }
-    if (image != null || builtin != null) {
+    if (video != null || image != null || builtin != null) {
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = theme.dim)))
     }
 }

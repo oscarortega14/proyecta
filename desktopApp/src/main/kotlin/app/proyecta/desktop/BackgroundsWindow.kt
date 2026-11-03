@@ -69,6 +69,7 @@ fun BackgroundsWindow(
     val state by presenter.state.collectAsState()
     var refresh by remember { mutableIntStateOf(0) }
     val images = remember(refresh) { library.backgrounds() }
+    val videos = remember(refresh) { library.videos() }
     var message by remember { mutableStateOf<String?>(null) }
     val songId = state.songId
     val preview = if (state.current != null && !state.blank) state else SAMPLE
@@ -112,6 +113,32 @@ fun BackgroundsWindow(
                                 val top = hexColor(preset.color)
                                 val bottom = preset.color2?.let(::hexColor) ?: top
                                 Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(top, bottom))))
+                            }
+                        }
+                        header("Videos en bucle (${videos.size})")
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            Text(
+                                if (!VideoBackgrounds.available) {
+                                    "Para usar videos de fondo instala VLC (64 bits): en PowerShell, winget install VideoLAN.VLC, y vuelve a abrir Proyecta."
+                                } else if (videos.isEmpty()) {
+                                    "Copia loops .mp4 (ej. de open.life.church) en la carpeta de fondos y presiona \"Actualizar\"."
+                                } else "Se reproducen en bucle y sin sonido. Revisa la licencia de cada video si transmiten el culto.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (!VideoBackgrounds.available) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        items(videos, key = { "v:$it" }) { name ->
+                            Column {
+                                Tile(name, theme.image == name, onClick = { themes.update { it.copy(image = name) } }) {
+                                    Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0xFF1B1B22)), contentAlignment = Alignment.Center) {
+                                        Text("▶", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                                if (songId != null) {
+                                    TextButton({ setSongBackground(name) }, Modifier.fillMaxWidth()) {
+                                        Text(if (state.background == name) "✓ Canción" else "Solo canción", style = MaterialTheme.typography.labelSmall)
+                                    }
+                                }
                             }
                         }
                         item(span = { GridItemSpan(maxLineSpan) }) {

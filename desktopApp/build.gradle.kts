@@ -19,6 +19,8 @@ dependencies {
     implementation("io.ktor:ktor-server-websockets:$ktor")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.9.0")
     implementation("org.slf4j:slf4j-nop:2.0.16")
+    // Fondos de video: usa el VLC instalado en el PC (si no está, se ignoran los videos).
+    implementation("uk.co.caprica:vlcj:4.8.3")
 
     testImplementation(kotlin("test"))
     testImplementation("io.ktor:ktor-client-cio:$ktor")
