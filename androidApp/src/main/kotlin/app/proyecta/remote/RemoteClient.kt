@@ -20,6 +20,8 @@ import app.proyecta.shared.WS_PATH
 import app.proyecta.shared.decodeServerMessage
 import app.proyecta.shared.encode
 import io.ktor.client.HttpClient
+import io.ktor.client.statement.bodyAsText
+import io.ktor.client.request.get
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.client.plugins.websocket.pingInterval
@@ -155,6 +157,14 @@ class RemoteClient(private val scope: CoroutineScope) {
                 found.values.toList()
             }
         }.getOrDefault(emptyList())
+    }
+
+    /** Nombre del PC (consulta /info), o null si no responde. */
+    suspend fun pcName(host: String): String? = withContext(Dispatchers.IO) {
+        runCatching {
+            val text = http.get("http://$host:$DEFAULT_PORT/info").bodyAsText()
+            ProtocolJson.decodeFromString(DiscoveryReply.serializer(), text).name.ifBlank { null }
+        }.getOrNull()
     }
 
     fun send(msg: ClientMessage) {

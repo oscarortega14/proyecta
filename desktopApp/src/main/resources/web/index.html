@@ -4,13 +4,24 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <meta name="theme-color" content="#16141a">
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-title" content="Proyecta">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/favicon.png">
 <title>Proyecta · Control remoto</title>
 <style>
   :root { --bg:#16141a; --card:#2a2730; --text:#ece6f0; --muted:#a59fb0; --accent:#cdbdff; --accent-bg:#4f378b; --danger:#f2b8b5; }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html, body { margin:0; height:100%; background:var(--bg); color:var(--text); font:16px/1.35 system-ui, -apple-system, Roboto, sans-serif; }
   body { display:flex; flex-direction:column; }
+  body { padding-top:env(safe-area-inset-top); padding-bottom:env(safe-area-inset-bottom); }
   header { display:flex; align-items:center; gap:8px; padding:8px 12px; font-size:14px; color:var(--muted); }
+  .banner { display:none; align-items:center; gap:10px; margin:8px 12px 0; padding:10px 12px; border-radius:12px; background:var(--accent-bg); color:#fff; font-size:15px; }
+  .banner a { color:#21005d; background:var(--accent); padding:8px 12px; border-radius:18px; text-decoration:none; font-weight:600; white-space:nowrap; }
+  .banner button { background:none; border:0; color:#fff; font-size:20px; padding:0 4px; }
   header .dot { width:10px; height:10px; border-radius:50%; background:#e46962; }
   header.ok .dot { background:#6dd58c; }
   nav { display:flex; border-bottom:1px solid #3a3640; }
@@ -48,6 +59,15 @@
 </head>
 <body>
 <header id="status"><span class="dot"></span><span id="statusText">Conectando…</span></header>
+<div class="banner" id="appBanner">
+  <span style="flex:1">¿Tienes la app Proyecta Remoto?</span>
+  <a id="openApp" href="#">Abrir en la app</a>
+  <button id="closeBanner" aria-label="Cerrar">✕</button>
+</div>
+<div class="banner" id="installBanner">
+  <span style="flex:1" id="installText"></span>
+  <button id="closeInstall" aria-label="Cerrar">✕</button>
+</div>
 <nav>
   <button data-tab="live" class="on">En pantalla</button>
   <button data-tab="songs">Canciones</button>
@@ -137,7 +157,7 @@ function toast(text) {
 
 function renderStatus() {
   $("status").classList.toggle("ok", S.connected);
-  $("statusText").textContent = S.connected ? "Conectado a " + location.hostname : "Sin conexión — reintentando…";
+  $("statusText").textContent = S.connected ? "Conectado a " + (pcName || location.hostname) : "Sin conexión — reintentando…";
 }
 
 function renderLive() {
@@ -248,6 +268,38 @@ const sendMsg = () => P.send("stage_message", { text: $("msg").value });
 $("sendMsg").onclick = sendMsg;
 $("msg").onkeydown = (e) => { if (e.key === "Enter") sendMsg(); };
 $("clearMsg").onclick = () => { $("msg").value = ""; P.send("stage_message", { text: "" }); };
+
+// --- Abrir en la app (Android) y sugerencia de instalar (iPhone) ---
+const store = { get: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } },
+                set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
+const standalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+const isAndroid = /Android/i.test(navigator.userAgent);
+const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+let pcName = "";
+fetch("/info").then((r) => r.json()).then((i) => { pcName = i.name || ""; renderStatus(); }).catch(() => {});
+
+if (isAndroid && !standalone && store.get("noAppBanner") !== "1") {
+  // Enlace propio de la app (funciona en Chrome, Via, el navegador de Lens…): la abre ya conectada a este PC.
+  $("openApp").href = "proyecta://connect?host=" + encodeURIComponent(location.hostname);
+  $("openApp").onclick = () => {
+    // Si a los 2 s seguimos aquí, el celular no tiene la app: avisar y seguir en la web.
+    let left = false;
+    const gone = () => { left = true; };
+    document.addEventListener("visibilitychange", gone, { once: true });
+    window.addEventListener("blur", gone, { once: true });
+    setTimeout(() => {
+      if (!left && document.visibilityState === "visible") toast("Este celular no tiene la app Proyecta Remoto. Puedes seguir usando esta página.");
+    }, 2000);
+  };
+  $("appBanner").style.display = "flex";
+}
+$("closeBanner").onclick = () => { $("appBanner").style.display = "none"; store.set("noAppBanner", "1"); };
+
+if (isIOS && !standalone && store.get("noInstallBanner") !== "1") {
+  $("installText").textContent = "Instálalo como app: toca Compartir (□↑) y luego «Agregar a pantalla de inicio».";
+  $("installBanner").style.display = "flex";
+}
+$("closeInstall").onclick = () => { $("installBanner").style.display = "none"; store.set("noInstallBanner", "1"); };
 
 P.on("status", renderStatus);
 P.on("state", renderLive);

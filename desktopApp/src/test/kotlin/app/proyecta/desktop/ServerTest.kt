@@ -128,10 +128,19 @@ class ServerTest {
     @Test
     fun servesTheWebPages() = runBlocking {
         val client = HttpClient(CIO)
-        for ((path, marker) in listOf("/" to "Control remoto", "/escenario.html" to "Escenario", "/obs.html" to "OBS", "/proyecta.js" to "const Proyecta")) {
+        for ((path, marker) in listOf(
+            "/" to "Control remoto", "/escenario.html" to "Escenario", "/obs.html" to "OBS", "/proyecta.js" to "const Proyecta",
+            "/manifest.json" to "\"display\": \"standalone\"", "/manifest-escenario.json" to "Escenario", "/info" to "\"port\"",
+        )) {
             val r = client.get("http://127.0.0.1:$port$path")
             assertEquals(HttpStatusCode.OK, r.status, path)
             assertTrue(marker in r.bodyAsText(), path)
+        }
+        // los íconos de la app web existen y son PNG
+        for (icon in listOf("icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png", "favicon.png")) {
+            val r = client.get("http://127.0.0.1:$port/icons/$icon")
+            assertEquals(HttpStatusCode.OK, r.status, icon)
+            assertEquals("image/png", r.headers["Content-Type"]?.substringBefore(';'), icon)
         }
         client.close()
     }

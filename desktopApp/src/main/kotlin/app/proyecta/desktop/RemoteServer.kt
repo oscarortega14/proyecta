@@ -13,6 +13,11 @@ import io.ktor.server.engine.EmbeddedServer
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.http.content.staticResources
 import io.ktor.server.routing.routing
+import app.proyecta.shared.ProtocolJson
+import app.proyecta.shared.DiscoveryReply
+import io.ktor.http.ContentType
+import io.ktor.server.response.respondText
+import io.ktor.server.routing.get
 import io.ktor.server.websocket.WebSockets
 import io.ktor.server.websocket.pingPeriod
 import io.ktor.server.websocket.timeout
@@ -31,6 +36,7 @@ class RemoteServer(
     val port: Int = DEFAULT_PORT,
 ) {
     private val presenter get() = commands.presenter
+    private val pcName: String = runCatching { java.net.InetAddress.getLocalHost().hostName }.getOrDefault("Proyecta")
     private var engine: EmbeddedServer<*, *>? = null
 
     fun start() {
@@ -48,6 +54,13 @@ class RemoteServer(
             timeout = 30.seconds
         }
         routing {
+            // Nombre del PC, para que la página muestre "Conectado a <nombre>".
+            get("/info") {
+                call.respondText(
+                    ProtocolJson.encodeToString(DiscoveryReply.serializer(), DiscoveryReply(pcName, port)),
+                    ContentType.Application.Json,
+                )
+            }
             // Páginas web: control remoto (/), vista de escenario y letras para OBS.
             staticResources("/", "web", index = "index.html")
 

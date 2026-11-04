@@ -70,6 +70,21 @@ import androidx.compose.material3.TextButton
 
 class MainActivity : ComponentActivity() {
     private lateinit var client: RemoteClient
+    /** Dirección recibida por un enlace proyecta://connect?host=… (desde el QR del navegador). */
+    private val linkHost = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+
+    /** Acepta proyecta://connect?host=192.168.x.x ; ignora cualquier otra cosa. */
+    private fun readLink(intent: android.content.Intent?) {
+        val uri = intent?.data ?: return
+        if (uri.scheme != "proyecta" || uri.host != "connect") return
+        val host = uri.getQueryParameter("host")?.trim().orEmpty()
+        if (host.matches(Regex("""^[0-9A-Za-z.\-:]{1,64}$"""))) linkHost.value = host
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        readLink(intent)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -78,6 +93,7 @@ class MainActivity : ComponentActivity() {
 
         val prefs = getSharedPreferences("proyecta", Context.MODE_PRIVATE)
         client = RemoteClient(lifecycleScope)
+        readLink(intent)
         prefs.getString("host", null)?.let { client.connect(it) }
         client.onHostChanged = { host -> prefs.edit().putString("host", host).apply() }
 
@@ -91,15 +107,24 @@ class MainActivity : ComponentActivity() {
             MaterialTheme(colorScheme = darkColorScheme()) {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     var pcName by remember { mutableStateOf(prefs.getString("name", "").orEmpty()) }
+                    val link by linkHost.collectAsState()
+                    val connect: (FoundServer) -> Unit = { server ->
+                        prefs.edit().putString("host", server.host).putString("name", server.name).apply()
+                        pcName = server.name
+                        client.connect(server.host)
+                    }
+                    // Enlace desde el navegador: conectarse a ese PC y averiguar su nombre.
+                    LaunchedEffect(link) {
+                        val host = link ?: return@LaunchedEffect
+                        connect(FoundServer(client.pcName(host) ?: host, host))
+                        linkHost.value = null
+                    }
                     RemoteApp(
                         client = client,
                         savedHost = prefs.getString("host", "").orEmpty(),
                         pcName = pcName,
-                        onConnect = { server ->
-                            prefs.edit().putString("host", server.host).putString("name", server.name).apply()
-                            pcName = server.name
-                            client.connect(server.host)
-                        },
+                        linkKey = link,
+                        onConnect = connect,
                     )
                 }
             }
@@ -113,7 +138,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun RemoteApp(client: RemoteClient, savedHost: String, pcName: String, onConnect: (FoundServer) -> Unit) {
+private fun RemoteApp(client: RemoteClient, savedHost: String, pcName: String, linkKey: String?, onConnect: (FoundServer) -> Unit) {
     val status by client.status.collectAsState()
     val state by client.state.collectAsState()
     val songs by client.songs.collectAsState()
@@ -121,6 +146,8 @@ private fun RemoteApp(client: RemoteClient, savedHost: String, pcName: String, o
     val plan by client.plan.collectAsState()
     val bibleResults by client.bibleResults.collectAsState()
     var editingHost by rememberSaveable { mutableStateOf(savedHost.isEmpty()) }
+    // Si llegó un enlace con la dirección, no hace falta buscar.
+    LaunchedEffect(linkKey) { if (linkKey != null) editingHost = false }
     var tab by rememberSaveable { mutableIntStateOf(0) }
 
     Column(Modifier.fillMaxSize()) {
