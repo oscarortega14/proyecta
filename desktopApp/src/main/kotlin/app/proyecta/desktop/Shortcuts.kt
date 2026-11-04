@@ -32,11 +32,17 @@ val SHORTCUTS = listOf(
     "L" to "Logo de la iglesia",
     "N" to "Siguiente elemento de la lista del culto",
     "Esc" to "Mostrar la letra (o salir de un campo de texto)",
+    "F5" to "Volver a encender la proyección",
 )
 
 /** Texto de ayuda que se muestra en la ventana del operador. */
 const val SHORTCUTS_HELP =
     "Teclado: → ↓ Espacio siguiente · ← ↑ anterior · C coro · 1–9 secciones · B negro · L logo · N siguiente de la lista · Esc mostrar letra"
+
+/** F5: volver a abrir la ventana de proyección (si se cerró o se apagó). */
+fun isReopenProjectorKey(e: KeyEvent): Boolean = reopensProjector(e.type, e.key)
+
+internal fun reopensProjector(type: KeyEventType, key: Key): Boolean = type == KeyEventType.KeyDown && key == Key.F5
 
 /**
  * Atajos al estilo Holyrics. Av Pág / Re Pág (los "clickers") y Ctrl+B funcionan siempre;

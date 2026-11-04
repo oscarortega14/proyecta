@@ -20,6 +20,10 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -68,8 +72,7 @@ fun OperatorScreen(
     catalog: Catalog,
     plan: ServicePlanState,
     serverError: String?,
-    projectorOn: Boolean,
-    onToggleProjector: () -> Unit,
+    projector: ProjectorControl,
     onCommand: (ClientMessage) -> String?,
     onReload: () -> Unit,
     onOpenFolder: () -> Unit,
@@ -100,9 +103,8 @@ fun OperatorScreen(
         Column(Modifier.fillMaxSize()) {
             TopBar(
                 message = serverError ?: message,
-                projectorOn = projectorOn,
+                projector = projector,
                 connectAttention = firewallOk == false,
-                onToggleProjector = onToggleProjector,
                 onOpenBackgrounds = onOpenBackgrounds,
                 onOpenConnect = onOpenConnect,
                 onHelp = { helpOpen = true },
@@ -138,9 +140,8 @@ fun OperatorScreen(
 @Composable
 private fun TopBar(
     message: String?,
-    projectorOn: Boolean,
+    projector: ProjectorControl,
     connectAttention: Boolean,
-    onToggleProjector: () -> Unit,
     onOpenBackgrounds: () -> Unit,
     onOpenConnect: () -> Unit,
     onHelp: () -> Unit,
@@ -163,11 +164,7 @@ private fun TopBar(
             if (connectAttention) Text("● ", color = MaterialTheme.colorScheme.error)
             Text("Conectar dispositivos")
         }
-        FilterChip(
-            selected = projectorOn,
-            onClick = onToggleProjector,
-            label = { Text(if (projectorOn) "Proyección: encendida" else "Proyección: apagada") },
-        )
+        ProjectorMenu(projector)
         TextButton(onHelp) { Text("?", style = MaterialTheme.typography.titleMedium) }
     }
 }
@@ -546,5 +543,60 @@ private fun CountdownBox(state: PresentationState, send: (ClientMessage) -> Unit
             enabled = (minutes.toIntOrNull() ?: 0) > 0,
         ) { Text(if (running) "Reiniciar" else "Iniciar") }
         OutlinedButton({ send(ClientMessage.StopCountdown) }, enabled = state.countdownEnd != null) { Text("Detener") }
+    }
+}
+
+/** Lo que el operador necesita para elegir y encender/apagar la proyección. */
+data class ProjectorControl(
+    val on: Boolean,
+    val screens: List<ScreenInfo>,
+    /** Pantalla en uso; null = en una ventana. */
+    val current: ScreenInfo?,
+    val onTurnOn: () -> Unit,
+    val onTurnOff: () -> Unit,
+    /** id de pantalla, o Settings.WINDOWED. */
+    val onChoose: (String) -> Unit,
+)
+
+@Composable
+private fun ProjectorMenu(p: ProjectorControl) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        if (p.on) {
+            FilterChip(
+                selected = true,
+                onClick = { open = true },
+                label = { Text("Proyección: " + (p.current?.let { "Pantalla ${it.number}" } ?: "en ventana") + "  ▾") },
+            )
+        } else {
+            Button(
+                p.onTurnOn,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+            ) { Text("Proyección apagada · Encender (F5)") }
+        }
+        DropdownMenu(open, { open = false }) {
+            Text(
+                "¿Dónde se proyecta?", style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+            )
+            for (screen in p.screens) {
+                DropdownMenuItem(
+                    text = { Text((if (screen == p.current) "✓ " else "    ") + screen.label) },
+                    onClick = { open = false; p.onChoose(screen.id) },
+                    modifier = Modifier.hand(),
+                )
+            }
+            DropdownMenuItem(
+                text = { Text((if (p.current == null) "✓ " else "    ") + "En una ventana (para probar)") },
+                onClick = { open = false; p.onChoose(Settings.WINDOWED) },
+                modifier = Modifier.hand(),
+            )
+            HorizontalDivider()
+            DropdownMenuItem(
+                text = { Text("Apagar proyección", color = MaterialTheme.colorScheme.error) },
+                onClick = { open = false; p.onTurnOff() },
+                modifier = Modifier.hand(),
+            )
+        }
     }
 }

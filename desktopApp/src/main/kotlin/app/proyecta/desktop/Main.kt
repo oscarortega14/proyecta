@@ -31,7 +31,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.awt.Desktop
-import java.awt.GraphicsEnvironment
 import java.io.File
 
 fun main() {
@@ -44,12 +43,26 @@ fun main() {
     }
     val discovery = DiscoveryResponder().also { runCatching { it.start() } }
     val themes = ThemeStore(File(library.baseDir, "tema.json"))
+    val settingsStore = SettingsStore(File(library.baseDir, "ajustes.json"))
 
     application {
         val state by presenter.state.collectAsState()
         val catalog by library.catalog.collectAsState()
         val plan by commands.plan.state.collectAsState()
         var projectorOn by remember { mutableStateOf(true) }
+        val settings by settingsStore.settings.collectAsState()
+        // Pantallas conectadas: se revisan cada pocos segundos por si enchufan el videobeam después.
+        var screens by remember { mutableStateOf(Screens.list()) }
+        LaunchedEffect(Unit) {
+            while (true) {
+                kotlinx.coroutines.delay(3000)
+                val now = withContext(Dispatchers.IO) { Screens.list() }
+                if (now != screens) screens = now
+            }
+        }
+        val projectorScreen = chooseProjectorScreen(screens, settings.projectorScreen)
+        var confirmProjectorOff by remember { mutableStateOf(false) }
+        var confirmExit by remember { mutableStateOf(false) }
         var editing by remember { mutableStateOf<EditRequest?>(null) }
         var backgroundsOpen by remember { mutableStateOf(false) }
         var connectOpen by remember { mutableStateOf(false) }
@@ -71,10 +84,12 @@ fun main() {
 
         ProvideLook(look) {
         Window(
-            onCloseRequest = { server.stop(); discovery.stop(); exitApplication() },
+            onCloseRequest = { confirmExit = true },
             title = "Proyecta — Operador",
             state = rememberWindowState(size = DpSize(1440.dp, 820.dp)),
-            onPreviewKeyEvent = { handleShortcut(it, commands) },
+            onPreviewKeyEvent = {
+                if (isReopenProjectorKey(it)) { projectorOn = true; true } else handleShortcut(it, commands)
+            },
         ) {
             MaterialTheme(colorScheme = darkColorScheme()) {
                 OperatorScreen(
@@ -82,8 +97,14 @@ fun main() {
                     catalog = catalog,
                     plan = plan,
                     serverError = serverError,
-                    projectorOn = projectorOn,
-                    onToggleProjector = { projectorOn = !projectorOn },
+                    projector = ProjectorControl(
+                        on = projectorOn,
+                        screens = screens,
+                        current = projectorScreen,
+                        onTurnOn = { projectorOn = true },
+                        onTurnOff = { confirmProjectorOff = true },
+                        onChoose = { id -> settingsStore.update { s -> s.copy(projectorScreen = id) }; projectorOn = true },
+                    ),
                     onCommand = commands::handle,
                     onReload = { library.reload() },
                     onOpenFolder = { runCatching { Desktop.getDesktop().open(library.baseDir) } },
@@ -96,6 +117,26 @@ fun main() {
                     onImport = { importSongs(library) },
                     onExport = { exportSongs(library) },
                 )
+                if (confirmProjectorOff) {
+                    AlertDialog(
+                        onDismissRequest = { confirmProjectorOff = false },
+                        title = { Text("¿Apagar la proyección?") },
+                        text = { Text("La congregación dejará de ver la letra. Para volver a encenderla presiona F5.") },
+                        confirmButton = { TextButton({ confirmProjectorOff = false; projectorOn = false }) { Text("Apagar") } },
+                        dismissButton = { Button({ confirmProjectorOff = false }) { Text("Seguir proyectando") } },
+                    )
+                }
+                if (confirmExit) {
+                    AlertDialog(
+                        onDismissRequest = { confirmExit = false },
+                        title = { Text("¿Cerrar Proyecta?") },
+                        text = { Text("Se apaga la proyección y se desconectan las tablets y celulares.") },
+                        confirmButton = {
+                            TextButton({ server.stop(); discovery.stop(); exitApplication() }) { Text("Cerrar Proyecta") }
+                        },
+                        dismissButton = { Button({ confirmExit = false }) { Text("Seguir usando") } },
+                    )
+                }
                 if (askFirewall) {
                     AlertDialog(
                         onDismissRequest = { askFirewall = false },
@@ -134,7 +175,14 @@ fun main() {
         }
 
         if (projectorOn) {
-            ProjectorWindow(state, onClose = { projectorOn = false }, onKey = { handleShortcut(it, commands) })
+            // key: al cambiar de pantalla la ventana se vuelve a crear en la nueva posición.
+            androidx.compose.runtime.key(projectorScreen) {
+                ProjectorWindow(
+                    state, projectorScreen,
+                    onClose = { confirmProjectorOff = true },
+                    onKey = { handleShortcut(it, commands) },
+                )
+            }
         }
         } // ProvideLook
     }
@@ -142,30 +190,27 @@ fun main() {
 
 
 /**
- * Si hay un segundo monitor (el videobeam), la ventana ocupa toda esa pantalla sin bordes.
- * Si solo hay uno, se abre como ventana normal para poder probar.
+ * En la pantalla elegida (el videobeam) la ventana ocupa toda la pantalla sin bordes.
+ * Sin pantalla ([screen] null) se abre como ventana normal para poder probar.
  */
 @Composable
 private fun ApplicationScope.ProjectorWindow(
     state: PresentationState,
+    screen: ScreenInfo?,
     onClose: () -> Unit,
     onKey: (KeyEvent) -> Boolean,
 ) {
-    val bounds = remember {
-        GraphicsEnvironment.getLocalGraphicsEnvironment().screenDevices
-            .getOrNull(1)?.defaultConfiguration?.bounds
-    }
     val windowState = rememberWindowState(
-        position = bounds?.let { WindowPosition(it.x.dp, it.y.dp) } ?: WindowPosition.PlatformDefault,
-        size = bounds?.let { DpSize(it.width.dp, it.height.dp) } ?: DpSize(960.dp, 540.dp),
+        position = screen?.let { WindowPosition(it.x.dp, it.y.dp) } ?: WindowPosition.PlatformDefault,
+        size = screen?.let { DpSize(it.width.dp, it.height.dp) } ?: DpSize(960.dp, 540.dp),
     )
     Window(
         onCloseRequest = onClose,
         title = "Proyecta — Proyección",
         state = windowState,
-        undecorated = bounds != null,
-        alwaysOnTop = bounds != null,
-        focusable = bounds == null,
+        undecorated = screen != null,
+        alwaysOnTop = screen != null,
+        focusable = screen == null,
         onPreviewKeyEvent = onKey,
     ) {
         // ¿La ventana se dibuja con la tarjeta gráfica? Así los fondos animados van fluidos y livianos.

@@ -66,7 +66,8 @@ class ConnectAndLayoutTest {
             MaterialTheme(colorScheme = darkColorScheme()) {
                 ProvideLook(Look(frozenTime = 2f)) {
                     OperatorScreen(
-                        state, catalog, plan, serverError = null, projectorOn = true, onToggleProjector = {},
+                        state, catalog, plan, serverError = null,
+                        projector = ProjectorControl(true, listOf(ScreenInfo("a", 1, 0, 0, 1920, 1080, true), ScreenInfo("b", 2, 1920, 0, 1280, 720, false)), ScreenInfo("b", 2, 1920, 0, 1280, 720, false), {}, {}, {}),
                         onCommand = { null }, onReload = {}, onOpenFolder = {}, onEdit = {}, onOpenBackgrounds = {},
                         onOpenConnect = {}, searchBible = { null }, firewallOk = false, onImport = { null }, onExport = { null },
                     )
