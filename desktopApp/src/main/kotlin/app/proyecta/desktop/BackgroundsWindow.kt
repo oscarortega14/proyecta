@@ -223,7 +223,7 @@ fun BackgroundsWindow(
                             Switch(theme.animate, { v -> themes.update { it.copy(animate = v) } })
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Fluidez máxima (60 cuadros/s, gasta más)", modifier = Modifier.weight(1f))
+                            Text("Fluidez máxima (60 cuadros/s). Apágala si el PC va lento", modifier = Modifier.weight(1f))
                             Switch(theme.smooth, { v -> themes.update { it.copy(smooth = v) } }, enabled = theme.animate)
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {

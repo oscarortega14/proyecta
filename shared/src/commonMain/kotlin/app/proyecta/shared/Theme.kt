@@ -18,8 +18,8 @@ data class Theme(
     val builtin: String? = "luz",
     /** Movimiento suave en los fondos incluidos (destellos, partículas…). Apagar si el PC es lento. */
     val animate: Boolean = true,
-    /** Fluidez máxima (60 cuadros/s) en los fondos animados; si no, 30 (suave y gasta la mitad). */
-    val smooth: Boolean = false,
+    /** Fluidez máxima (60 cuadros/s) en los fondos animados; apagado, 30 (gasta menos en un PC modesto). */
+    val smooth: Boolean = true,
     /** Cuánto oscurecer el fondo de imagen para que se lea la letra (0 = nada, 0.8 = casi negro). */
     val dim: Float = 0.3f,
     val textColor: String = "#FFFFFF",
