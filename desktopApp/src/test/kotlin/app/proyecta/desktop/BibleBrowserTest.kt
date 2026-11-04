@@ -40,6 +40,16 @@ class BibleBrowserTest {
     }
 
     @Test
+    fun realBibleReadsSeveralPassages() {
+        val bible = assertNotNull(Library.bundledBible)
+        val p = bible.lookup("Juan 3:16; Romanos 5:8")
+        assertEquals("Juan 3:16; Romanos 5:8", p.title)
+        assertTrue(p.slides[0].text.contains("amó Dios") && p.slides[1].text.contains("Cristo"))
+        val cross = bible.lookup("Mateo 5:47-6:2")
+        assertEquals(listOf("Mateo 5:47", "Mateo 5:48", "Mateo 6:1", "Mateo 6:2"), cross.slides.map { it.label })
+    }
+
+    @Test
     fun bundledBibleHas66BooksInCanonicalOrder() {
         val bible = assertNotNull(Library.bundledBible)
         assertEquals(66, bible.books.size)

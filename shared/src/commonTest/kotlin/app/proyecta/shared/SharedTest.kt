@@ -73,6 +73,54 @@ class BibleTest {
     }
 
     @Test
+    fun parsesSeveralReferencesAndCrossChapterRanges() {
+        assertEquals(BibleReference("Mateo", 5, 3, 4, chapterTo = 6), BibleReference.parse("Mateo 5:3-6:4"))
+        assertEquals(BibleReference("Salmos", 1, chapterTo = 2), BibleReference.parse("Salmos 1-2"))
+        assertEquals(
+            listOf(BibleReference("Juan", 3, 16), BibleReference("Romanos", 5, 8)),
+            BibleReference.parseAll("Juan 3:16; Romanos 5:8"),
+        )
+        // Sin libro después de ";": mismo libro (cap:vers) o mismo capítulo (solo versículo)
+        assertEquals(
+            listOf(BibleReference("Juan", 3, 16), BibleReference("Juan", 5, 24), BibleReference("Juan", 5, 26, 27)),
+            BibleReference.parseAll("Juan 3:16; 5:24; 26-27"),
+        )
+        // Después de un capítulo entero, un número solo es otro capítulo
+        assertEquals(listOf(BibleReference("Salmos", 23), BibleReference("Salmos", 24)), BibleReference.parseAll("Salmos 23; 24"))
+        assertNull(BibleReference.parse("Juan 3:16; Romanos 5:8")) // parse = una sola cita
+        assertNull(BibleReference.parseAll("5:24; Juan 3:16")) // la primera debe tener libro
+        assertNull(BibleReference.parseAll("Juan 3:16; hola"))
+    }
+
+    @Test
+    fun looksUpSeveralPassagesAtOnce() {
+        val p = bible.lookup("Juan 3:6; Romanos 5:8")
+        assertEquals("Juan 3:6; Romanos 5:8", p.title)
+        assertEquals(listOf("Juan 3:6", "Romanos 5:8"), p.slides.map { it.label })
+
+        val sameBook = bible.lookup("juan 3:9; 4:1-2")
+        assertEquals("Juan 3:9; 4:1-2", sameBook.title)
+        assertEquals(listOf("Juan 3:9", "Juan 4:1", "Juan 4:2"), sameBook.slides.map { it.label })
+
+        val cross = bible.lookup("Mateo 2:9-3:2")
+        assertEquals("Mateo 2:9-3:2", cross.title)
+        assertEquals(listOf("Mateo 2:9", "Mateo 2:10", "Mateo 3:1", "Mateo 3:2"), cross.slides.map { it.label })
+
+        val chapters = bible.lookup("Salmos 1-2")
+        assertEquals("Salmos 1-2", chapters.title)
+        assertEquals(20, chapters.slides.size)
+    }
+
+    @Test
+    fun rejectsBadOrHugeReadings() {
+        assertTrue(assertFailsWith<IllegalArgumentException> { bible.lookup("Juan 3:8-2") }.message!!.contains("final"))
+        assertTrue(assertFailsWith<IllegalArgumentException> { bible.lookup("Juan 4-2") }.message!!.contains("final"))
+        assertTrue(assertFailsWith<IllegalArgumentException> { bible.lookup("Juan 3:1-9:1") }.message!!.contains("capítulo 9"))
+        val huge = Bible("Grande", listOf(Bible.Book("Salmos", List(150) { List(20) { "v" } })))
+        assertTrue(assertFailsWith<IllegalArgumentException> { huge.lookup("Salmos 1-150") }.message!!.contains("muy larga"))
+    }
+
+    @Test
     fun reportsClearErrors() {
         assertTrue(assertFailsWith<IllegalArgumentException> { bible.lookup("juan 99") }.message!!.contains("capítulo"))
         assertTrue(assertFailsWith<IllegalArgumentException> { bible.lookup("juan 3:40") }.message!!.contains("versículo"))

@@ -18,26 +18,59 @@ const val OLD_TESTAMENT_BOOKS = 39
 fun slideIndexOfVerse(chapter: List<String>, verse: Int): Int =
     chapter.take(verse - 1).count { it.isNotBlank() }
 
-/** Una cita ya interpretada, ej. "1 Corintios 13:4-7". */
+/**
+ * Una cita ya interpretada, ej. "1 Corintios 13:4-7".
+ * [chapterTo] permite cruzar capítulos ("Mateo 5:3-6:4") o tomar varios enteros ("Salmos 1-2").
+ */
 data class BibleReference(
     val book: String,
     val chapter: Int,
     val verseFrom: Int? = null,
     val verseTo: Int? = null,
+    val chapterTo: Int? = null,
 ) {
     companion object {
-        // libro (puede empezar con 1-3), capítulo, y opcionalmente versículo o rango
-        private val RX = Regex("""^\s*([1-3]?\s*[^\d\s][^\d]*?)\.?\s*(\d+)(?:\s*[:.,\s]\s*(\d+)(?:\s*[-–]\s*(\d+))?)?\s*$""")
+        // libro (puede empezar con 1-3), capítulo, versículo opcional y "hasta" opcional (versículo o capítulo:versículo)
+        private val RX = Regex("""^\s*([1-3]?\s*[^\d\s;][^\d;]*?)\.?\s*(\d+)(?:\s*[:.,\s]\s*(\d+))?(?:\s*[-–]\s*(?:(\d+)\s*[:.]\s*)?(\d+))?\s*$""")
+        // Continuación sin libro tras ";": "5:24", "18", "18-20", "6:1-7:2"
+        private val CONT = Regex("""^\s*(\d+)(?:\s*[:.]\s*(\d+))?(?:\s*[-–]\s*(?:(\d+)\s*[:.]\s*)?(\d+))?\s*$""")
 
-        fun parse(query: String): BibleReference? {
-            val m = RX.matchEntire(query) ?: return null
-            val (book, ch, from, to) = m.destructured
-            return BibleReference(
-                book = book.trim(),
-                chapter = ch.toInt(),
-                verseFrom = from.toIntOrNull(),
-                verseTo = to.toIntOrNull(),
-            )
+        /** Una sola cita (sin ";"). */
+        fun parse(query: String): BibleReference? = parseAll(query)?.singleOrNull()
+
+        /**
+         * Una o varias citas separadas por ";": "Juan 3:16; Romanos 5:8", "Juan 3:16; 5:24" (mismo libro),
+         * "Juan 3:16; 18" (mismo capítulo). null si alguna parte no se entiende.
+         */
+        fun parseAll(query: String): List<BibleReference>? {
+            val parts = query.split(';').map { it.trim() }.filter { it.isNotEmpty() }
+            if (parts.isEmpty()) return null
+            val out = mutableListOf<BibleReference>()
+            for (part in parts) {
+                val full = RX.matchEntire(part)
+                if (full != null) {
+                    val (book, ch, from, toCh, to) = full.destructured
+                    out += make(book.trim(), ch.toInt(), from.toIntOrNull(), toCh.toIntOrNull(), to.toIntOrNull())
+                    continue
+                }
+                val prev = out.lastOrNull() ?: return null
+                val m = CONT.matchEntire(part) ?: return null
+                val (a, b, toCh, to) = m.destructured
+                val prevEnd = prev.chapterTo ?: prev.chapter
+                out += if (b.isEmpty() && prev.verseFrom != null) {
+                    // "18" o "18-20" después de una cita con versículos: versículos del mismo capítulo
+                    make(prev.book, prevEnd, a.toInt(), toCh.toIntOrNull(), to.toIntOrNull())
+                } else {
+                    make(prev.book, a.toInt(), b.toIntOrNull(), toCh.toIntOrNull(), to.toIntOrNull())
+                }
+            }
+            return out
+        }
+
+        private fun make(book: String, chapter: Int, from: Int?, toChapter: Int?, to: Int?): BibleReference = when {
+            toChapter != null -> BibleReference(book, chapter, from, to, toChapter.takeIf { it != chapter })
+            from == null && to != null -> BibleReference(book, chapter, null, null, to.takeIf { it != chapter }) // "Salmos 1-2"
+            else -> BibleReference(book, chapter, from, to)
         }
     }
 }
@@ -50,35 +83,79 @@ class Bible(val name: String, val books: List<Book>) {
 
     data class Passage(val title: String, val slides: List<Slide>)
 
-    /** Busca una cita como "Juan 3:16", "sal 23", "1 co 13 4-7". Lanza IllegalArgumentException con un mensaje claro. */
+    /**
+     * Busca una o varias citas: "Juan 3:16", "sal 23", "1 co 13 4-7", "Mateo 5:3-6:4", "Salmos 1-2",
+     * "Juan 3:16; Romanos 5:8". Lanza IllegalArgumentException con un mensaje claro.
+     */
     fun lookup(query: String): Passage {
-        val ref = BibleReference.parse(query)
+        val refs = BibleReference.parseAll(query)
             ?: throw IllegalArgumentException("No entiendo la cita \"$query\". Ejemplo: Juan 3:16")
+        val slides = mutableListOf<Slide>()
+        val titles = mutableListOf<String>()
+        var lastBook: String? = null
+        for (ref in refs) {
+            val (title, part) = passage(ref)
+            // "Juan 3:16; 5:24": el libro no se repite en el título
+            val bookName = part.first().label.substringBeforeLast(' ')
+            titles += if (bookName == lastBook) title.removePrefix("$bookName ") else title
+            lastBook = bookName
+            slides += part
+            if (slides.size > MAX_VERSES) {
+                throw IllegalArgumentException("La lectura es muy larga (más de $MAX_VERSES versículos). Divídela en partes.")
+            }
+        }
+        return Passage(titles.joinToString("; "), slides)
+    }
+
+    private fun passage(ref: BibleReference): Pair<String, List<Slide>> {
         val bookIndex = findBook(ref.book)
             ?: throw IllegalArgumentException("No encontré el libro \"${ref.book}\"")
         val book = books[bookIndex]
-        val chapter = book.chapters.getOrNull(ref.chapter - 1)
-            ?: throw IllegalArgumentException("${book.name} no tiene capítulo ${ref.chapter}")
-        val from = ref.verseFrom ?: 1
-        val to = (ref.verseTo ?: ref.verseFrom ?: chapter.size).coerceAtMost(chapter.size)
-        if (from !in 1..chapter.size || to < from) {
-            throw IllegalArgumentException("${book.name} ${ref.chapter} no tiene el versículo $from")
+        val lastChapter = ref.chapterTo ?: ref.chapter
+        for (c in listOf(ref.chapter, lastChapter)) {
+            if (book.chapters.getOrNull(c - 1) == null) throw IllegalArgumentException("${book.name} no tiene capítulo $c")
         }
-        // Algunas traducciones dejan versículos vacíos (numeración distinta); no se proyectan.
-        val slides = (from..to).mapNotNull { v ->
-            chapter[v - 1].trim().takeIf { it.isNotEmpty() }?.let { Slide("${book.name} ${ref.chapter}:$v", it) }
+        if (lastChapter < ref.chapter) throw IllegalArgumentException("${book.name} ${ref.chapter}-$lastChapter: el final va antes del inicio")
+        val first = book.chapters[ref.chapter - 1]
+        val from = ref.verseFrom ?: 1
+        if (from !in 1..first.size) throw IllegalArgumentException("${book.name} ${ref.chapter} no tiene el versículo $from")
+
+        val slides = mutableListOf<Slide>()
+        var to = 0
+        for (c in ref.chapter..lastChapter) {
+            val verses = book.chapters[c - 1]
+            val start = if (c == ref.chapter) from else 1
+            val end = when {
+                c != lastChapter -> verses.size
+                ref.verseTo != null -> ref.verseTo.coerceAtMost(verses.size)
+                ref.verseFrom != null && ref.chapterTo == null -> from // un solo versículo
+                else -> verses.size
+            }
+            if (c == lastChapter) to = end
+            if (end < start) {
+                if (c == ref.chapter) throw IllegalArgumentException("${book.name} ${ref.chapter}:$from-${ref.verseTo}: el final va antes del inicio")
+                continue
+            }
+            // Algunas traducciones dejan versículos vacíos (numeración distinta); no se proyectan.
+            for (v in start..end) {
+                verses[v - 1].trim().takeIf { it.isNotEmpty() }?.let { slides += Slide("${book.name} $c:$v", it) }
+            }
         }
         if (slides.isEmpty()) {
             throw IllegalArgumentException("${book.name} ${ref.chapter}:$from no tiene texto en esta traducción")
         }
         val title = buildString {
             append(book.name).append(' ').append(ref.chapter)
-            if (ref.verseFrom != null) {
-                append(':').append(from)
-                if (to != from) append('-').append(to)
+            when {
+                ref.chapterTo != null && ref.verseFrom == null && ref.verseTo == null -> append('-').append(lastChapter)
+                ref.chapterTo != null -> append(':').append(from).append('-').append(lastChapter).append(':').append(to)
+                ref.verseFrom != null -> {
+                    append(':').append(from)
+                    if (to != from) append('-').append(to)
+                }
             }
         }
-        return Passage(title, slides)
+        return title to slides
     }
 
     /** Índice de búsqueda (texto normalizado de cada versículo), se arma la primera vez. */
@@ -122,6 +199,9 @@ class Bible(val name: String, val books: List<Book>) {
     }
 
     companion object {
+        /** Tope para que una lectura no sea enorme (Salmos 1-150 son 2.461 versículos). */
+        const val MAX_VERSES = 400
+
         val BOOK_NAMES = listOf(
             "Génesis", "Éxodo", "Levítico", "Números", "Deuteronomio", "Josué", "Jueces", "Rut",
             "1 Samuel", "2 Samuel", "1 Reyes", "2 Reyes", "1 Crónicas", "2 Crónicas", "Esdras",

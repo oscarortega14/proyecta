@@ -266,7 +266,7 @@ private fun BibleTab(
     var reference by remember { mutableStateOf("") }
     var hits by remember { mutableStateOf<Pair<List<BibleHit>, Int>?>(null) }
     val showOrSearch = {
-        if (BibleReference.parse(reference) != null) present(ClientMessage.ShowBible(reference))
+        if (BibleReference.parseAll(reference) != null) present(ClientMessage.ShowBible(reference))
         else hits = searchBible(reference)
     }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
