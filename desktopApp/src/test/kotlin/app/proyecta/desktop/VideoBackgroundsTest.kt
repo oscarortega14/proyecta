@@ -67,6 +67,32 @@ class VideoBackgroundsTest {
         }
     }
 
+    /** Con VLC real: el modo liviano entrega cuadros más chicos y el anuncio (con sonido) más grandes. */
+    @Test
+    fun lightModeAndAnnouncementsWithVlc() {
+        val path = System.getenv("PROYECTA_VIDEO") ?: return
+        val file = File(path)
+        fun firstFrame(announcement: Boolean, light: Boolean): VideoFrame {
+            val loop = assertNotNull(VideoBackgrounds.acquire(file, announcement, light))
+            try {
+                val deadline = System.currentTimeMillis() + 10_000
+                while (loop.frame.value == null && System.currentTimeMillis() < deadline) {
+                    javax.swing.SwingUtilities.invokeAndWait { }
+                    Thread.sleep(100)
+                }
+                return assertNotNull(loop.frame.value, "sin cuadros (anuncio=$announcement, liviano=$light)")
+            } finally {
+                VideoBackgrounds.release(file, announcement, light)
+            }
+        }
+        val normal = firstFrame(false, false)
+        val light = firstFrame(false, true)
+        val ad = firstFrame(true, false)
+        println("VIDEO normal=${normal.width} liviano=${light.width} anuncio=${ad.width}")
+        assertTrue(light.width <= 854 && light.width < normal.width || normal.width <= 854)
+        assertTrue(ad.width >= normal.width)
+    }
+
     /**
      * Estrés (antes la app se caía al dibujar un cuadro ya liberado): el video real con VLC dibujado
      * a la vez como videobeam (30 cps) y miniatura (10 cps), redibujando a 60 por segundo.
