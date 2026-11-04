@@ -78,6 +78,7 @@ class MainActivity : ComponentActivity() {
         val prefs = getSharedPreferences("proyecta", Context.MODE_PRIVATE)
         client = RemoteClient(lifecycleScope)
         prefs.getString("host", null)?.let { client.connect(it) }
+        client.onHostChanged = { host -> prefs.edit().putString("host", host).apply() }
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -122,7 +123,7 @@ private fun RemoteApp(client: RemoteClient, savedHost: String, onConnect: (Strin
         StatusBar(status, onEdit = { editingHost = true })
         // Ojo: nada de "return" temprano dentro de Column (es inline y rompe la recomposición).
         if (editingHost) {
-            ConnectForm(savedHost) { host -> editingHost = false; onConnect(host) }
+            ConnectForm(savedHost, client) { host -> editingHost = false; onConnect(host) }
         } else {
             // Desplazable: en celulares angostos las pestañas no parten las palabras.
             ScrollableTabRow(selectedTabIndex = tab, edgePadding = 0.dp) {
@@ -170,11 +171,37 @@ private fun StatusBar(status: ConnectionStatus, onEdit: () -> Unit) {
 }
 
 @Composable
-private fun ConnectForm(initial: String, onConnect: (String) -> Unit) {
+private fun ConnectForm(initial: String, client: RemoteClient, onConnect: (String) -> Unit) {
     var host by rememberSaveable { mutableStateOf(initial) }
+    var searching by remember { mutableStateOf(false) }
+    var found by remember { mutableStateOf<List<FoundServer>?>(null) }
+    var attempt by remember { mutableIntStateOf(0) }
     val connect = { if (host.isNotBlank()) onConnect(host.trim()) }
+
+    // Al abrir: buscar a Proyecta en la red. Si hay uno solo, conectarse sin preguntar.
+    LaunchedEffect(attempt) {
+        searching = true
+        val result = client.discover()
+        searching = false
+        found = result
+        if (result.size == 1 && attempt == 0 && initial.isEmpty()) onConnect(result[0].host)
+    }
+
     Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Escribe la dirección que muestra Proyecta en el computador (ej. 192.168.1.20)")
+        when {
+            searching -> Text("Buscando Proyecta en la red…", style = MaterialTheme.typography.titleMedium)
+            found.isNullOrEmpty() -> Text(
+                "No encontré Proyecta en esta red. Revisa que el computador tenga Proyecta abierto y esté en el mismo Wi-Fi.",
+                color = MaterialTheme.colorScheme.error,
+            )
+            else -> Text("Elige el computador:", style = MaterialTheme.typography.titleMedium)
+        }
+        found.orEmpty().forEach { s ->
+            Button({ onConnect(s.host) }, Modifier.fillMaxWidth().height(56.dp)) { Text("${s.name}  (${s.host})", maxLines = 1) }
+        }
+        OutlinedButton({ attempt++ }, Modifier.fillMaxWidth(), enabled = !searching) { Text("Buscar de nuevo") }
+
+        Text("O escribe la dirección que muestra Proyecta (ej. 192.168.1.20):", color = MaterialTheme.colorScheme.onSurfaceVariant)
         OutlinedTextField(
             host, { host = it },
             label = { Text("Dirección del computador") },
@@ -183,7 +210,7 @@ private fun ConnectForm(initial: String, onConnect: (String) -> Unit) {
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
             keyboardActions = KeyboardActions(onGo = { connect() }),
         )
-        Button(onClick = connect, modifier = Modifier.fillMaxWidth()) { Text("Conectar") }
+        OutlinedButton(onClick = connect, modifier = Modifier.fillMaxWidth(), enabled = host.isNotBlank()) { Text("Conectar a esta dirección") }
     }
 }
 

@@ -78,6 +78,10 @@ fun OperatorScreen(
     onEdit: (songId: String?) -> Unit,
     onOpenBackgrounds: () -> Unit,
     searchBible: (String) -> Pair<List<BibleHit>, Int>?,
+    firewallOk: Boolean?,
+    onAllowFirewall: () -> Unit,
+    onImport: () -> String?,
+    onExport: () -> String?,
 ) {
     var message by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(message) { if (message != null) { delay(5000); message = null } }
@@ -94,12 +98,15 @@ fun OperatorScreen(
         color = MaterialTheme.colorScheme.background,
     ) {
         Row(Modifier.fillMaxSize().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            LibraryPanel(catalog, Modifier.width(300.dp).fillMaxHeight(), send, onReload, onOpenFolder, onEdit, searchBible)
+            LibraryPanel(
+                catalog, Modifier.width(300.dp).fillMaxHeight(), send, onReload, onOpenFolder, onEdit, searchBible,
+                onImport = { onImport()?.let { message = it } }, onExport = { onExport()?.let { message = it } },
+            )
             PlanPanel(plan, Modifier.width(250.dp).fillMaxHeight(), send)
             SlidesPanel(state, Modifier.weight(1f).fillMaxHeight(), send, onEdit)
             ControlPanel(
                 state, addresses, port, serverError ?: message, projectorOn, onToggleProjector,
-                Modifier.width(300.dp).fillMaxHeight(), send, onOpenBackgrounds,
+                Modifier.width(300.dp).fillMaxHeight(), send, onOpenBackgrounds, firewallOk, onAllowFirewall,
             )
         }
     }
@@ -114,6 +121,8 @@ private fun LibraryPanel(
     onOpenFolder: () -> Unit,
     onEdit: (songId: String?) -> Unit,
     searchBible: (String) -> Pair<List<BibleHit>, Int>?,
+    onImport: () -> Unit,
+    onExport: () -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
     var reference by remember { mutableStateOf("") }
@@ -195,9 +204,13 @@ private fun LibraryPanel(
                 }
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onReload, Modifier.weight(1f)) { Text("Recargar") }
-            OutlinedButton(onOpenFolder, Modifier.weight(1f)) { Text("Abrir carpeta") }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            OutlinedButton(onImport, Modifier.weight(1f), contentPadding = PaddingValues(4.dp)) { Text("Importar…") }
+            OutlinedButton(onExport, Modifier.weight(1f), contentPadding = PaddingValues(4.dp)) { Text("Exportar…") }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            OutlinedButton(onReload, Modifier.weight(1f), contentPadding = PaddingValues(4.dp)) { Text("Recargar") }
+            OutlinedButton(onOpenFolder, Modifier.weight(1f), contentPadding = PaddingValues(4.dp)) { Text("Abrir carpeta") }
         }
     }
 }
@@ -255,6 +268,8 @@ private fun ControlPanel(
     modifier: Modifier,
     send: (ClientMessage) -> Unit,
     onOpenBackgrounds: () -> Unit,
+    firewallOk: Boolean?,
+    onAllowFirewall: () -> Unit,
 ) {
     Column(modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("En pantalla", style = MaterialTheme.typography.titleMedium)
@@ -294,6 +309,13 @@ private fun ControlPanel(
         StageMessageBox(state.stageMessage, send)
         HorizontalDivider()
         Text("Control remoto", style = MaterialTheme.typography.titleMedium)
+        if (firewallOk == false) {
+            Text(
+                "Las tablets y celulares todavía no pueden conectarse: falta el permiso de Windows.",
+                color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall,
+            )
+            Button(onAllowFirewall, Modifier.fillMaxWidth()) { Text("Permitir conexiones") }
+        }
         if (addresses.isEmpty()) {
             Text("No encontré una red local. Conecta este equipo al Wi-Fi o al router.")
         } else {

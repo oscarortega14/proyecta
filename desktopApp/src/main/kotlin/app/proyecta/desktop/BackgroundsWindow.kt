@@ -119,7 +119,7 @@ fun BackgroundsWindow(
                         item(span = { GridItemSpan(maxLineSpan) }) {
                             Text(
                                 if (!VideoBackgrounds.available) {
-                                    "Para usar videos de fondo instala VLC (64 bits): en PowerShell, winget install VideoLAN.VLC, y vuelve a abrir Proyecta."
+                                    "Los videos de fondo no están disponibles en esta instalación (falta el reproductor incluido)."
                                 } else if (videos.isEmpty()) {
                                     "Copia loops .mp4 (ej. de open.life.church) en la carpeta de fondos y presiona \"Actualizar\"."
                                 } else "Se reproducen en bucle y sin sonido. Revisa la licencia de cada video si transmiten el culto.",

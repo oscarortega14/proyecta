@@ -1,4 +1,6 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import java.net.URI
+import java.security.MessageDigest
 
 plugins {
     kotlin("jvm")
@@ -27,13 +29,52 @@ dependencies {
     testImplementation("io.ktor:ktor-client-websockets:$ktor")
 }
 
+// --- VLC incluido (solo Windows): reproduce los fondos de video sin instalar nada aparte ---
+// Se descarga el VLC portable oficial una vez, se verifica su SHA-256 y se extrae solo lo
+// necesario para reproducir video (sin interfaz, idiomas, red ni codificadores).
+val vlcVersion = "3.0.21"
+val vlcSha256 = "a0b7ec02b50adf6417eed014fb8df50af39690505a4225b85b3dc2ed17d14843"
+val vlcZip = layout.buildDirectory.file("vlc-download/vlc-$vlcVersion-win64.zip")
+val appResources = layout.buildDirectory.dir("appResources")
+
+val downloadVlc by tasks.registering {
+    outputs.file(vlcZip)
+    doLast {
+        val zip = vlcZip.get().asFile
+        fun sha(f: File) = MessageDigest.getInstance("SHA-256").digest(f.readBytes()).joinToString("") { "%02x".format(it) }
+        if (!zip.exists() || sha(zip) != vlcSha256) {
+            zip.parentFile.mkdirs()
+            val url = "https://download.videolan.org/pub/videolan/vlc/$vlcVersion/win64/vlc-$vlcVersion-win64.zip"
+            logger.lifecycle("Descargando VLC $vlcVersion…")
+            URI(url).toURL().openStream().use { input -> zip.outputStream().use { input.copyTo(it) } }
+            check(sha(zip) == vlcSha256) { "La firma SHA-256 de VLC no coincide: descarga dañada o alterada" }
+        }
+    }
+}
+
+val prepareVlc by tasks.registering(Sync::class) {
+    dependsOn(downloadVlc)
+    val keepPluginDirs = listOf("codec", "demux", "video_chroma", "video_output", "video_filter", "packetizer", "stream_filter", "misc", "d3d11", "d3d9")
+    from(zipTree(vlcZip)) {
+        include("vlc-$vlcVersion/libvlc.dll", "vlc-$vlcVersion/libvlccore.dll", "vlc-$vlcVersion/COPYING.txt", "vlc-$vlcVersion/AUTHORS.txt")
+        include(keepPluginDirs.map { "vlc-$vlcVersion/plugins/$it/**" })
+        include("vlc-$vlcVersion/plugins/access/libfilesystem_plugin.dll")
+        // codificadores (solo sirven para crear video) y subtítulos avanzados
+        exclude("**/libx264*", "**/libx265*", "**/libx26410b*", "**/liblibass*", "**/plugins.dat")
+        eachFile { path = path.removePrefix("vlc-$vlcVersion/") }
+        includeEmptyDirs = false
+    }
+    into(appResources.map { it.dir("windows/vlc") })
+}
+
 compose.desktop {
     application {
         mainClass = "app.proyecta.desktop.MainKt"
         nativeDistributions {
+            appResourcesRootDir.set(appResources)
             targetFormats(TargetFormat.Msi, TargetFormat.Deb)
             packageName = "Proyecta"
-            packageVersion = "1.2.0"
+            packageVersion = "1.3.0"
             description = "Proyección de canciones y Biblia con control remoto"
             vendor = "Proyecta"
             copyright = "MIT License"
@@ -48,5 +89,17 @@ compose.desktop {
                 upgradeUuid = "7f0c7a52-3b1e-4c58-9f0e-2b6f3a9d8e41"
             }
         }
+    }
+}
+
+// El VLC incluido entra en el instalador de Windows y en `run` (para probar).
+tasks.matching { it.name == "prepareAppResources" }.configureEach { dependsOn(prepareVlc) }
+
+// En Windows las pruebas usan el mismo VLC incluido que la app empaquetada.
+if (System.getProperty("os.name").startsWith("Windows")) {
+    tasks.withType<Test>().configureEach {
+        dependsOn(prepareVlc)
+        systemProperty("compose.application.resources.dir", appResources.get().dir("windows").asFile.absolutePath)
+        System.getenv("PROYECTA_VIDEO")?.let { environment("PROYECTA_VIDEO", it) }
     }
 }

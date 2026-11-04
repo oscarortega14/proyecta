@@ -86,6 +86,8 @@ class OverlaysTest {
         val r = RemoteServer.bibleSearch(library, "amo DIOS")
         assertTrue(r is ServerMessage.BibleResults)
         assertEquals(listOf("Juan 1:1"), r.hits.map { it.reference })
-        assertTrue(RemoteServer.bibleSearch(Library(createTempDirectory("v").toFile()).also { it.reload() }, "x") is ServerMessage.Error)
+        // sin Biblia en la carpeta se usa la Reina-Valera 1909 incluida
+        val bundled = RemoteServer.bibleSearch(Library(createTempDirectory("v").toFile()).also { it.reload() }, "de tal manera amó Dios")
+        assertTrue(bundled is ServerMessage.BibleResults && bundled.hits.first().reference == "Juan 3:16")
     }
 }

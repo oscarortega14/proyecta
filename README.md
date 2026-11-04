@@ -82,8 +82,11 @@ El botón "+ Orden" del editor la agrega con las secciones existentes.
 - **Buscar en la Biblia por frase**: escribe palabras ("amó Dios mundo") en vez de una cita y presiona "Buscar".
 - **Atajos de teclado**: → ↓ Espacio siguiente · ← ↑ anterior · `C` coro · `1`–`9` secciones · `B` negro ·
   `L` logo · `N` siguiente de la lista · `Esc` mostrar letra (o salir de un campo de texto) · Av Pág / Re Pág (clickers).
-- **Fondos incluidos** (dibujados por el programa, sin archivos ni licencias): Luz celestial (predeterminado),
-  Aurora, Bokeh dorado, Atardecer, Noche estrellada, Océano y Calvario.
+- **Fondos incluidos y animados** (dibujados por el programa, sin archivos ni licencias): Luz celestial (predeterminado),
+  Aurora, Bokeh dorado, Atardecer, Noche estrellada, Océano, Calvario y Destellos. Interruptor "Animación".
+- **Fondos de video en bucle** (`.mp4`, `.mov`, `.webm`…) en `Proyecta/fondos`, reproducidos con el VLC incluido
+  (licencia de VLC en `vlc/COPYING.txt`). Loops gratis para iglesias: open.life.church, Igniter Media, Hillsong.
+  Si transmiten el culto, revisen la licencia de cada video.
 - **Fondos y letra** (botón "Fondos y letra…"): fondos de color o degradado incluidos, o tus propias imágenes
   `.jpg`/`.png` en `Proyecta/fondos` (mejor 1920×1080); oscurecer la imagen, color y tamaño de la letra, sombra.
   Se guarda en `Proyecta/tema.json`. Fondo propio por canción con la línea `Fondo: archivo.jpg` debajo del título
@@ -100,16 +103,20 @@ El botón "+ Orden" del editor la agrega con las secciones existentes.
 
 Cualquiera conectado a la misma red puede controlar la proyección: úsalo en la red de la iglesia, no en una red pública.
 
+## Instalar en un PC nuevo (sin pasos manuales)
+
+1. Doble clic en `Proyecta-<versión>.msi`. Trae Java, el reproductor de video (VLC) y la Biblia Reina-Valera 1909.
+2. Abrir Proyecta y presionar **"Permitir"** en el aviso "Conectar tablets y celulares" (y "Sí" en la ventana de Windows).
+   Crea la regla del firewall para la red local (TCP 8765 y UDP 8766). Si se omite, hay un botón "Permitir conexiones".
+3. **Importar…** las canciones (archivos `.txt` o un `.zip` hecho con **Exportar…**).
+
+En la tablet o el celular: abrir la app. Encuentra sola al PC en la red (si el router le cambia la IP, lo vuelve a buscar).
+
 ## Uso
 
 - Doble monitor: la proyección se abre a pantalla completa en el segundo monitor (el videobeam).
 - Teclado y clickers de presentación: **Av Pág / Re Pág** para avanzar o retroceder, **Ctrl+B** pantalla negra.
 - En la tablet, escribe la dirección IP que muestra el computador (abajo a la derecha).
-- El firewall de Windows debe permitir el puerto 8765 en la red local. En una PowerShell de administrador:
-  ```powershell
-  Set-NetConnectionProfile -Name "<nombre del Wi-Fi>" -NetworkCategory Private
-  New-NetFirewallRule -DisplayName "Proyecta (control remoto)" -Direction Inbound -Protocol TCP -LocalPort 8765 -RemoteAddress LocalSubnet -Profile Private -Action Allow
-  ```
 - No pongas el código del programa en una carpeta llamada `Proyecta` dentro de la carpeta personal: Windows no distingue mayúsculas y se mezclaría con la biblioteca.
 
 ## Compilar

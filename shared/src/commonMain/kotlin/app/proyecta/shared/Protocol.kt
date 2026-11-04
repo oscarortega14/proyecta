@@ -8,6 +8,14 @@ import kotlinx.serialization.json.Json
 const val DEFAULT_PORT = 8765
 const val WS_PATH = "/ws"
 
+/** Descubrimiento en la red local: el remoto envía [DISCOVERY_REQUEST] por UDP (broadcast) a este puerto. */
+const val DISCOVERY_PORT = 8766
+const val DISCOVERY_REQUEST = "PROYECTA?"
+
+/** Respuesta del PC al descubrimiento. */
+@Serializable
+data class DiscoveryReply(val name: String, val port: Int = DEFAULT_PORT)
+
 /** Órdenes que manda el control remoto (o la ventana de operador) al presentador. */
 @Serializable
 sealed interface ClientMessage {

@@ -15,6 +15,8 @@ import java.nio.charset.Charset
 import java.nio.charset.CodingErrorAction
 
 /** Lo que el remoto necesita saber de la biblioteca. */
+data class ImportResult(val added: Int, val skipped: Int, val renamed: Int)
+
 data class Catalog(
     val songs: List<SongSummary> = emptyList(),
     val bibleName: String? = null,
@@ -111,6 +113,56 @@ class Library(val baseDir: File) {
         return save(id, lines.joinToString("\n"))
     }
 
+    /**
+     * Importa canciones: archivos .txt sueltos o dentro de .zip. Si ya existe una con el mismo
+     * nombre y el mismo texto se omite; si el texto es distinto se guarda como "Nombre (2)".
+     */
+    @Synchronized
+    fun importSongs(sources: List<File>): ImportResult {
+        songsDir.mkdirs()
+        var added = 0; var skipped = 0; var renamed = 0
+        fun take(name: String, bytes: ByteArray) {
+            val base = File(name).nameWithoutExtension.trim().ifEmpty { return }
+            val text = decodeSmart(bytes)
+            var target = File(songsDir, "$base.txt")
+            if (target.exists()) {
+                if (readTextSmart(target).trim() == text.trim()) { skipped++; return }
+                var n = 2
+                while (File(songsDir, "$base ($n).txt").exists()) n++
+                target = File(songsDir, "$base ($n).txt")
+                renamed++
+            }
+            target.writeText(text, Charsets.UTF_8)
+            added++
+        }
+        for (src in sources) {
+            when {
+                src.isDirectory -> src.listFiles { f -> f.isFile && f.extension.equals("txt", true) }.orEmpty().forEach { take(it.name, it.readBytes()) }
+                src.extension.equals("zip", true) -> java.util.zip.ZipFile(src).use { zip ->
+                    zip.entries().asSequence()
+                        .filter { !it.isDirectory && it.name.endsWith(".txt", true) && !it.name.contains("__MACOSX") }
+                        .forEach { e -> take(e.name.substringAfterLast('/'), zip.getInputStream(e).readBytes()) }
+                }
+                src.extension.equals("txt", true) -> take(src.name, src.readBytes())
+            }
+        }
+        reload()
+        return ImportResult(added, skipped, renamed)
+    }
+
+    /** Guarda todas las canciones en un .zip (respaldo o para pasarlas a otro PC). Devuelve cuántas. */
+    fun exportSongs(target: File): Int {
+        val files = songsDir.listFiles { f -> f.isSongFile() }.orEmpty().sortedBy { it.name }
+        java.util.zip.ZipOutputStream(target.outputStream()).use { zip ->
+            for (f in files) {
+                zip.putNextEntry(java.util.zip.ZipEntry("canciones/${f.name}"))
+                f.inputStream().use { it.copyTo(zip) }
+                zip.closeEntry()
+            }
+        }
+        return files.size
+    }
+
     @Synchronized
     fun delete(id: String) {
         songFile(id).delete()
@@ -142,7 +194,11 @@ class Library(val baseDir: File) {
                 .onFailure { error = "No pude leer ${f.name}: ${it.message}" }
                 .getOrNull()
         }
-        if (bibleFile == null) error = "No hay Biblia. Copia un archivo .json o .txt (VPL) en ${bibleDir.absolutePath}"
+        if (bibleFile == null) {
+            // Sin Biblia propia en la carpeta: se usa la Reina-Valera 1909 que viene con el programa.
+            bible = bundledBible
+            if (bible == null) error = "No hay Biblia. Copia un archivo .json o .txt (VPL) en ${bibleDir.absolutePath}"
+        }
 
         _catalog.value = Catalog(loaded.map { it.summary() }, bible?.name, error)
     }
@@ -170,6 +226,22 @@ class Library(val baseDir: File) {
     }
 
     companion object {
+        /** Reina-Valera 1909 (dominio público) incluida en el programa. */
+        val bundledBible: Bible? by lazy {
+            Library::class.java.getResourceAsStream("/biblia/Reina-Valera 1909.txt")?.use { input ->
+                runCatching { Bible.fromVpl(decodeSmart(input.readBytes()), "Reina-Valera 1909") }.getOrNull()
+            }
+        }
+
+        fun decodeSmart(bytes: ByteArray): String = try {
+            Charsets.UTF_8.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .decode(ByteBuffer.wrap(bytes)).toString()
+        } catch (_: CharacterCodingException) {
+            String(bytes, Charset.forName("windows-1252"))
+        }.removePrefix("\uFEFF")
+
         val IMAGE_EXTENSIONS = setOf("jpg", "jpeg", "png", "webp", "bmp")
         private val FONDO_LINE = Regex("""^fondo\s*:.*$""", RegexOption.IGNORE_CASE)
         private val FORBIDDEN = Regex("""[\\/:*?"<>|\u0000-\u001F]""")

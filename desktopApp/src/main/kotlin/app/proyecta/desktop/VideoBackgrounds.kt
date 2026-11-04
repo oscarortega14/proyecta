@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import com.sun.jna.NativeLibrary
 import org.jetbrains.skia.ColorAlphaType
 import org.jetbrains.skia.ColorType
 import org.jetbrains.skia.Image as SkiaImage
@@ -35,14 +36,33 @@ val VIDEO_EXTENSIONS = setOf("mp4", "mov", "m4v", "webm", "mkv", "avi", "wmv")
 fun isVideoFile(name: String) = name.substringAfterLast('.', "").lowercase() in VIDEO_EXTENSIONS
 
 /**
- * Fondos de video en bucle usando el VLC instalado en el PC (vía vlcj).
- * Si VLC no está, [available] es false y los videos simplemente no se muestran.
+ * Fondos de video en bucle con VLC (vía vlcj). Se usa el VLC que viene dentro de Proyecta
+ * (carpeta "vlc" en los recursos de la app); si no está, uno instalado en el PC.
+ * Si no hay ninguno, [available] es false y los videos simplemente no se muestran.
  */
 object VideoBackgrounds {
     /** Ancho máximo al que VLC entrega los cuadros: detrás de la letra no se nota y alivia mucho el trabajo. */
     private const val MAX_WIDTH = 1280
 
-    val available: Boolean by lazy { runCatching { NativeDiscovery().discover() }.getOrDefault(false) }
+    /** Carpeta del VLC incluido en la app (Windows), si existe. */
+    val bundledDir: File? by lazy {
+        System.getProperty("compose.application.resources.dir")
+            ?.let { File(it, "vlc") }
+            ?.takeIf { File(it, "libvlc.dll").isFile && File(it, "libvlccore.dll").isFile }
+    }
+
+    val available: Boolean by lazy { useBundled() || runCatching { NativeDiscovery().discover() }.getOrDefault(false) }
+
+    /** Apunta JNA al VLC incluido; VLC busca sus "plugins" junto a libvlccore.dll. */
+    private fun useBundled(): Boolean {
+        val dir = bundledDir ?: return false
+        return runCatching {
+            NativeLibrary.addSearchPath("libvlccore", dir.absolutePath)
+            NativeLibrary.addSearchPath("libvlc", dir.absolutePath)
+            NativeLibrary.getInstance(File(dir, "libvlccore.dll").absolutePath) // cargar primero su dependencia
+            true
+        }.getOrDefault(false)
+    }
 
     private val factory: MediaPlayerFactory? by lazy {
         if (!available) null

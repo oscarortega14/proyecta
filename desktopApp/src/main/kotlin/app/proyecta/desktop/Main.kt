@@ -23,6 +23,15 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import app.proyecta.shared.ClientMessage
 import app.proyecta.shared.PresentationState
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.awt.Desktop
 import java.awt.GraphicsEnvironment
 import java.io.File
@@ -36,6 +45,7 @@ fun main() {
         "No pude abrir el puerto ${server.port} para el control remoto: ${it.message}"
     }
     val addresses = RemoteServer.localAddresses()
+    val discovery = DiscoveryResponder().also { runCatching { it.start() } }
     val themes = ThemeStore(File(library.baseDir, "tema.json"))
 
     application {
@@ -45,12 +55,25 @@ fun main() {
         var projectorOn by remember { mutableStateOf(true) }
         var editing by remember { mutableStateOf<EditRequest?>(null) }
         var backgroundsOpen by remember { mutableStateOf(false) }
+        // Firewall de Windows: se revisa al abrir; si falta la regla se ofrece crearla con un clic.
+        var firewallOk by remember { mutableStateOf<Boolean?>(null) }
+        var askFirewall by remember { mutableStateOf(false) }
+        val scope = rememberCoroutineScope()
+        LaunchedEffect(Unit) {
+            val ok = withContext(Dispatchers.IO) { FirewallSetup.ruleExists() }
+            firewallOk = ok
+            askFirewall = !ok
+        }
+        val allowFirewall: () -> Unit = {
+            askFirewall = false
+            scope.launch { firewallOk = withContext(Dispatchers.IO) { FirewallSetup.requestRule() } }
+        }
         val theme by themes.theme.collectAsState()
         val look = Look(theme, backgroundFile = { name -> library.backgroundFile(name) })
 
         ProvideLook(look) {
         Window(
-            onCloseRequest = { server.stop(); exitApplication() },
+            onCloseRequest = { server.stop(); discovery.stop(); exitApplication() },
             title = "Proyecta — Operador",
             state = rememberWindowState(size = DpSize(1440.dp, 820.dp)),
             onPreviewKeyEvent = { handleShortcut(it, commands) },
@@ -70,8 +93,27 @@ fun main() {
                     onOpenFolder = { runCatching { Desktop.getDesktop().open(library.baseDir) } },
                     onEdit = { id -> editing = EditRequest(id) },
                     onOpenBackgrounds = { backgroundsOpen = true },
+                    firewallOk = firewallOk,
+                    onAllowFirewall = allowFirewall,
+                    onImport = { importSongs(library) },
+                    onExport = { exportSongs(library) },
                     searchBible = { q -> library.bible?.search(q) },
                 )
+                if (askFirewall) {
+                    AlertDialog(
+                        onDismissRequest = { askFirewall = false },
+                        title = { Text("Conectar tablets y celulares") },
+                        text = {
+                            Text(
+                                "Para que la tablet, los celulares y la vista de escenario se conecten a Proyecta, " +
+                                    "Windows necesita dar permiso una sola vez. Al presionar \"Permitir\" aparecerá " +
+                                    "la ventana de Windows: elige \"Sí\".",
+                            )
+                        },
+                        confirmButton = { Button(allowFirewall) { Text("Permitir") } },
+                        dismissButton = { TextButton({ askFirewall = false }) { Text("Ahora no") } },
+                    )
+                }
             }
         }
 
@@ -120,4 +162,34 @@ private fun ApplicationScope.ProjectorWindow(
     ) {
         ProjectorScreen(state)
     }
+}
+
+/** Elegir archivos .txt o .zip (o varios) e importarlos a la biblioteca. */
+private fun importSongs(library: Library): String? {
+    val dialog = java.awt.FileDialog(null as java.awt.Frame?, "Importar canciones (.txt o .zip)", java.awt.FileDialog.LOAD).apply {
+        isMultipleMode = true
+        setFilenameFilter { _, name -> name.endsWith(".txt", true) || name.endsWith(".zip", true) }
+        file = "*.txt;*.zip"
+        isVisible = true
+    }
+    val files = dialog.files?.toList().orEmpty()
+    if (files.isEmpty()) return null
+    val r = runCatching { library.importSongs(files) }.getOrElse { return "No pude importar: ${it.message}" }
+    return buildString {
+        append("Importadas: ${r.added}")
+        if (r.skipped > 0) append(" · ya estaban: ${r.skipped}")
+        if (r.renamed > 0) append(" · con nombre nuevo (texto distinto): ${r.renamed}")
+    }
+}
+
+/** Guardar todas las canciones en un .zip (respaldo o para otro PC). */
+private fun exportSongs(library: Library): String? {
+    val dialog = java.awt.FileDialog(null as java.awt.Frame?, "Exportar canciones", java.awt.FileDialog.SAVE).apply {
+        file = "canciones-proyecta.zip"
+        isVisible = true
+    }
+    val name = dialog.file ?: return null
+    val target = java.io.File(dialog.directory, if (name.endsWith(".zip", true)) name else "$name.zip")
+    val n = runCatching { library.exportSongs(target) }.getOrElse { return "No pude exportar: ${it.message}" }
+    return "Exportadas $n canciones a ${target.absolutePath}"
 }
