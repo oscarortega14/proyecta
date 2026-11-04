@@ -47,6 +47,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.AlertDialog
 import app.proyecta.shared.BibleReference
 import app.proyecta.shared.BibleHit
+import app.proyecta.shared.Bible
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.key
@@ -76,6 +77,7 @@ fun OperatorScreen(
     onOpenBackgrounds: () -> Unit,
     onOpenConnect: () -> Unit,
     searchBible: (String) -> Pair<List<BibleHit>, Int>?,
+    bible: Bible? = null,
     firewallOk: Boolean?,
     onImport: () -> String?,
     onExport: () -> String?,
@@ -108,7 +110,7 @@ fun OperatorScreen(
             HorizontalDivider()
             Row(Modifier.fillMaxSize().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 LeftPanel(
-                    catalog, plan, Modifier.width(330.dp).fillMaxHeight(), send, onReload, onOpenFolder, onEdit, searchBible,
+                    catalog, plan, Modifier.width(330.dp).fillMaxHeight(), send, onReload, onOpenFolder, onEdit, searchBible, bible,
                     onImport = { onImport()?.let { message = it } }, onExport = { onExport()?.let { message = it } },
                 )
                 SlidesPanel(state, Modifier.weight(1f).fillMaxHeight(), send, onEdit)
@@ -181,6 +183,7 @@ private fun LeftPanel(
     onOpenFolder: () -> Unit,
     onEdit: (songId: String?) -> Unit,
     searchBible: (String) -> Pair<List<BibleHit>, Int>?,
+    bible: Bible?,
     onImport: () -> Unit,
     onExport: () -> Unit,
 ) {
@@ -198,7 +201,7 @@ private fun LeftPanel(
         }
         when (tab) {
             0 -> SongsTab(catalog, Modifier.weight(1f), send, present, onReload, onOpenFolder, onEdit, onImport, onExport)
-            1 -> BibleTab(catalog, Modifier.weight(1f), send, present, searchBible)
+            1 -> BibleTab(catalog, bible, Modifier.weight(1f), send, present, searchBible)
             else -> PlanPanel(plan, Modifier.weight(1f).fillMaxWidth(), send)
         }
     }
@@ -257,6 +260,7 @@ private fun SongsTab(
 @Composable
 private fun BibleTab(
     catalog: Catalog,
+    bible: Bible?,
     modifier: Modifier,
     send: (ClientMessage) -> Unit,
     present: (ClientMessage) -> Unit,
@@ -293,12 +297,18 @@ private fun BibleTab(
             }
         }
         hits?.let { (list, total) ->
-            Text(
-                if (total == 0) "Sin resultados" else "$total resultados" + if (total > list.size) " (primeros ${list.size})" else "",
-                style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    if (total == 0) "Sin resultados" else "$total resultados" + if (total > list.size) " (primeros ${list.size})" else "",
+                    style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton({ hits = null }, contentPadding = PaddingValues(6.dp)) { Text("✕ Ver libros") }
+            }
         }
-        LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
+        if (hits == null && bible != null) {
+            BibleBrowser(bible, Modifier.weight(1f).fillMaxWidth(), send, present)
+        } else LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
             items(hits?.first.orEmpty(), key = { it.reference }) { hit ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f).handClickable { present(ClientMessage.ShowBible(hit.reference)) }.padding(vertical = 6.dp, horizontal = 4.dp)) {
@@ -309,7 +319,7 @@ private fun BibleTab(
                 }
             }
         }
-        if (hits == null) {
+        if (hits == null && bible == null) {
             Text(
                 "Escribe una cita (Juan 3:16, Sal 23, 1 Co 13:4-7) y presiona Enter para mostrarla, o unas palabras para buscarlas en toda la Biblia.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,

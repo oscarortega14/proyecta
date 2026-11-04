@@ -91,6 +91,7 @@ fun main() {
                     onOpenBackgrounds = { backgroundsOpen = true },
                     onOpenConnect = { connectOpen = true },
                     searchBible = { q -> library.bible?.search(q) },
+                    bible = remember(catalog) { library.bible },
                     firewallOk = firewallOk,
                     onImport = { importSongs(library) },
                     onExport = { exportSongs(library) },
