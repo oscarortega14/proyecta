@@ -16,6 +16,9 @@ class Presenter(
     /** Reloj del PC (inyectable para las pruebas de la cuenta regresiva). */
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
+    /** Se llama cada vez que se proyecta una canción o una lectura (para el historial). */
+    var onShown: ((HistoryEntry.Kind, title: String, ref: String) -> Unit)? = null
+
     private val _state = MutableStateFlow(PresentationState())
     val state: StateFlow<PresentationState> = _state.asStateFlow()
 
@@ -46,6 +49,7 @@ class Presenter(
                 ),
             )
         }
+        onShown?.invoke(HistoryEntry.Kind.SONG, song.title, song.id)
         return null
     }
 
@@ -74,6 +78,7 @@ class Presenter(
             return e.message
         }
         _state.update { it.keepingOverlays(PresentationState(passage.title, passage.slides, 0, isBible = true)) }
+        onShown?.invoke(HistoryEntry.Kind.BIBLE, passage.title, passage.title)
         return null
     }
 

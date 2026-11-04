@@ -68,6 +68,9 @@ fun main() {
         var editing by remember { mutableStateOf<EditRequest?>(null) }
         var backgroundsOpen by remember { mutableStateOf(false) }
         var connectOpen by remember { mutableStateOf(false) }
+        var historyOpen by remember { mutableStateOf(false) }
+        val historyEntries by commands.history!!.entries.collectAsState()
+        val lastSung = remember(historyEntries) { commands.history!!.lastSung() }
         // Firewall de Windows: se revisa al abrir; si falta la regla se ofrece crearla con un clic.
         var firewallOk by remember { mutableStateOf<Boolean?>(null) }
         var askFirewall by remember { mutableStateOf(false) }
@@ -115,6 +118,8 @@ fun main() {
                     onEdit = { id -> editing = EditRequest(id) },
                     onOpenBackgrounds = { backgroundsOpen = true },
                     onOpenConnect = { connectOpen = true },
+                    onOpenHistory = { historyOpen = true },
+                    lastSung = lastSung,
                     searchBible = { q -> library.bible?.search(q) },
                     bible = remember(catalog) { library.bible },
                     onSelectBible = { name ->
@@ -172,6 +177,10 @@ fun main() {
                 onAllowFirewall = allowFirewall,
                 onClose = { connectOpen = false },
             )
+        }
+
+        if (historyOpen) {
+            HistoryWindow(commands.history!!, onClose = { historyOpen = false })
         }
 
         if (backgroundsOpen) {

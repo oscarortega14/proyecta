@@ -82,6 +82,9 @@ fun OperatorScreen(
     onEdit: (songId: String?) -> Unit,
     onOpenBackgrounds: () -> Unit,
     onOpenConnect: () -> Unit,
+    onOpenHistory: () -> Unit = {},
+    /** Última vez que se cantó cada canción (id → fecha). */
+    lastSung: Map<String, java.time.LocalDate> = emptyMap(),
     searchBible: (String) -> Pair<List<BibleHit>, Int>?,
     bible: Bible? = null,
     onSelectBible: (String) -> Unit = {},
@@ -111,12 +114,13 @@ fun OperatorScreen(
                 connectAttention = firewallOk == false,
                 onOpenBackgrounds = onOpenBackgrounds,
                 onOpenConnect = onOpenConnect,
+                onOpenHistory = onOpenHistory,
                 onHelp = { helpOpen = true },
             )
             HorizontalDivider()
             Row(Modifier.fillMaxSize().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 LeftPanel(
-                    catalog, plan, savedLists, onDeleteSavedList, Modifier.width(330.dp).fillMaxHeight(), send, onReload, onOpenFolder, onEdit, searchBible, bible, onSelectBible,
+                    catalog, lastSung, plan, savedLists, onDeleteSavedList, Modifier.width(330.dp).fillMaxHeight(), send, onReload, onOpenFolder, onEdit, searchBible, bible, onSelectBible,
                     onImport = { onImport()?.let { message = it } }, onExport = { onExport()?.let { message = it } },
                 )
                 SlidesPanel(state, Modifier.weight(1f).fillMaxHeight(), send, onEdit)
@@ -148,6 +152,7 @@ private fun TopBar(
     connectAttention: Boolean,
     onOpenBackgrounds: () -> Unit,
     onOpenConnect: () -> Unit,
+    onOpenHistory: () -> Unit,
     onHelp: () -> Unit,
 ) {
     Row(
@@ -163,6 +168,7 @@ private fun TopBar(
             maxLines = 1, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f).padding(horizontal = 16.dp),
         )
+        OutlinedButton(onOpenHistory) { Text("Historial") }
         OutlinedButton(onOpenBackgrounds) { Text("Fondos y letra") }
         OutlinedButton(onOpenConnect) {
             if (connectAttention) Text("● ", color = MaterialTheme.colorScheme.error)
@@ -177,6 +183,7 @@ private fun TopBar(
 @Composable
 private fun LeftPanel(
     catalog: Catalog,
+    lastSung: Map<String, java.time.LocalDate>,
     plan: ServicePlanState,
     savedLists: List<String>,
     onDeleteSavedList: (String) -> Unit,
@@ -204,7 +211,7 @@ private fun LeftPanel(
             }
         }
         when (tab) {
-            0 -> SongsTab(catalog, Modifier.weight(1f), send, present, onReload, onOpenFolder, onEdit, onImport, onExport)
+            0 -> SongsTab(catalog, lastSung, Modifier.weight(1f), send, present, onReload, onOpenFolder, onEdit, onImport, onExport)
             1 -> BibleTab(catalog, bible, onSelectBible, Modifier.weight(1f), send, present, searchBible)
             else -> PlanPanel(plan, savedLists, onDeleteSavedList, Modifier.weight(1f).fillMaxWidth(), send)
         }
@@ -214,6 +221,7 @@ private fun LeftPanel(
 @Composable
 private fun SongsTab(
     catalog: Catalog,
+    lastSung: Map<String, java.time.LocalDate>,
     modifier: Modifier,
     send: (ClientMessage) -> Unit,
     present: (ClientMessage) -> Unit,
@@ -239,8 +247,9 @@ private fun SongsTab(
                 ) {
                     Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
                         Text(song.title, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        // "Cantada: hace 3 días" ayuda a no repetir
                         Text(
-                            song.firstLine, style = MaterialTheme.typography.bodySmall, maxLines = 1,
+                            lastSung[song.id]?.let { "Cantada: ${formatAgo(it)} · " }.orEmpty() + song.firstLine, style = MaterialTheme.typography.bodySmall, maxLines = 1,
                             overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }

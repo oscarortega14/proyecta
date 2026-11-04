@@ -149,7 +149,7 @@ fun suggestedListName(today: java.time.LocalDate = java.time.LocalDate.now()): S
 }
 
 /** Reparte cada orden: lo de la lista a [ServicePlan], el resto al [Presenter]. */
-class Commands(val presenter: Presenter, val plan: ServicePlan) {
+class Commands(val presenter: Presenter, val plan: ServicePlan, val history: History? = null) {
     fun handle(msg: ClientMessage): String? = when (msg) {
         is ClientMessage.PlanAddSong, is ClientMessage.PlanAddBible, is ClientMessage.PlanRemove,
         is ClientMessage.PlanMove, is ClientMessage.PlanGo, ClientMessage.PlanNext, ClientMessage.PlanClear,
@@ -162,7 +162,9 @@ class Commands(val presenter: Presenter, val plan: ServicePlan) {
         fun create(library: Library): Commands {
             val presenter = Presenter(library)
             val plan = ServicePlan(File(library.baseDir, "lista-del-culto.json"), library, presenter::handle)
-            return Commands(presenter, plan)
+            val history = History(File(library.baseDir, "historial.csv"))
+            presenter.onShown = history::record
+            return Commands(presenter, plan, history)
         }
     }
 }
