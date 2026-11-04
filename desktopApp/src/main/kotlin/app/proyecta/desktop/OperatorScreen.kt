@@ -83,6 +83,7 @@ fun OperatorScreen(
     onOpenBackgrounds: () -> Unit,
     onOpenConnect: () -> Unit,
     onOpenHistory: () -> Unit = {},
+    onOpenWelcome: () -> Unit = {},
     /** Última vez que se cantó cada canción (id → fecha). */
     lastSung: Map<String, java.time.LocalDate> = emptyMap(),
     searchBible: (String) -> Pair<List<BibleHit>, Int>?,
@@ -139,6 +140,7 @@ fun OperatorScreen(
                     }
                 },
                 confirmButton = { TextButton({ helpOpen = false }) { Text("Entendido") } },
+                dismissButton = { TextButton({ helpOpen = false; onOpenWelcome() }) { Text("Ver la guía de inicio") } },
             )
         }
     }

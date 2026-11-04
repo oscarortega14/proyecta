@@ -119,6 +119,7 @@ fun main() {
                     onOpenBackgrounds = { backgroundsOpen = true },
                     onOpenConnect = { connectOpen = true },
                     onOpenHistory = { historyOpen = true },
+                    onOpenWelcome = { settingsStore.update { it.copy(welcomeDone = false) } },
                     lastSung = lastSung,
                     searchBible = { q -> library.bible?.search(q) },
                     bible = remember(catalog) { library.bible },
@@ -130,6 +131,10 @@ fun main() {
                     onImport = { importSongs(library) },
                     onExport = { exportSongs(library) },
                 )
+                // La primera vez: guía corta. Después del aviso del firewall, para no encimar ventanas.
+                if (!settings.welcomeDone && !askFirewall) {
+                    WelcomeDialog(onDone = { settingsStore.update { it.copy(welcomeDone = true) } })
+                }
                 if (confirmProjectorOff) {
                     AlertDialog(
                         onDismissRequest = { confirmProjectorOff = false },
