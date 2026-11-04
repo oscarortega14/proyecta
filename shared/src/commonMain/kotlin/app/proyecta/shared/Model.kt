@@ -17,6 +17,8 @@ data class SongSummary(
     val firstLine: String = "",
 )
 
+private val VERSE_LABEL = Regex(""".*\d+:\d+$""")
+
 /** Lo que se está proyectando en este momento. */
 @Serializable
 data class PresentationState(
@@ -41,6 +43,8 @@ data class PresentationState(
     val countdownText: String = "",
     /** Anuncio en pantalla: imagen o video (archivo en Proyecta/anuncios) en vez de letra, o null. */
     val media: String? = null,
+    /** Predicación en pantalla (songId es el id de la predicación): las etiquetas salen como encabezado. */
+    val sermon: Boolean = false,
 ) {
     /** Segundos que faltan de la cuenta regresiva (0 si terminó), o null si no hay. */
     fun countdownSeconds(now: Long): Long? = countdownEnd?.let { ((it - now + 999) / 1000).coerceAtLeast(0) }
@@ -48,7 +52,12 @@ data class PresentationState(
     val current: Slide? get() = slides.getOrNull(index)
 
     /** Secciones para saltar rápido (Coro, Pregón 1…). Vacío para la Biblia. */
-    val sections: List<Section> get() = if (isBible) emptyList() else slides.sections()
+    val sections: List<Section> get() = when {
+        isBible -> emptyList()
+        // En una predicación, los versículos ("Juan 10:11") no son secciones para saltar: solo los puntos.
+        sermon -> slides.sections().filterNot { VERSE_LABEL.matches(it.label) }
+        else -> slides.sections()
+    }
 
     /** Posición en [sections] de la sección que contiene la diapositiva actual, o -1. */
     val currentSection: Int get() = sections.indexOfLast { it.start <= index }

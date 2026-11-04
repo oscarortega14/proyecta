@@ -27,6 +27,8 @@ data class Catalog(
     val bibleNotice: String? = null,
     /** Archivos de la carpeta anuncios (imágenes y videos). */
     val announcements: List<String> = emptyList(),
+    /** Predicaciones (carpeta predicaciones), con el mismo formato que las canciones. */
+    val sermons: List<SongSummary> = emptyList(),
 )
 
 /**
@@ -39,6 +41,10 @@ class Library(val baseDir: File) {
     val bibleDir = File(baseDir, "biblia")
     val backgroundsDir = File(baseDir, "fondos")
     val announcementsDir = File(baseDir, "anuncios")
+    val sermonsDir = File(baseDir, "predicaciones")
+    @Volatile private var sermons: Map<String, Song> = emptyMap()
+
+    fun sermon(id: String): Song? = sermons[id]
 
     @Volatile private var songs: Map<String, Song> = emptyMap()
     @Volatile var bible: Bible? = null
@@ -56,10 +62,10 @@ class Library(val baseDir: File) {
 
     fun song(id: String): Song? = songs[id]
 
-    private fun songFile(id: String) = File(songsDir, "$id.txt")
+    private fun songFile(id: String, sermon: Boolean = false) = File(if (sermon) sermonsDir else songsDir, "$id.txt")
 
     /** Texto tal como está en el archivo, para el editor. */
-    fun rawText(id: String): String? = songFile(id).takeIf { it.isFile }?.let { readTextSmart(it) }
+    fun rawText(id: String, sermon: Boolean = false): String? = songFile(id, sermon).takeIf { it.isFile }?.let { readTextSmart(it) }
 
     /**
      * Guarda una canción y recarga la biblioteca. El nombre del archivo sale del título,
@@ -67,26 +73,28 @@ class Library(val baseDir: File) {
      * Lanza IllegalArgumentException con un mensaje para el usuario si algo no cuadra.
      */
     @Synchronized
-    fun save(oldId: String?, text: String): String {
+    fun save(oldId: String?, text: String, sermon: Boolean = false): String {
+        val dir = if (sermon) sermonsDir else songsDir
+        val what = if (sermon) "una predicación" else "una canción"
         val normalized = text.replace("\r\n", "\n").replace('\r', '\n').trimEnd() + "\n"
         if (!normalized.trimStart().startsWith("#")) {
-            throw IllegalArgumentException("La primera línea debe ser el título, por ejemplo: # Cuán grande es Él")
+            throw IllegalArgumentException("La primera línea debe ser el título, por ejemplo: # " + if (sermon) "El buen pastor" else "Cuán grande es Él")
         }
         val title = SongParser.parse("", normalized).title.trim()
         if (title.isEmpty()) throw IllegalArgumentException("Falta el título después de #")
         val newId = fileNameFor(title)
         if (newId.isEmpty()) throw IllegalArgumentException("El título no sirve como nombre de archivo")
-        val existing = songFile(newId)
+        val existing = songFile(newId, sermon)
         val renaming = oldId != null && !newId.equals(oldId, ignoreCase = true)
         if ((oldId == null || renaming) && existing.exists()) {
-            throw IllegalArgumentException("Ya existe una canción llamada \"$title\"")
+            throw IllegalArgumentException("Ya existe $what llamada \"$title\"")
         }
 
-        songsDir.mkdirs()
+        dir.mkdirs()
         // Escribir primero a un temporal para no dejar el archivo a medias si algo falla.
-        val tmp = File(songsDir, ".$newId.tmp")
+        val tmp = File(dir, ".$newId.tmp")
         tmp.writeText(normalized, Charsets.UTF_8)
-        if (oldId != null) songFile(oldId).takeIf { it.exists() }?.delete()
+        if (oldId != null) songFile(oldId, sermon).takeIf { it.exists() }?.delete()
         if (!tmp.renameTo(existing)) {
             existing.writeText(normalized, Charsets.UTF_8)
             tmp.delete()
@@ -187,8 +195,8 @@ class Library(val baseDir: File) {
     }
 
     @Synchronized
-    fun delete(id: String) {
-        songFile(id).delete()
+    fun delete(id: String, sermon: Boolean = false) {
+        songFile(id, sermon).delete()
         reload()
     }
 
@@ -198,6 +206,11 @@ class Library(val baseDir: File) {
         bibleDir.mkdirs()
         backgroundsDir.mkdirs()
         announcementsDir.mkdirs()
+        sermonsDir.mkdirs()
+        if (sermonsDir.listFiles { f -> f.isSongFile() }.isNullOrEmpty()) writeExampleSermon()
+        sermons = sermonsDir.listFiles { f -> f.isSongFile() }.orEmpty()
+            .map { f -> SongParser.parse(f.nameWithoutExtension, readTextSmart(f), f.nameWithoutExtension) }
+            .associateBy { it.id }
         if (songsDir.listFiles { f -> f.isSongFile() }.isNullOrEmpty()) writeExampleSong()
 
         val loaded = songsDir.listFiles { f -> f.isSongFile() }.orEmpty()
@@ -235,7 +248,10 @@ class Library(val baseDir: File) {
         val active = preferredBible?.takeIf { it in names } ?: userBibles.keys.firstOrNull() ?: BUNDLED_BIBLES.first()
         bible = userBibles[active] ?: bundled(active)
         val error = bibleErrors ?: if (bible == null) "No hay Biblia. Copia un archivo .json o .txt (VPL) en ${bibleDir.absolutePath}" else null
-        _catalog.value = Catalog(songs, bible?.name, error, names, BIBLE_NOTICES[bible?.name], scanAnnouncements())
+        _catalog.value = Catalog(
+            songs, bible?.name, error, names, BIBLE_NOTICES[bible?.name], scanAnnouncements(),
+            sermons.values.sortedBy { normalizeText(it.title) }.map { it.summary() },
+        )
     }
 
     private fun scanAnnouncements(): List<String> = announcementsDir.listFiles { f -> f.isFile && isMediaFile(f.name) }.orEmpty()
@@ -266,6 +282,32 @@ class Library(val baseDir: File) {
     }
 
     private fun File.isSongFile() = isFile && extension.equals("txt", true)
+
+    private fun writeExampleSermon() {
+        File(sermonsDir, "Ejemplo de predicación.txt").writeText(
+            """
+            # El buen pastor
+
+            Introducción:
+            Dios nos busca primero
+            aunque nos alejemos
+
+            Biblia: Juan 10:11
+
+            Punto 1:
+            Él conoce a sus ovejas
+
+            Punto 2:
+            Él da su vida por ellas
+
+            Biblia: Salmos 23:1-3
+
+            Conclusión:
+            Volvamos al buen pastor
+            """.trimIndent() + "\n",
+            Charsets.UTF_8,
+        )
+    }
 
     private fun writeExampleSong() {
         File(songsDir, "Canción de ejemplo.txt").writeText(

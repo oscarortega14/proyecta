@@ -35,6 +35,11 @@ class ServicePlan(
             if (song == null) "Canción no encontrada" else { update { it.copy(items = it.items + PlanItem(PlanKind.SONG, song.id, song.title)) }; null }
         }
         is ClientMessage.PlanAddBible -> addBible(msg.reference)
+        is ClientMessage.PlanAddSermon -> {
+            val sermon = library.sermon(msg.id)
+            if (sermon == null) "Predicación no encontrada"
+            else { update { it.copy(items = it.items + PlanItem(PlanKind.SERMON, sermon.id, "Predicación: ${sermon.title}")) }; null }
+        }
         is ClientMessage.PlanAddMedia -> {
             if (library.announcementFile(msg.name) == null) "Anuncio no encontrado"
             else { update { it.copy(items = it.items + PlanItem(PlanKind.MEDIA, msg.name, "Anuncio: ${msg.name.substringBeforeLast('.')}")) }; null }
@@ -99,6 +104,7 @@ class ServicePlan(
             PlanKind.SONG -> present(ClientMessage.SelectSong(item.ref))
             PlanKind.BIBLE -> present(ClientMessage.ShowBible(item.ref))
             PlanKind.MEDIA -> present(ClientMessage.ShowMedia(item.ref))
+            PlanKind.SERMON -> present(ClientMessage.ShowSermon(item.ref))
         }
         if (error == null) update { it.copy(current = index) }
         return error
@@ -158,7 +164,7 @@ class Commands(val presenter: Presenter, val plan: ServicePlan, val history: His
     fun handle(msg: ClientMessage): String? = when (msg) {
         is ClientMessage.PlanAddSong, is ClientMessage.PlanAddBible, is ClientMessage.PlanRemove,
         is ClientMessage.PlanMove, is ClientMessage.PlanGo, ClientMessage.PlanNext, ClientMessage.PlanClear,
-        is ClientMessage.PlanSave, is ClientMessage.PlanOpen, is ClientMessage.PlanAddMedia,
+        is ClientMessage.PlanSave, is ClientMessage.PlanOpen, is ClientMessage.PlanAddMedia, is ClientMessage.PlanAddSermon,
         -> plan.handle(msg)
         else -> presenter.handle(msg)
     }

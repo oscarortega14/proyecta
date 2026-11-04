@@ -80,6 +80,7 @@ fun OperatorScreen(
     onReload: () -> Unit,
     onOpenFolder: () -> Unit,
     onEdit: (songId: String?) -> Unit,
+    onEditSermon: (String?) -> Unit = {},
     onOpenBackgrounds: () -> Unit,
     onOpenConnect: () -> Unit,
     onOpenHistory: () -> Unit = {},
@@ -133,8 +134,9 @@ fun OperatorScreen(
                     currentMedia = state.media,
                     onAddAnnouncements = { onAddAnnouncements()?.let { message = it } },
                     onOpenAnnouncements = onOpenAnnouncements,
+                    onEditSermon = onEditSermon,
                 )
-                SlidesPanel(state, Modifier.weight(1f).fillMaxHeight(), send, onEdit)
+                SlidesPanel(state, Modifier.weight(1f).fillMaxHeight(), send) { id -> if (state.sermon) onEditSermon(id) else onEdit(id) }
                 LivePanel(state, Modifier.width(320.dp).fillMaxHeight(), send)
             }
         }
@@ -219,6 +221,7 @@ private fun LeftPanel(
     currentMedia: String?,
     onAddAnnouncements: () -> Unit,
     onOpenAnnouncements: () -> Unit,
+    onEditSermon: (String?) -> Unit,
 ) {
     var tab by remember { mutableIntStateOf(0) }
     val focusManager = LocalFocusManager.current
@@ -240,7 +243,7 @@ private fun LeftPanel(
             }
         }
         when (tab) {
-            0 -> SongsTab(catalog, lastSung, Modifier.weight(1f), send, present, onReload, onOpenFolder, onEdit, onImport, onExport)
+            0 -> SongsTab(catalog, lastSung, Modifier.weight(1f), send, present, onReload, onOpenFolder, onEdit, onImport, onExport, onEditSermon)
             1 -> BibleTab(catalog, bible, onSelectBible, Modifier.weight(1f), send, present, searchBible)
             2 -> AnnouncementsTab(catalog.announcements, currentMedia, Modifier.weight(1f), send, present, onAddAnnouncements, onOpenAnnouncements)
             else -> PlanPanel(plan, savedLists, onDeleteSavedList, Modifier.weight(1f).fillMaxWidth(), send)
@@ -260,38 +263,54 @@ private fun SongsTab(
     onEdit: (songId: String?) -> Unit,
     onImport: () -> Unit,
     onExport: () -> Unit,
+    onEditSermon: (String?) -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
-    val results = remember(query, catalog) { catalog.songs.search(query) }
+    var sermons by remember { mutableStateOf(false) }
+    val list = if (sermons) catalog.sermons else catalog.songs
+    val results = remember(query, catalog, sermons) { list.search(query) }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            FilterChip(!sermons, { sermons = false }, { Text("Canciones (${catalog.songs.size})") })
+            FilterChip(sermons, { sermons = true }, { Text("Predicaciones (${catalog.sermons.size})") })
+        }
         OutlinedTextField(
             query, { query = it },
-            label = { Text("Buscar entre ${catalog.songs.size} canciones") },
+            label = { Text(if (sermons) "Buscar predicación" else "Buscar entre ${catalog.songs.size} canciones") },
             singleLine = true, modifier = Modifier.fillMaxWidth().marksTyping(),
         )
         LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
             items(results, key = { it.id }) { song ->
                 Row(
-                    Modifier.fillMaxWidth().handClickable { present(ClientMessage.SelectSong(song.id)) }.padding(start = 4.dp),
+                    Modifier.fillMaxWidth().handClickable {
+                        present(if (sermons) ClientMessage.ShowSermon(song.id) else ClientMessage.SelectSong(song.id))
+                    }.padding(start = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
                         Text(song.title, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         // "Cantada: hace 3 días" ayuda a no repetir
                         Text(
-                            lastSung[song.id]?.let { "Cantada: ${formatAgo(it)} · " }.orEmpty() + song.firstLine, style = MaterialTheme.typography.bodySmall, maxLines = 1,
+                            (if (sermons) "" else lastSung[song.id]?.let { "Cantada: ${formatAgo(it)} · " }.orEmpty()) + song.firstLine, style = MaterialTheme.typography.bodySmall, maxLines = 1,
                             overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    TextButton({ send(ClientMessage.PlanAddSong(song.id)) }, contentPadding = PaddingValues(6.dp)) { Text("+ Lista") }
-                    TextButton({ onEdit(song.id) }, contentPadding = PaddingValues(6.dp)) { Text("Editar") }
+                    TextButton(
+                        { send(if (sermons) ClientMessage.PlanAddSermon(song.id) else ClientMessage.PlanAddSong(song.id)) },
+                        contentPadding = PaddingValues(6.dp),
+                    ) { Text("+ Lista") }
+                    TextButton({ if (sermons) onEditSermon(song.id) else onEdit(song.id) }, contentPadding = PaddingValues(6.dp)) { Text("Editar") }
                 }
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Button({ onEdit(null) }, Modifier.weight(1f), contentPadding = PaddingValues(4.dp)) { Text("+ Nueva") }
-            OutlinedButton(onImport, Modifier.weight(1f), contentPadding = PaddingValues(4.dp)) { Text("Importar…") }
-            OutlinedButton(onExport, Modifier.weight(1f), contentPadding = PaddingValues(4.dp)) { Text("Exportar…") }
+            if (sermons) {
+                Button({ onEditSermon(null) }, Modifier.weight(1f), contentPadding = PaddingValues(4.dp)) { Text("+ Nueva predicación") }
+            } else {
+                Button({ onEdit(null) }, Modifier.weight(1f), contentPadding = PaddingValues(4.dp)) { Text("+ Nueva") }
+                OutlinedButton(onImport, Modifier.weight(1f), contentPadding = PaddingValues(4.dp)) { Text("Importar…") }
+                OutlinedButton(onExport, Modifier.weight(1f), contentPadding = PaddingValues(4.dp)) { Text("Exportar…") }
+            }
         }
         Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
             TextButton(onReload) { Text("Recargar") }
@@ -386,7 +405,7 @@ private fun SlidesPanel(
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.weight(1f),
             )
-            state.songId?.let { id -> OutlinedButton({ onEdit(id) }) { Text("Editar canción") } }
+            state.songId?.let { id -> OutlinedButton({ onEdit(id) }) { Text(if (state.sermon) "Editar predicación" else "Editar canción") } }
         }
         SectionJumps(state, send)
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState, verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -532,7 +551,7 @@ private fun PlanPanel(
                         Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
                             Text("${i + 1}. ${item.title}", maxLines = 2, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
                             Text(
-                                when (item.kind) { PlanKind.BIBLE -> "Lectura"; PlanKind.MEDIA -> "Anuncio"; else -> "Canción" },
+                                when (item.kind) { PlanKind.BIBLE -> "Lectura"; PlanKind.MEDIA -> "Anuncio"; PlanKind.SERMON -> "Predicación"; else -> "Canción" },
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )

@@ -55,8 +55,23 @@ private val NEW_SONG_TEMPLATE = """
     Línea del coro
 """.trimIndent() + "\n"
 
-/** Qué canción se está editando: [songId] null = canción nueva. */
-data class EditRequest(val songId: String?)
+private val NEW_SERMON_TEMPLATE = """
+    # Título de la predicación
+
+    Introducción:
+    Una idea para empezar
+
+    Biblia: Juan 3:16
+
+    Punto 1:
+    Primera idea principal
+
+    Punto 2:
+    Segunda idea principal
+""".trimIndent() + "\n"
+
+/** Qué se está editando: [songId] null = nueva. [sermon]: una predicación en vez de una canción. */
+data class EditRequest(val songId: String?, val sermon: Boolean = false)
 
 @Composable
 fun SongEditorWindow(
@@ -66,18 +81,21 @@ fun SongEditorWindow(
     onClose: () -> Unit,
 ) {
     val songId = request.songId
-    val original = remember(request) { songId?.let { library.rawText(it) } ?: NEW_SONG_TEMPLATE }
+    val sermon = request.sermon
+    val original = remember(request) { songId?.let { library.rawText(it, sermon) } ?: if (sermon) NEW_SERMON_TEMPLATE else NEW_SONG_TEMPLATE }
     var value by remember(request) { mutableStateOf(TextFieldValue(original, TextRange(original.length))) }
     var error by remember(request) { mutableStateOf<String?>(null) }
     var confirmDiscard by remember(request) { mutableStateOf(false) }
     var confirmDelete by remember(request) { mutableStateOf(false) }
     val dirty = value.text != original
     val preview = remember(value.text) { SongParser.parse("vista", value.text, "(sin título)") }
+    // Predicación: la vista previa ya trae los versículos de "Biblia: …" y avisa si una cita no existe.
+    val expanded = remember(value.text, sermon) { if (sermon) app.proyecta.shared.Sermon.expand(preview, library.bible) else null }
 
     fun save() {
         try {
-            val newId = library.save(songId, value.text)
-            presenter.songSaved(songId, newId)
+            val newId = library.save(songId, value.text, sermon)
+            if (sermon) presenter.sermonSaved(songId, newId) else presenter.songSaved(songId, newId)
             onClose()
         } catch (e: IllegalArgumentException) {
             error = e.message
@@ -88,7 +106,11 @@ fun SongEditorWindow(
 
     Window(
         onCloseRequest = { if (dirty) confirmDiscard = true else onClose() },
-        title = if (songId == null) "Nueva canción" else "Editar: ${preview.title}",
+        title = when {
+            songId == null && sermon -> "Nueva predicación"
+            songId == null -> "Nueva canción"
+            else -> "Editar: ${preview.title}"
+        },
         state = rememberFittedWindowState(DpSize(1150.dp, 780.dp)),
         onPreviewKeyEvent = {
             if (it.type == KeyEventType.KeyDown && it.isCtrlPressed && it.key == Key.S) { save(); true } else false
@@ -101,11 +123,17 @@ fun SongEditorWindow(
                         Button(::save) { Text("Guardar (Ctrl+S)") }
                         OutlinedButton({ if (dirty) confirmDiscard = true else onClose() }) { Text("Cancelar") }
                         Spacer(Modifier.width(16.dp))
-                        TextButton({ value = value.insertBlock("Coro:\n") }) { Text("+ Coro") }
-                        TextButton({ value = value.insertBlock("Pregón ${nextNumber(value.text, "Pregón")}:\n") }) { Text("+ Pregón") }
-                        TextButton({ value = value.insertBlock("Puente:\n") }) { Text("+ Puente") }
-                        TextButton({ value = value.insertBlock("") }) { Text("+ Nueva diapositiva") }
-                        TextButton({ value = value.withOrderLine() }) { Text("+ Orden") }
+                        if (sermon) {
+                            TextButton({ value = value.insertBlock("Punto ${nextNumber(value.text, "Punto")}:\n") }) { Text("+ Punto") }
+                            TextButton({ value = value.insertBlock("Biblia: ") }) { Text("+ Versículo") }
+                            TextButton({ value = value.insertBlock("") }) { Text("+ Nueva diapositiva") }
+                        } else {
+                            TextButton({ value = value.insertBlock("Coro:\n") }) { Text("+ Coro") }
+                            TextButton({ value = value.insertBlock("Pregón ${nextNumber(value.text, "Pregón")}:\n") }) { Text("+ Pregón") }
+                            TextButton({ value = value.insertBlock("Puente:\n") }) { Text("+ Puente") }
+                            TextButton({ value = value.insertBlock("") }) { Text("+ Nueva diapositiva") }
+                            TextButton({ value = value.withOrderLine() }) { Text("+ Orden") }
+                        }
                         Spacer(Modifier.weight(1f))
                         if (songId != null) {
                             OutlinedButton(
@@ -124,12 +152,21 @@ fun SongEditorWindow(
                             modifier = Modifier.weight(1f).fillMaxHeight(),
                             textStyle = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 15.sp),
                         )
-                        Preview(preview.title, preview.slides, preview.unknownOrder, Modifier.width(400.dp).fillMaxHeight())
+                        Preview(
+                            preview.title, expanded?.slides ?: preview.slides,
+                            expanded?.problems ?: preview.unknownOrder.map { "En \"Orden:\" no existe: $it" },
+                            Modifier.width(400.dp).fillMaxHeight(),
+                        )
                     }
                     Text(
-                        "Formato: la primera línea es \"# Título\". Una línea en blanco separa diapositivas. " +
-                            "\"Coro:\", \"Pregón 1:\"… al inicio de un bloque crean una sección para saltar rápido. " +
-                            "\"Orden: Inicio, Coro, Pregón 1, Coro\" (debajo del título) repite secciones al avanzar.",
+                        if (sermon) {
+                            "Formato: la primera línea es \"# Título\" (sale como portada). Una línea en blanco separa diapositivas. " +
+                                "\"Punto 1:\" al inicio de un bloque sale como encabezado. Un bloque \"Biblia: Juan 10:11\" se reemplaza por los versículos."
+                        } else {
+                            "Formato: la primera línea es \"# Título\". Una línea en blanco separa diapositivas. " +
+                                "\"Coro:\", \"Pregón 1:\"… al inicio de un bloque crean una sección para saltar rápido. " +
+                                "\"Orden: Inicio, Coro, Pregón 1, Coro\" (debajo del título) repite secciones al avanzar."
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -148,9 +185,9 @@ fun SongEditorWindow(
                     AlertDialog(
                         onDismissRequest = { confirmDelete = false },
                         title = { Text("¿Eliminar \"${preview.title}\"?") },
-                        text = { Text("Se borra el archivo $songId.txt de la carpeta de canciones.") },
+                        text = { Text("Se borra el archivo $songId.txt de la carpeta de ${if (sermon) "predicaciones" else "canciones"}.") },
                         confirmButton = {
-                            TextButton({ confirmDelete = false; library.delete(songId); onClose() }) {
+                            TextButton({ confirmDelete = false; library.delete(songId, sermon); onClose() }) {
                                 Text("Eliminar", color = MaterialTheme.colorScheme.error)
                             }
                         },
@@ -163,12 +200,12 @@ fun SongEditorWindow(
 }
 
 @Composable
-private fun Preview(title: String, slides: List<app.proyecta.shared.Slide>, unknownOrder: List<String>, modifier: Modifier) {
+private fun Preview(title: String, slides: List<app.proyecta.shared.Slide>, problems: List<String>, modifier: Modifier) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(title, style = MaterialTheme.typography.titleMedium)
-        if (unknownOrder.isNotEmpty()) {
+        if (problems.isNotEmpty()) {
             Text(
-                "En \"Orden:\" no existen: " + unknownOrder.joinToString(", "),
+                problems.joinToString("\n"),
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
             )

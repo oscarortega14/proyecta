@@ -31,6 +31,7 @@ class Presenter(
         is ClientMessage.SetBlank -> { _state.update { it.copy(blank = msg.blank) }; null }
         is ClientMessage.ShowBible -> showBible(msg.reference)
         is ClientMessage.ShowMedia -> showMedia(msg.name)
+        is ClientMessage.ShowSermon -> showSermon(msg.id)
         is ClientMessage.StageMessage -> { _state.update { it.copy(stageMessage = msg.text.trim()) }; null }
         is ClientMessage.ShowLogo -> { _state.update { it.copy(logo = msg.show, blank = if (msg.show) false else it.blank) }; null }
         is ClientMessage.SetAlert -> { _state.update { it.copy(alert = msg.text.trim()) }; null }
@@ -61,7 +62,7 @@ class Presenter(
     fun songSaved(oldId: String?, newId: String) {
         val song = library.song(newId) ?: return
         _state.update { s ->
-            val onScreen = !s.isBible && s.songId != null && (s.songId == oldId || s.songId == newId)
+            val onScreen = !s.isBible && !s.sermon && s.songId != null && (s.songId == oldId || s.songId == newId)
             if (!onScreen) return@update s
             val idx = when {
                 song.slides.isEmpty() -> -1
@@ -81,6 +82,24 @@ class Presenter(
         _state.update { it.keepingOverlays(PresentationState(passage.title, passage.slides, 0, isBible = true)) }
         onShown?.invoke(HistoryEntry.Kind.BIBLE, passage.title, passage.title)
         return null
+    }
+
+    private fun showSermon(id: String): String? {
+        val sermon = library.sermon(id) ?: return "Predicación no encontrada (¿se borró el archivo?)"
+        val slides = app.proyecta.shared.Sermon.expand(sermon, library.bible).slides
+        _state.update { it.keepingOverlays(PresentationState(sermon.title, slides, 0, songId = sermon.id, sermon = true, background = sermon.background)) }
+        onShown?.invoke(HistoryEntry.Kind.SERMON, sermon.title, sermon.id)
+        return null
+    }
+
+    /** Tras guardar una predicación en el editor: si está en pantalla, se actualiza sin moverse. */
+    fun sermonSaved(oldId: String?, newId: String) {
+        val sermon = library.sermon(newId) ?: return
+        _state.update { s ->
+            if (!s.sermon || (s.songId != oldId && s.songId != newId)) return@update s
+            val slides = app.proyecta.shared.Sermon.expand(sermon, library.bible).slides
+            s.copy(title = sermon.title, slides = slides, index = s.index.coerceIn(0, slides.lastIndex), songId = sermon.id)
+        }
     }
 
     private fun showMedia(name: String): String? {

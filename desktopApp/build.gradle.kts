@@ -14,7 +14,7 @@ kotlin { jvmToolchain(17) }
 val ktor = "3.0.1"
 
 /** Versión de Proyecta: va al instalador y a la app (para avisar cuando hay una más nueva). */
-val appVersion = "2.0.0"
+val appVersion = "2.1.0"
 
 dependencies {
     implementation(project(":shared"))

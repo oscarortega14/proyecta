@@ -206,7 +206,9 @@ internal fun animationFps(preview: Boolean, gpu: Boolean, smooth: Boolean, light
 @Composable
 private fun SlideText(state: PresentationState, text: String, label: String, theme: Theme, width: Dp, height: Dp) {
     val pad = width * 0.05f
-    val showLabel = state.isBible && label.isNotEmpty()
+    // Biblia: la cita abajo. Predicación: "Punto 1", "Juan 10:11"… como encabezado arriba.
+    val showLabel = (state.isBible || state.sermon) && label.isNotEmpty()
+    val labelOnTop = state.sermon
     val color = hexColor(theme.textColor)
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
@@ -224,8 +226,12 @@ private fun SlideText(state: PresentationState, text: String, label: String, the
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        if (showLabel && labelOnTop) {
+            Text(label, style = labelStyle(size).copy(color = color.copy(alpha = 0.8f), shadow = shadow, fontWeight = FontWeight.Bold))
+            Spacer(Modifier.height(with(density) { (size * LABEL_GAP).sp.toDp() }))
+        }
         Text(text, style = slideStyle(size).copy(color = color, shadow = shadow))
-        if (showLabel) {
+        if (showLabel && !labelOnTop) {
             Spacer(Modifier.height(with(density) { (size * LABEL_GAP).sp.toDp() }))
             Text(label, style = labelStyle(size).copy(color = color.copy(alpha = 0.75f), shadow = shadow))
         }

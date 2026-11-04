@@ -97,6 +97,13 @@ sealed interface ClientMessage {
     @Serializable @SerialName("plan_add_media")
     data class PlanAddMedia(val name: String) : ClientMessage
 
+    /** Proyectar una predicación (archivo de la carpeta predicaciones). */
+    @Serializable @SerialName("sermon")
+    data class ShowSermon(val id: String) : ClientMessage
+
+    @Serializable @SerialName("plan_add_sermon")
+    data class PlanAddSermon(val id: String) : ClientMessage
+
     /** Buscar una frase en la Biblia; responde con ServerMessage.BibleResults. */
     @Serializable @SerialName("bible_search")
     data class BibleSearch(val query: String) : ClientMessage
@@ -111,7 +118,7 @@ sealed interface ClientMessage {
 data class BibleBookInfo(val name: String, val chapters: Int)
 
 @Serializable
-enum class PlanKind { SONG, BIBLE, MEDIA }
+enum class PlanKind { SONG, BIBLE, MEDIA, SERMON }
 
 /** Un elemento de la lista del culto: una canción (ref = id) o una cita (ref = referencia). */
 @Serializable
@@ -135,6 +142,8 @@ sealed interface ServerMessage {
         val bibleBooks: List<BibleBookInfo> = emptyList(),
         /** Anuncios (imágenes y videos) que se pueden mostrar. */
         val announcements: List<String> = emptyList(),
+        /** Predicaciones preparadas. */
+        val sermons: List<SongSummary> = emptyList(),
     ) : ServerMessage
 
     @Serializable @SerialName("state")

@@ -33,7 +33,7 @@ const Proyecta = (() => {
         emit("state");
       }
       else if (m.type === "bible_results") emit("bibleResults", m);
-      else if (m.type === "library") { S.songs = m.songs; S.bibleName = m.bibleName; S.bibleBooks = m.bibleBooks || []; S.announcements = m.announcements || []; emit("library"); }
+      else if (m.type === "library") { S.songs = m.songs; S.bibleName = m.bibleName; S.bibleBooks = m.bibleBooks || []; S.announcements = m.announcements || []; S.sermons = m.sermons || []; emit("library"); }
       else if (m.type === "bible_chapter") emit("bibleChapter", m);
       else if (m.type === "plan") { S.plan = m.plan; S.savedLists = m.saved || []; emit("plan"); }
       else if (m.type === "error") emit("error", m.message);
@@ -53,7 +53,8 @@ const Proyecta = (() => {
       if (s.label) out.push({ label: s.label, start: i });
       else if (i === 0) out.push({ label: "Inicio", start: 0 });
     });
-    return out;
+    // En una predicación los versículos ("Juan 10:11") no son secciones: solo los puntos.
+    return st.sermon ? out.filter((x) => !/\d+:\d+$/.test(x.label)) : out;
   }
   function currentSection(st) {
     const secs = sections(st);

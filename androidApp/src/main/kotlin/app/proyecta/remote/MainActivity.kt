@@ -162,6 +162,7 @@ private fun RemoteApp(client: RemoteClient, savedHost: String, pcName: String, l
     val plan by client.plan.collectAsState()
     val savedLists by client.savedLists.collectAsState()
     val announcements by client.announcements.collectAsState()
+    val sermons by client.sermons.collectAsState()
     val bibleResults by client.bibleResults.collectAsState()
     val bibleBooks by client.bibleBooks.collectAsState()
     val bibleChapter by client.bibleChapter.collectAsState()
@@ -214,7 +215,7 @@ private fun RemoteApp(client: RemoteClient, savedHost: String, pcName: String, l
                         },
                     )
                     3 -> PlanTab(plan, savedLists, state.stageMessage, client::send) { tab = 0 }
-                    4 -> MoreTab(state, announcements, client.serverOffset, client::send) { tab = 0 }
+                    4 -> MoreTab(state, announcements, sermons, client.serverOffset, client::send) { tab = 0 }
                 }
             }
             Controls(state, client::send)
@@ -409,7 +410,7 @@ private fun PlanTab(plan: ServicePlanState, saved: List<String>, stageMessage: S
                 Row(Modifier.padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f).padding(vertical = 10.dp)) {
                         Text("${i + 1}. ${item.title}", fontSize = 17.sp, fontWeight = FontWeight.Medium)
-                        Text(when (item.kind) { PlanKind.BIBLE -> "Lectura"; PlanKind.MEDIA -> "Anuncio"; else -> "Canción" }, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(when (item.kind) { PlanKind.BIBLE -> "Lectura"; PlanKind.MEDIA -> "Anuncio"; PlanKind.SERMON -> "Predicación"; else -> "Canción" }, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     TextButton({ send(ClientMessage.PlanMove(i, i - 1)) }, enabled = i > 0) { Text("▲") }
                     TextButton({ send(ClientMessage.PlanMove(i, i + 1)) }, enabled = i < plan.items.lastIndex) { Text("▼") }
@@ -439,7 +440,7 @@ private fun PlanTab(plan: ServicePlanState, saved: List<String>, stageMessage: S
 }
 
 @Composable
-private fun MoreTab(state: PresentationState, announcements: List<String>, serverOffset: Long, send: (ClientMessage) -> Unit, onShown: () -> Unit) {
+private fun MoreTab(state: PresentationState, announcements: List<String>, sermons: List<SongSummary>, serverOffset: Long, send: (ClientMessage) -> Unit, onShown: () -> Unit) {
     val context = LocalContext.current
     var alert by rememberSaveable { mutableStateOf("") }
     var minutes by rememberSaveable { mutableStateOf("5") }
@@ -454,6 +455,22 @@ private fun MoreTab(state: PresentationState, announcements: List<String>, serve
         item {
             Button({ send(ClientMessage.ShowLogo(!state.logo)) }, Modifier.fillMaxWidth().height(56.dp)) {
                 Text(if (state.logo) "Quitar logo" else "Mostrar logo de la iglesia", fontSize = 17.sp)
+            }
+        }
+        if (sermons.isNotEmpty()) {
+            item { Text("Predicaciones", style = MaterialTheme.typography.titleMedium) }
+            items(sermons, key = { "predicacion:${it.id}" }) { s ->
+                val on = state.sermon && state.songId == s.id
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f).clickable { send(ClientMessage.ShowSermon(s.id)); onShown() }.padding(vertical = 8.dp)) {
+                        Text((if (on) "▶ " else "") + s.title, fontSize = 17.sp, color = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                        Text(s.firstLine, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    TextButton({
+                        send(ClientMessage.PlanAddSermon(s.id))
+                        Toast.makeText(context, "Agregada a la lista", Toast.LENGTH_SHORT).show()
+                    }) { Text("+ Lista") }
+                }
             }
         }
         if (announcements.isNotEmpty()) {

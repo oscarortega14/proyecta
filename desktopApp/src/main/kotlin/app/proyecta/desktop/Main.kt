@@ -133,6 +133,7 @@ fun main() {
                     onReload = { library.reload() },
                     onOpenFolder = { runCatching { Desktop.getDesktop().open(library.baseDir) } },
                     onEdit = { id -> editing = EditRequest(id) },
+                    onEditSermon = { id -> editing = EditRequest(id, sermon = true) },
                     onOpenBackgrounds = { backgroundsOpen = true },
                     onOpenConnect = { connectOpen = true },
                     onOpenHistory = { historyOpen = true },

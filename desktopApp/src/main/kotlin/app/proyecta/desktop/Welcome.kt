@@ -34,7 +34,8 @@ val WELCOME_STEPS = listOf(
         "Proyectar una canción",
         "En la pestaña Canciones haz clic en una canción. Avanza con → , Espacio o el clicker de presentaciones; retrocede con ←.\n\n" +
             "Atajos: C va al coro, 1–9 a cada sección, B pone la pantalla en negro y Esc la vuelve a mostrar. " +
-            "\"+ Nueva\" e \"Importar…\" agregan canciones (también desde OpenLP y Holyrics).",
+            "\"+ Nueva\" e \"Importar…\" agregan canciones (también desde OpenLP y Holyrics). " +
+            "Arriba, \"Predicaciones\" guarda los puntos del sermón con sus versículos.",
     ),
     WelcomeStep(
         "La Biblia",

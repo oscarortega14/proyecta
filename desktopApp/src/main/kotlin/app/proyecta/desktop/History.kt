@@ -16,7 +16,7 @@ data class HistoryEntry(
     val title: String,
     val ref: String,
 ) {
-    enum class Kind(val label: String) { SONG("Canción"), BIBLE("Lectura") }
+    enum class Kind(val label: String) { SONG("Canción"), BIBLE("Lectura"), SERMON("Predicación") }
 }
 
 /**
