@@ -119,6 +119,16 @@ class MainActivity : ComponentActivity() {
                         connect(FoundServer(client.pcName(host) ?: host, host))
                         linkHost.value = null
                     }
+                    // Conexión guardada de una versión anterior, sin nombre: preguntárselo al PC.
+                    LaunchedEffect(Unit) {
+                        val host = prefs.getString("host", "").orEmpty()
+                        if (pcName.isEmpty() && host.isNotEmpty()) {
+                            client.pcName(host)?.let { name ->
+                                prefs.edit().putString("name", name).apply()
+                                pcName = name
+                            }
+                        }
+                    }
                     RemoteApp(
                         client = client,
                         savedHost = prefs.getString("host", "").orEmpty(),
@@ -187,10 +197,11 @@ private fun RemoteApp(client: RemoteClient, savedHost: String, pcName: String, l
 @Composable
 private fun StatusBar(status: ConnectionStatus, pcName: String, showSearch: Boolean, onEdit: () -> Unit) {
     val pc = pcName.ifEmpty { "el computador" }
+    val toPc = if (pcName.isEmpty()) "al computador" else "a $pcName"
     val (text, color) = when (status) {
         ConnectionStatus.Idle -> "Sin conectar" to MaterialTheme.colorScheme.onSurfaceVariant
-        is ConnectionStatus.Connecting -> "Conectando a $pc…" to MaterialTheme.colorScheme.tertiary
-        is ConnectionStatus.Connected -> "Conectado a $pc" to MaterialTheme.colorScheme.primary
+        is ConnectionStatus.Connecting -> "Conectando $toPc…" to MaterialTheme.colorScheme.tertiary
+        is ConnectionStatus.Connected -> "Conectado $toPc" to MaterialTheme.colorScheme.primary
         is ConnectionStatus.Failed -> "Sin conexión con $pc — reintentando" to MaterialTheme.colorScheme.error
     }
     Row(
