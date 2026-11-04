@@ -73,7 +73,8 @@ class RemoteServer(
                         }
                     }
                     launch {
-                        commands.plan.state.collect { p -> send(Frame.Text(ServerMessage.Plan(p).encode())) }
+                        kotlinx.coroutines.flow.combine(commands.plan.state, commands.plan.saved) { p, saved -> ServerMessage.Plan(p, saved) }
+                            .collect { m -> send(Frame.Text(m.encode())) }
                     }
                     presenter.state.collect { s -> send(Frame.Text(ServerMessage.State(s, System.currentTimeMillis()).encode())) }
                 }

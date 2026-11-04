@@ -50,6 +50,7 @@ fun main() {
         val state by presenter.state.collectAsState()
         val catalog by library.catalog.collectAsState()
         val plan by commands.plan.state.collectAsState()
+        val savedLists by commands.plan.saved.collectAsState()
         var projectorOn by remember { mutableStateOf(true) }
         val settings by settingsStore.settings.collectAsState()
         // Pantallas conectadas: se revisan cada pocos segundos por si enchufan el videobeam después.
@@ -97,6 +98,8 @@ fun main() {
                     state = state,
                     catalog = catalog,
                     plan = plan,
+                    savedLists = savedLists,
+                    onDeleteSavedList = { commands.plan.deleteSaved(it) },
                     serverError = serverError,
                     projector = ProjectorControl(
                         on = projectorOn,

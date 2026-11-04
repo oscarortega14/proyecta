@@ -78,6 +78,10 @@ class RemoteClient(private val scope: CoroutineScope) {
     private val _plan = MutableStateFlow(ServicePlanState())
     val plan: StateFlow<ServicePlanState> = _plan.asStateFlow()
 
+    /** Listas guardadas en el PC. */
+    private val _savedLists = MutableStateFlow<List<String>>(emptyList())
+    val savedLists: StateFlow<List<String>> = _savedLists.asStateFlow()
+
     private val _bibleName = MutableStateFlow<String?>(null)
     val bibleName: StateFlow<String?> = _bibleName.asStateFlow()
 
@@ -195,7 +199,7 @@ class RemoteClient(private val scope: CoroutineScope) {
                 _state.value = m.state
             }
             is ServerMessage.BibleResults -> _bibleResults.value = m
-            is ServerMessage.Plan -> _plan.value = m.plan
+            is ServerMessage.Plan -> { _plan.value = m.plan; _savedLists.value = m.saved }
             is ServerMessage.Error -> _errors.tryEmit(m.message)
         }
     }

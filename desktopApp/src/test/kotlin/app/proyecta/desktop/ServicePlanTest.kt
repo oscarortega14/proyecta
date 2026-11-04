@@ -78,4 +78,52 @@ class ServicePlanTest {
         commands.handle(ClientMessage.PlanClear)
         assertEquals(0, Commands.create(library).plan.state.value.items.size)
     }
+
+    @Test
+    fun savesAndOpensNamedLists() {
+        add("A", "B")
+        commands.handle(ClientMessage.PlanGo(1))
+        assertEquals(null, commands.handle(ClientMessage.PlanSave("Culto domingo 8 nov 2026")))
+        assertEquals("Culto domingo 8 nov 2026", plan.name)
+        assertEquals(listOf("Culto domingo 8 nov 2026"), commands.plan.saved.value)
+
+        // Otra lista para el miércoles
+        commands.handle(ClientMessage.PlanClear)
+        add("C")
+        commands.handle(ClientMessage.PlanSave("Miércoles"))
+        assertEquals(listOf("C"), plan.items.map { it.ref })
+
+        // Abrir la del domingo: reemplaza la actual y empieza desde el principio
+        assertEquals(null, commands.handle(ClientMessage.PlanOpen("Culto domingo 8 nov 2026")))
+        assertEquals(listOf("A", "B"), plan.items.map { it.ref })
+        assertEquals(-1, plan.current)
+        assertEquals("Culto domingo 8 nov 2026", plan.name)
+        assertEquals(setOf("Culto domingo 8 nov 2026", "Miércoles"), commands.plan.saved.value.toSet())
+
+        // Sigue ahí al reiniciar el programa
+        val again = Commands.create(library)
+        assertEquals(setOf("Culto domingo 8 nov 2026", "Miércoles"), again.plan.saved.value.toSet())
+        assertEquals("Culto domingo 8 nov 2026", again.plan.state.value.name)
+
+        commands.plan.deleteSaved("Miércoles")
+        assertEquals(listOf("Culto domingo 8 nov 2026"), commands.plan.saved.value)
+        assertNotNull(commands.handle(ClientMessage.PlanOpen("Miércoles")))
+    }
+
+    @Test
+    fun rejectsEmptyListsAndBadNames() {
+        assertNotNull(commands.handle(ClientMessage.PlanSave("Vacía"))) // no hay nada que guardar
+        add("A")
+        assertNotNull(commands.handle(ClientMessage.PlanSave("   ")))
+        assertEquals(null, commands.handle(ClientMessage.PlanSave("Culto 8/11: noche?")))
+        assertEquals(listOf("Culto 8-11- noche-"), commands.plan.saved.value) // sin caracteres prohibidos en Windows
+        assertEquals(null, cleanListName(" .. "))
+    }
+
+    @Test
+    fun suggestsNextSunday() {
+        assertEquals("Culto domingo 8 nov 2026", suggestedListName(java.time.LocalDate.of(2026, 11, 4))) // miércoles
+        assertEquals("Culto domingo 8 nov 2026", suggestedListName(java.time.LocalDate.of(2026, 11, 8))) // domingo: hoy
+        assertEquals("Culto domingo 3 ene 2027", suggestedListName(java.time.LocalDate.of(2026, 12, 28)))
+    }
 }

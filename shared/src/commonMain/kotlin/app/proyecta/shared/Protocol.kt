@@ -60,6 +60,14 @@ sealed interface ClientMessage {
     @Serializable @SerialName("plan_clear")
     data object PlanClear : ClientMessage
 
+    /** Guardar la lista actual con un nombre (ej. "Culto domingo 8 nov"). */
+    @Serializable @SerialName("plan_save")
+    data class PlanSave(val name: String) : ClientMessage
+
+    /** Abrir una lista guardada (reemplaza la actual). */
+    @Serializable @SerialName("plan_open")
+    data class PlanOpen(val name: String) : ClientMessage
+
     /** Mensaje para la vista de escenario ("" lo borra). No se ve en el videobeam. */
     @Serializable @SerialName("stage_message")
     data class StageMessage(val text: String) : ClientMessage
@@ -99,7 +107,12 @@ enum class PlanKind { SONG, BIBLE }
 data class PlanItem(val kind: PlanKind, val ref: String, val title: String)
 
 @Serializable
-data class ServicePlanState(val items: List<PlanItem> = emptyList(), val current: Int = -1)
+data class ServicePlanState(
+    val items: List<PlanItem> = emptyList(),
+    val current: Int = -1,
+    /** Nombre con el que se guardó o abrió (vacío = sin guardar). */
+    val name: String = "",
+)
 
 /** Mensajes que el escritorio envía a los remotos conectados. */
 @Serializable
@@ -126,7 +139,11 @@ sealed interface ServerMessage {
     data class BibleChapter(val book: String, val chapter: Int, val verses: List<String>) : ServerMessage
 
     @Serializable @SerialName("plan")
-    data class Plan(val plan: ServicePlanState) : ServerMessage
+    data class Plan(
+        val plan: ServicePlanState,
+        /** Listas guardadas, la más reciente primero. */
+        val saved: List<String> = emptyList(),
+    ) : ServerMessage
 
     @Serializable @SerialName("error")
     data class Error(val message: String) : ServerMessage

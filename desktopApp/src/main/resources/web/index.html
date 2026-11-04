@@ -118,7 +118,17 @@
     </div>
   </section>
   <section id="plan" class="tab">
-    <div class="row"><h2 style="flex:1">Lista del culto</h2><button class="btn small" id="planNext">Siguiente ▶</button></div>
+    <div class="row"><div style="flex:1"><h2 style="margin:0">Lista del culto</h2><small id="planName" style="color:var(--accent)"></small></div><button class="btn small" id="planNext">Siguiente ▶</button></div>
+    <div class="row three"><button class="btn small outline" id="planSave">Guardar</button><button class="btn small outline" id="planOpen">Abrir</button></div>
+    <div id="planSaveBox" hidden>
+      <input id="planSaveName" type="text" enterkeyhint="done">
+      <div class="row three"><button class="btn small" id="planSaveOk">Guardar</button><button class="btn small outline" id="planSaveCancel">Cancelar</button></div>
+    </div>
+    <div id="planOpenBox" hidden>
+      <p class="muted">Abrir una lista guardada (reemplaza la actual):</p>
+      <div id="planSavedList"></div>
+      <button class="link" id="planOpenCancel">Cerrar</button>
+    </div>
     <div id="planList"></div>
     <p class="muted" id="planEmpty">La lista está vacía. Agrega canciones con "+" o citas desde Biblia.</p>
   </section>
@@ -350,9 +360,27 @@ function renderSongs() {
   });
 }
 
+// "Culto domingo 8 nov 2026": el próximo domingo (o hoy). Igual que en el PC.
+function suggestedListName(d = new Date()) {
+  const m = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+  const s = new Date(d); s.setDate(s.getDate() + (7 - s.getDay()) % 7);
+  return "Culto domingo " + s.getDate() + " " + m[s.getMonth()] + " " + s.getFullYear();
+}
+
 function renderPlan() {
   const list = $("planList"); list.replaceChildren();
   const items = S.plan.items;
+  const saved = S.savedLists || [];
+  $("planName").textContent = S.plan.name || "";
+  $("planSave").disabled = !items.length;
+  $("planOpen").disabled = !saved.length;
+  $("planOpen").textContent = "Abrir (" + saved.length + ")";
+  const box = $("planSavedList"); box.replaceChildren();
+  saved.forEach((name) => {
+    const row = P.el("div", "item"); const t = P.el("div", "t"); t.appendChild(P.el("b", null, name));
+    t.onclick = () => { P.send("plan_open", { name }); $("planOpenBox").hidden = true; };
+    row.appendChild(t); box.appendChild(row);
+  });
   $("planEmpty").style.display = items.length ? "none" : "block";
   items.forEach((it, i) => {
     const row = P.el("div", "item" + (i === S.plan.current ? " on" : ""));
@@ -379,6 +407,13 @@ $("ref").onkeydown = (e) => { if (e.key === "Enter") showRef(); };
 $("addRef").onclick = () => { if ($("ref").value.trim()) addBible($("ref").value.trim()); };
 $("closeHits").onclick = () => { $("hitsBox").hidden = true; $("browser").hidden = false; };
 $("planNext").onclick = () => P.send("plan_next");
+$("planSave").onclick = () => { $("planSaveName").value = S.plan.name || suggestedListName(); $("planOpenBox").hidden = true; $("planSaveBox").hidden = false; };
+const savePlan = () => { const n = $("planSaveName").value.trim(); if (n) { P.send("plan_save", { name: n }); $("planSaveBox").hidden = true; toast("Lista guardada: " + n); } };
+$("planSaveOk").onclick = savePlan;
+$("planSaveName").onkeydown = (e) => { if (e.key === "Enter") savePlan(); };
+$("planSaveCancel").onclick = () => { $("planSaveBox").hidden = true; };
+$("planOpen").onclick = () => { $("planSaveBox").hidden = true; $("planOpenBox").hidden = false; };
+$("planOpenCancel").onclick = () => { $("planOpenBox").hidden = true; };
 $("searchRef").onclick = () => { if ($("ref").value.trim()) { $("ref").blur(); P.send("bible_search", { query: $("ref").value.trim() }); } };
 $("logo").onclick = () => P.send("logo", { show: !S.state.logo });
 const sendAlert = () => { if ($("alertText").value.trim()) P.send("alert", { text: $("alertText").value }); };

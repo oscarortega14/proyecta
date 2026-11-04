@@ -35,7 +35,7 @@ const Proyecta = (() => {
       else if (m.type === "bible_results") emit("bibleResults", m);
       else if (m.type === "library") { S.songs = m.songs; S.bibleName = m.bibleName; S.bibleBooks = m.bibleBooks || []; emit("library"); }
       else if (m.type === "bible_chapter") emit("bibleChapter", m);
-      else if (m.type === "plan") { S.plan = m.plan; emit("plan"); }
+      else if (m.type === "plan") { S.plan = m.plan; S.savedLists = m.saved || []; emit("plan"); }
       else if (m.type === "error") emit("error", m.message);
     };
   }

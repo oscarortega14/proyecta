@@ -154,6 +154,7 @@ private fun RemoteApp(client: RemoteClient, savedHost: String, pcName: String, l
     val songs by client.songs.collectAsState()
     val bibleName by client.bibleName.collectAsState()
     val plan by client.plan.collectAsState()
+    val savedLists by client.savedLists.collectAsState()
     val bibleResults by client.bibleResults.collectAsState()
     val bibleBooks by client.bibleBooks.collectAsState()
     val bibleChapter by client.bibleChapter.collectAsState()
@@ -195,7 +196,7 @@ private fun RemoteApp(client: RemoteClient, savedHost: String, pcName: String, l
                             tab = 0
                         },
                     )
-                    3 -> PlanTab(plan, state.stageMessage, client::send) { tab = 0 }
+                    3 -> PlanTab(plan, savedLists, state.stageMessage, client::send) { tab = 0 }
                     4 -> MoreTab(state, client.serverOffset, client::send)
                 }
             }
@@ -351,15 +352,26 @@ private fun Controls(state: PresentationState, send: (ClientMessage) -> Unit) {
 }
 
 @Composable
-private fun PlanTab(plan: ServicePlanState, stageMessage: String, send: (ClientMessage) -> Unit, onPlayed: () -> Unit) {
+private fun PlanTab(plan: ServicePlanState, saved: List<String>, stageMessage: String, send: (ClientMessage) -> Unit, onPlayed: () -> Unit) {
     var msg by rememberSaveable { mutableStateOf("") }
+    var saving by rememberSaveable { mutableStateOf(false) }
+    var opening by rememberSaveable { mutableStateOf(false) }
+    if (saving) SavePlanDialog(plan.name.ifEmpty { suggestedListName() }, { saving = false }) { name -> saving = false; send(ClientMessage.PlanSave(name)) }
+    if (opening) OpenPlanDialog(saved, { opening = false }) { name -> opening = false; send(ClientMessage.PlanOpen(name)) }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Lista del culto", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                Column(Modifier.weight(1f)) {
+                    Text("Lista del culto", style = MaterialTheme.typography.titleLarge)
+                    if (plan.name.isNotEmpty()) Text(plan.name, color = MaterialTheme.colorScheme.primary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
                 Button({ send(ClientMessage.PlanNext); onPlayed() }, enabled = plan.current < plan.items.lastIndex) {
                     Text("Siguiente ▶")
                 }
+            }
+            Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton({ saving = true }, Modifier.weight(1f), enabled = plan.items.isNotEmpty()) { Text("Guardar") }
+                OutlinedButton({ opening = true }, Modifier.weight(1f), enabled = saved.isNotEmpty()) { Text("Abrir (${saved.size})") }
             }
             if (plan.items.isEmpty()) {
                 Text(

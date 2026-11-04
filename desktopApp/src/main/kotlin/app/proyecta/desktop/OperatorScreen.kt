@@ -24,6 +24,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -71,6 +72,8 @@ fun OperatorScreen(
     state: PresentationState,
     catalog: Catalog,
     plan: ServicePlanState,
+    savedLists: List<String> = emptyList(),
+    onDeleteSavedList: (String) -> Unit = {},
     serverError: String?,
     projector: ProjectorControl,
     onCommand: (ClientMessage) -> String?,
@@ -113,7 +116,7 @@ fun OperatorScreen(
             HorizontalDivider()
             Row(Modifier.fillMaxSize().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 LeftPanel(
-                    catalog, plan, Modifier.width(330.dp).fillMaxHeight(), send, onReload, onOpenFolder, onEdit, searchBible, bible, onSelectBible,
+                    catalog, plan, savedLists, onDeleteSavedList, Modifier.width(330.dp).fillMaxHeight(), send, onReload, onOpenFolder, onEdit, searchBible, bible, onSelectBible,
                     onImport = { onImport()?.let { message = it } }, onExport = { onExport()?.let { message = it } },
                 )
                 SlidesPanel(state, Modifier.weight(1f).fillMaxHeight(), send, onEdit)
@@ -175,6 +178,8 @@ private fun TopBar(
 private fun LeftPanel(
     catalog: Catalog,
     plan: ServicePlanState,
+    savedLists: List<String>,
+    onDeleteSavedList: (String) -> Unit,
     modifier: Modifier,
     send: (ClientMessage) -> Unit,
     onReload: () -> Unit,
@@ -201,7 +206,7 @@ private fun LeftPanel(
         when (tab) {
             0 -> SongsTab(catalog, Modifier.weight(1f), send, present, onReload, onOpenFolder, onEdit, onImport, onExport)
             1 -> BibleTab(catalog, bible, onSelectBible, Modifier.weight(1f), send, present, searchBible)
-            else -> PlanPanel(plan, Modifier.weight(1f).fillMaxWidth(), send)
+            else -> PlanPanel(plan, savedLists, onDeleteSavedList, Modifier.weight(1f).fillMaxWidth(), send)
         }
     }
 }
@@ -438,12 +443,33 @@ private fun SectionJumps(state: PresentationState, send: (ClientMessage) -> Unit
 }
 
 @Composable
-private fun PlanPanel(plan: ServicePlanState, modifier: Modifier, send: (ClientMessage) -> Unit) {
+private fun PlanPanel(
+    plan: ServicePlanState,
+    savedLists: List<String>,
+    onDeleteSaved: (String) -> Unit,
+    modifier: Modifier,
+    send: (ClientMessage) -> Unit,
+) {
+    var saving by remember { mutableStateOf(false) }
+    var opening by remember { mutableStateOf(false) }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Orden del culto", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+            Column(Modifier.weight(1f)) {
+                Text("Orden del culto", style = MaterialTheme.typography.titleSmall)
+                if (plan.name.isNotEmpty()) {
+                    Text(plan.name, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
             if (plan.items.isNotEmpty()) TextButton({ send(ClientMessage.PlanClear) }) { Text("Vaciar") }
         }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            OutlinedButton({ saving = true }, Modifier.weight(1f), enabled = plan.items.isNotEmpty(), contentPadding = PaddingValues(6.dp)) { Text("Guardar…") }
+            OutlinedButton({ opening = true }, Modifier.weight(1f), enabled = savedLists.isNotEmpty(), contentPadding = PaddingValues(6.dp)) {
+                Text("Abrir… (${savedLists.size})")
+            }
+        }
+        if (saving) SavePlanDialog(plan.name.ifEmpty { suggestedListName() }, savedLists, { saving = false }) { name -> saving = false; send(ClientMessage.PlanSave(name)) }
+        if (opening) OpenPlanDialog(savedLists, plan.items.isNotEmpty(), onDeleteSaved, { opening = false }) { name -> opening = false; send(ClientMessage.PlanOpen(name)) }
         Button({ send(ClientMessage.PlanNext) }, Modifier.fillMaxWidth(), enabled = plan.current < plan.items.lastIndex) {
             Text("Siguiente elemento ▶")
         }
@@ -631,4 +657,59 @@ private fun BibleChooser(catalog: Catalog, onSelect: (String) -> Unit) {
             )
         }
     }
+}
+
+@Composable
+private fun SavePlanDialog(initial: String, saved: List<String>, onDismiss: () -> Unit, onSave: (String) -> Unit) {
+    var name by remember { mutableStateOf(initial) }
+    val clean = cleanListName(name)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Guardar la lista del culto") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedTextField(name, { name = it }, label = { Text("Nombre") }, singleLine = true, modifier = Modifier.fillMaxWidth().marksTyping())
+                if (clean != null && clean in saved) {
+                    Text("Ya hay una lista con ese nombre: se reemplaza.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
+                }
+            }
+        },
+        confirmButton = { Button({ clean?.let(onSave) }, enabled = clean != null) { Text("Guardar") } },
+        dismissButton = { TextButton(onDismiss) { Text("Cancelar") } },
+    )
+}
+
+@Composable
+private fun OpenPlanDialog(
+    saved: List<String>,
+    replacesCurrent: Boolean,
+    onDelete: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onOpen: (String) -> Unit,
+) {
+    var confirmDelete by remember { mutableStateOf<String?>(null) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Abrir una lista guardada") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (replacesCurrent) {
+                    Text("La lista actual se reemplaza (guárdala antes si la quieres conservar).", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                LazyColumn(Modifier.heightIn(max = 360.dp)) {
+                    items(saved, key = { it }) { name ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(name, Modifier.weight(1f).handClickable { onOpen(name) }.padding(vertical = 10.dp, horizontal = 4.dp))
+                            if (confirmDelete == name) {
+                                TextButton({ confirmDelete = null; onDelete(name) }) { Text("Eliminar", color = MaterialTheme.colorScheme.error) }
+                            } else {
+                                TextButton({ confirmDelete = name }, contentPadding = PaddingValues(4.dp)) { Text("✕") }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onDismiss) { Text("Cerrar") } },
+    )
 }

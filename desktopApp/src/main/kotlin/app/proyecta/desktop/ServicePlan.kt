@@ -18,9 +18,15 @@ class ServicePlan(
     private val file: File,
     private val library: Library,
     private val present: (ClientMessage) -> String?,
+    /** Carpeta de las listas guardadas con nombre (Proyecta/listas). */
+    private val listsDir: File = File(file.parentFile, "listas"),
 ) {
-    private val _state = MutableStateFlow(load())
+    private val _state = MutableStateFlow(load(file) ?: ServicePlanState())
     val state: StateFlow<ServicePlanState> = _state.asStateFlow()
+
+    private val _saved = MutableStateFlow(scanSaved())
+    /** Nombres de las listas guardadas, la más reciente primero. */
+    val saved: StateFlow<List<String>> = _saved.asStateFlow()
 
     @Synchronized
     fun handle(msg: ClientMessage): String? = when (msg) {
@@ -37,8 +43,44 @@ class ServicePlan(
             if (next < _state.value.items.size) go(next) else "No hay más elementos en la lista"
         }
         ClientMessage.PlanClear -> { update { ServicePlanState() }; null }
+        is ClientMessage.PlanSave -> saveAs(msg.name)
+        is ClientMessage.PlanOpen -> open(msg.name)
         else -> null
     }
+
+    /** Guarda la lista actual en listas/<nombre>.json. Devuelve un mensaje de error o null. */
+    @Synchronized
+    fun saveAs(name: String): String? {
+        val clean = cleanListName(name) ?: return "Escribe un nombre para la lista"
+        if (_state.value.items.isEmpty()) return "La lista está vacía"
+        val saved = _state.value.copy(current = -1, name = clean)
+        val ok = runCatching {
+            listsDir.mkdirs()
+            File(listsDir, "$clean.json").writeText(ProtocolJson.encodeToString(ServicePlanState.serializer(), saved), Charsets.UTF_8)
+        }.isSuccess
+        if (!ok) return "No pude guardar la lista"
+        update { it.copy(name = clean) }
+        _saved.value = scanSaved()
+        return null
+    }
+
+    /** Reemplaza la lista actual por una guardada. */
+    @Synchronized
+    fun open(name: String): String? {
+        val loaded = load(File(listsDir, "$name.json")) ?: return "No encontré la lista \"$name\""
+        update { loaded.copy(current = -1, name = name) }
+        return null
+    }
+
+    @Synchronized
+    fun deleteSaved(name: String) {
+        File(listsDir, "$name.json").delete()
+        _saved.value = scanSaved()
+    }
+
+    private fun scanSaved(): List<String> = listsDir.listFiles { f -> f.isFile && f.extension == "json" }.orEmpty()
+        .sortedByDescending { it.lastModified() }
+        .map { it.nameWithoutExtension }
 
     private fun addBible(reference: String): String? {
         val bible = library.bible ?: return "No hay Biblia cargada"
@@ -89,9 +131,21 @@ class ServicePlan(
         }
     }
 
-    private fun load(): ServicePlanState = runCatching {
-        ProtocolJson.decodeFromString(ServicePlanState.serializer(), file.readText(Charsets.UTF_8))
-    }.getOrDefault(ServicePlanState())
+    private fun load(f: File): ServicePlanState? = runCatching {
+        ProtocolJson.decodeFromString(ServicePlanState.serializer(), f.readText(Charsets.UTF_8))
+    }.getOrNull()
+}
+
+/** Nombre seguro para archivo (sin / \\ : * ? " < > |), o null si queda vacío. */
+fun cleanListName(name: String): String? =
+    name.replace(Regex("""[\\/:*?"<>|\p{Cntrl}]"""), "-").trim().trim('.').take(80).trim().ifEmpty { null }
+
+private val MONTHS = listOf("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")
+
+/** Nombre sugerido: el próximo domingo (o hoy si es domingo), ej. "Culto domingo 8 nov 2026". */
+fun suggestedListName(today: java.time.LocalDate = java.time.LocalDate.now()): String {
+    val sunday = today.with(java.time.temporal.TemporalAdjusters.nextOrSame(java.time.DayOfWeek.SUNDAY))
+    return "Culto domingo ${sunday.dayOfMonth} ${MONTHS[sunday.monthValue - 1]} ${sunday.year}"
 }
 
 /** Reparte cada orden: lo de la lista a [ServicePlan], el resto al [Presenter]. */
@@ -99,6 +153,7 @@ class Commands(val presenter: Presenter, val plan: ServicePlan) {
     fun handle(msg: ClientMessage): String? = when (msg) {
         is ClientMessage.PlanAddSong, is ClientMessage.PlanAddBible, is ClientMessage.PlanRemove,
         is ClientMessage.PlanMove, is ClientMessage.PlanGo, ClientMessage.PlanNext, ClientMessage.PlanClear,
+        is ClientMessage.PlanSave, is ClientMessage.PlanOpen,
         -> plan.handle(msg)
         else -> presenter.handle(msg)
     }
