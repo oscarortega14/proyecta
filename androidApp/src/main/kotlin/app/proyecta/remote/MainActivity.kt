@@ -220,7 +220,7 @@ private fun RemoteApp(client: RemoteClient, savedHost: String, pcName: String, l
                         },
                     )
                     3 -> PlanTab(plan, savedLists, state.stageMessage, client::send) { tab = 0 }
-                    4 -> MoreTab(state, announcements, sermons, client.serverOffset, client::send) { tab = 0 }
+                    4 -> MoreTab(state, announcements, sermons, client.serverOffset, client::send, onUpload = client::uploadAnnouncement) { tab = 0 }
                 }
             }
             Controls(state, client::send)
@@ -445,8 +445,29 @@ private fun PlanTab(plan: ServicePlanState, saved: List<String>, stageMessage: S
 }
 
 @Composable
-private fun MoreTab(state: PresentationState, announcements: List<String>, sermons: List<SongSummary>, serverOffset: Long, send: (ClientMessage) -> Unit, onShown: () -> Unit) {
+private fun MoreTab(
+    state: PresentationState,
+    announcements: List<String>,
+    sermons: List<SongSummary>,
+    serverOffset: Long,
+    send: (ClientMessage) -> Unit,
+    onUpload: suspend (name: String, size: Long?, open: () -> java.io.InputStream) -> String,
+    onShown: () -> Unit,
+) {
     val context = LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var uploadMsg by remember { mutableStateOf<String?>(null) }
+    // Elegir foto o video (galería o cámara) y subirlo a los anuncios del PC.
+    val pick = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val (name, size) = context.contentResolver.query(uri, null, null, null, null)?.use { c ->
+            val n = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+            val s = c.getColumnIndex(android.provider.OpenableColumns.SIZE)
+            if (c.moveToFirst()) (c.getString(n) ?: "foto.jpg") to (if (s >= 0 && !c.isNull(s)) c.getLong(s) else null) else null
+        } ?: ("foto.jpg" to null)
+        uploadMsg = "Subiendo $name…"
+        scope.launch { uploadMsg = onUpload(name, size) { context.contentResolver.openInputStream(uri)!! } }
+    }
     var alert by rememberSaveable { mutableStateOf("") }
     var minutes by rememberSaveable { mutableStateOf("5") }
     var cdText by rememberSaveable { mutableStateOf("Comenzamos en") }
@@ -478,8 +499,12 @@ private fun MoreTab(state: PresentationState, announcements: List<String>, sermo
                 }
             }
         }
+        item {
+            Text("Anuncios", style = MaterialTheme.typography.titleMedium)
+            OutlinedButton({ pick.launch(arrayOf("image/*", "video/*")) }, Modifier.fillMaxWidth().padding(top = 6.dp)) { Text("📷 Subir foto o video") }
+            uploadMsg?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+        }
         if (announcements.isNotEmpty()) {
-            item { Text("Anuncios", style = MaterialTheme.typography.titleMedium) }
             items(announcements, key = { "anuncio:$it" }) { name ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(

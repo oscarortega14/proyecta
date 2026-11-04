@@ -23,6 +23,10 @@ import app.proyecta.shared.encode
 import io.ktor.client.HttpClient
 import io.ktor.client.statement.bodyAsText
 import io.ktor.client.request.get
+import io.ktor.utils.io.jvm.javaio.toByteReadChannel
+import io.ktor.client.request.setBody
+import io.ktor.client.request.header
+import io.ktor.client.request.post
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.client.plugins.websocket.pingInterval
@@ -211,6 +215,30 @@ class RemoteClient(private val scope: CoroutineScope) {
             val text = http.get("http://$host:$DEFAULT_PORT/info").bodyAsText()
             ProtocolJson.decodeFromString(DiscoveryReply.serializer(), text).name.ifBlank { null }
         }.getOrNull()
+    }
+
+    /**
+     * Sube una foto o video a los anuncios del PC (con la clave guardada).
+     * Devuelve un mensaje para mostrar. Se envía por partes, sin cargar todo el video en memoria.
+     */
+    suspend fun uploadAnnouncement(name: String, size: Long?, open: () -> java.io.InputStream): String = withContext(Dispatchers.IO) {
+        val host = (_status.value as? ConnectionStatus.Connected)?.host ?: return@withContext "No hay conexión con el computador"
+        runCatching {
+            val response = http.post("http://$host:$DEFAULT_PORT/anuncios") {
+                url { parameters.append("nombre", name) }
+                header("X-Proyecta-Pin", savedPin().orEmpty())
+                setBody(object : io.ktor.http.content.OutgoingContent.ReadChannelContent() {
+                    override val contentLength: Long? = size
+                    override fun readFrom(): io.ktor.utils.io.ByteReadChannel =
+                        open().toByteReadChannel()
+                })
+            }
+            when (response.status.value) {
+                200 -> "Listo: ya está en Anuncios del computador"
+                401 -> "Falta la clave para subir anuncios"
+                else -> response.bodyAsText().ifBlank { "No se pudo subir" }
+            }
+        }.getOrElse { "No se pudo subir: ${it.message}" }
     }
 
     fun clearBibleResults() { _bibleResults.value = null }
