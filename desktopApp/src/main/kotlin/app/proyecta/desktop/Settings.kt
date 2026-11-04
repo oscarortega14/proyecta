@@ -22,6 +22,10 @@ data class Settings(
     val pin: String? = null,
     /** El operador quitó la clave a propósito: cualquiera en la red puede controlar. */
     val pinOff: Boolean = false,
+    /** Último respaldo automático o manual (milisegundos). */
+    val lastBackup: Long = 0,
+    /** Carpeta extra donde copiar cada respaldo (memoria USB, Google Drive…), o null. */
+    val backupCopyDir: String? = null,
 ) {
     /** La clave que se exige ahora (null = no se pide). */
     val activePin: String? get() = pin?.takeIf { !pinOff }

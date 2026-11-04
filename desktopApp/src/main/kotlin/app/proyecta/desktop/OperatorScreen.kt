@@ -85,6 +85,7 @@ fun OperatorScreen(
     onOpenConnect: () -> Unit,
     onOpenHistory: () -> Unit = {},
     onOpenWelcome: () -> Unit = {},
+    onOpenBackups: () -> Unit = {},
     /** Versión nueva disponible (null = ninguna). */
     updateVersion: String? = null,
     onOpenUpdate: () -> Unit = {},
@@ -122,6 +123,8 @@ fun OperatorScreen(
                 onOpenBackgrounds = onOpenBackgrounds,
                 onOpenConnect = onOpenConnect,
                 onOpenHistory = onOpenHistory,
+                onOpenWelcome = onOpenWelcome,
+                onOpenBackups = onOpenBackups,
                 updateVersion = updateVersion,
                 onOpenUpdate = onOpenUpdate,
                 onHelp = { helpOpen = true },
@@ -167,6 +170,8 @@ private fun TopBar(
     onOpenBackgrounds: () -> Unit,
     onOpenConnect: () -> Unit,
     onOpenHistory: () -> Unit,
+    onOpenWelcome: () -> Unit,
+    onOpenBackups: () -> Unit,
     updateVersion: String?,
     onOpenUpdate: () -> Unit,
     onHelp: () -> Unit,
@@ -196,7 +201,7 @@ private fun TopBar(
             Text("Conectar dispositivos")
         }
         ProjectorMenu(projector)
-        TextButton(onHelp) { Text("?", style = MaterialTheme.typography.titleMedium) }
+        HelpMenu(onHelp, onOpenWelcome, onOpenBackups)
     }
 }
 
@@ -770,4 +775,20 @@ private fun OpenPlanDialog(
         },
         confirmButton = { TextButton(onDismiss) { Text("Cerrar") } },
     )
+}
+
+/** "?": atajos, la guía de inicio y los respaldos. */
+@Composable
+private fun HelpMenu(onShortcuts: () -> Unit, onWelcome: () -> Unit, onBackups: () -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        TextButton({ open = true }) { Text("?", style = MaterialTheme.typography.titleMedium) }
+        DropdownMenu(open, { open = false }) {
+            DropdownMenuItem({ Text("Atajos de teclado") }, { open = false; onShortcuts() }, Modifier.hand())
+            DropdownMenuItem({ Text("Guía de inicio") }, { open = false; onWelcome() }, Modifier.hand())
+            DropdownMenuItem({ Text("Respaldos…") }, { open = false; onBackups() }, Modifier.hand())
+            HorizontalDivider()
+            Text("Proyecta ${Updater.currentVersion}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
+        }
+    }
 }

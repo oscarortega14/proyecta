@@ -30,6 +30,10 @@ class History(
     private val _entries = MutableStateFlow(load())
     val entries: StateFlow<List<HistoryEntry>> = _entries.asStateFlow()
 
+    /** Volver a leer de disco (después de restaurar un respaldo). */
+    @Synchronized
+    fun reloadFromDisk() { _entries.value = load() }
+
     @Synchronized
     fun record(kind: HistoryEntry.Kind, title: String, ref: String) {
         val t = now()

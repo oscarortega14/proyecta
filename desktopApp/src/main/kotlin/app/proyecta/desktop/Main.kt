@@ -42,6 +42,7 @@ fun main() {
     // Clave para controlar desde la red: se crea sola la primera vez (se puede cambiar o quitar).
     if (settingsStore.value.pin == null) settingsStore.update { it.copy(pin = Settings.randomPin()) }
     val server = RemoteServer(commands, library, pin = settingsStore.pin)
+    val backups = Backups(baseDir, settingsStore)
     val serverError = runCatching { server.start() }.exceptionOrNull()?.let {
         "No pude abrir el puerto ${server.port} para el control remoto: ${it.message}"
     }
@@ -78,6 +79,12 @@ fun main() {
         var backgroundsOpen by remember { mutableStateOf(false) }
         var connectOpen by remember { mutableStateOf(false) }
         var historyOpen by remember { mutableStateOf(false) }
+        var backupsOpen by remember { mutableStateOf(false) }
+        // Respaldo semanal automático, un rato después de abrir.
+        LaunchedEffect(Unit) {
+            kotlinx.coroutines.delay(30_000)
+            if (backups.isDue()) withContext(Dispatchers.IO) { runCatching { backups.create() } }
+        }
         // Actualizaciones: se pregunta a GitHub un rato después de abrir (sin estorbar el arranque).
         var release by remember { mutableStateOf<Release?>(null) }
         var updateOpen by remember { mutableStateOf(false) }
@@ -140,6 +147,7 @@ fun main() {
                     updateVersion = release?.version?.takeIf { offerUpdate },
                     onOpenUpdate = { updateOpen = true },
                     onOpenWelcome = { settingsStore.update { it.copy(welcomeDone = false) } },
+                    onOpenBackups = { backupsOpen = true },
                     lastSung = lastSung,
                     searchBible = { q -> library.bible?.search(q) },
                     bible = remember(catalog) { library.bible },
@@ -163,6 +171,14 @@ fun main() {
                         onLater = { updateOpen = false },
                         onSkip = { updateOpen = false; settingsStore.update { it.copy(skippedUpdate = release!!.version) } },
                         onExitForInstall = { server.stop(); discovery.stop(); exitApplication() },
+                    )
+                }
+                if (backupsOpen) {
+                    BackupsDialog(
+                        backups, settings,
+                        onChooseCopyDir = { d -> settingsStore.update { it.copy(backupCopyDir = d) } },
+                        onRestored = { library.reload(); commands.plan.reloadFromDisk(); commands.history?.reloadFromDisk() },
+                        onClose = { backupsOpen = false },
                     )
                 }
                 if (confirmProjectorOff) {

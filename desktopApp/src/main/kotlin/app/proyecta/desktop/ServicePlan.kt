@@ -81,6 +81,13 @@ class ServicePlan(
         return null
     }
 
+    /** Volver a leer de disco (después de restaurar un respaldo). */
+    @Synchronized
+    fun reloadFromDisk() {
+        _state.value = load(file) ?: ServicePlanState()
+        _saved.value = scanSaved()
+    }
+
     @Synchronized
     fun deleteSaved(name: String) {
         File(listsDir, "$name.json").delete()
