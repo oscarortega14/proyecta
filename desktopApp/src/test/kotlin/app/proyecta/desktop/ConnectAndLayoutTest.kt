@@ -62,7 +62,8 @@ class ConnectAndLayoutTest {
             "Reina-Valera 1909",
         )
         val plan = ServicePlanState(listOf(PlanItem(PlanKind.SONG, "Alabad a Jehová", "Alabad a Jehová"), PlanItem(PlanKind.BIBLE, "Juan 3:16", "Juan 3:16")), 0)
-        ImageComposeScene(1440, 820, Density(1f)) {
+        // También como queda en un portátil con la pantalla al 125 % (ventana maximizada ≈ 1229×620)
+        for ((name, w, h) in listOf(Triple("operador.png", 1440, 820), Triple("operador-chico.png", 1229, 620))) ImageComposeScene(w, h, Density(1f)) {
             MaterialTheme(colorScheme = darkColorScheme()) {
                 ProvideLook(Look(frozenTime = 2f)) {
                     OperatorScreen(
@@ -73,7 +74,7 @@ class ConnectAndLayoutTest {
                     )
                 }
             }
-        }.use { File(out, "operador.png").writeBytes(it.render(0).encodeToData(EncodedImageFormat.PNG)!!.bytes) }
+        }.use { File(out, name).writeBytes(it.render(0).encodeToData(EncodedImageFormat.PNG)!!.bytes) }
         ImageComposeScene(980, 720, Density(1f)) {
             MaterialTheme(colorScheme = darkColorScheme()) {
                 androidx.compose.material3.Surface { QrCode("http://192.168.40.35:8765", androidx.compose.ui.unit.Dp(220f)) }

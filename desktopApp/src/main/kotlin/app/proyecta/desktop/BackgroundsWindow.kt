@@ -84,7 +84,7 @@ fun BackgroundsWindow(
     Window(
         onCloseRequest = onClose,
         title = "Fondos y letra",
-        state = rememberWindowState(size = DpSize(1200.dp, 760.dp)),
+        state = rememberFittedWindowState(DpSize(1200.dp, 760.dp)),
     ) {
         MaterialTheme(colorScheme = darkColorScheme()) {
             Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {

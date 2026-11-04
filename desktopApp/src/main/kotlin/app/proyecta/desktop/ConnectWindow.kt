@@ -79,7 +79,7 @@ fun ConnectWindow(
 ) {
     var selected by remember { mutableStateOf(addresses.firstOrNull()) }
     val host = selected
-    Window(onCloseRequest = onClose, title = "Conectar dispositivos", state = rememberWindowState(size = DpSize(980.dp, 720.dp))) {
+    Window(onCloseRequest = onClose, title = "Conectar dispositivos", state = rememberFittedWindowState(DpSize(980.dp, 720.dp))) {
         MaterialTheme(colorScheme = darkColorScheme()) {
             Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                 Column(

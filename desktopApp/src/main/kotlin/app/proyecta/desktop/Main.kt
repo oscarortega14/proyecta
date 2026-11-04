@@ -106,7 +106,7 @@ fun main() {
         Window(
             onCloseRequest = { confirmExit = true },
             title = "Proyecta — Operador",
-            state = rememberWindowState(size = DpSize(1440.dp, 820.dp)),
+            state = rememberFittedWindowState(DpSize(1440.dp, 820.dp), maximizeIfSmall = true),
             onPreviewKeyEvent = {
                 if (isReopenProjectorKey(it)) { projectorOn = true; true } else handleShortcut(it, commands)
             },

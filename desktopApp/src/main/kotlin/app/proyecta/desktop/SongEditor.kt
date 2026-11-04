@@ -89,7 +89,7 @@ fun SongEditorWindow(
     Window(
         onCloseRequest = { if (dirty) confirmDiscard = true else onClose() },
         title = if (songId == null) "Nueva canción" else "Editar: ${preview.title}",
-        state = rememberWindowState(size = DpSize(1150.dp, 780.dp)),
+        state = rememberFittedWindowState(DpSize(1150.dp, 780.dp)),
         onPreviewKeyEvent = {
             if (it.type == KeyEventType.KeyDown && it.isCtrlPressed && it.key == Key.S) { save(); true } else false
         },

@@ -101,7 +101,7 @@ fun PixabayWindow(library: Library, themes: ThemeStore, client: PixabayClient, o
     // Primera búsqueda al abrir
     androidx.compose.runtime.LaunchedEffect(Unit) { if (client.configured) search() }
 
-    Window(onCloseRequest = onClose, title = "Buscar fondos en internet", state = rememberWindowState(size = DpSize(1200.dp, 800.dp))) {
+    Window(onCloseRequest = onClose, title = "Buscar fondos en internet", state = rememberFittedWindowState(DpSize(1200.dp, 800.dp))) {
         MaterialTheme(colorScheme = darkColorScheme()) {
             Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                 Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
