@@ -94,7 +94,7 @@ fun ProjectorScreen(state: PresentationState, modifier: Modifier = Modifier, loo
                     val h = maxHeight
                     val bottom = if (state.alert.isNotEmpty()) alertBarHeight(h) else 0.dp
                     Box(Modifier.fillMaxSize().padding(bottom = bottom)) {
-                        SlideText(state, slide.text, slide.label, theme, w, h - bottom)
+                        SlideText(state, slide.text, slide.label, theme, w, h - bottom, slide.text2)
                     }
                 }
             }
@@ -204,7 +204,7 @@ internal fun animationFps(preview: Boolean, gpu: Boolean, smooth: Boolean, light
 }
 
 @Composable
-private fun SlideText(state: PresentationState, text: String, label: String, theme: Theme, width: Dp, height: Dp) {
+private fun SlideText(state: PresentationState, text: String, label: String, theme: Theme, width: Dp, height: Dp, text2: String = "") {
     val pad = width * 0.05f
     // Biblia: la cita abajo. Predicación: "Punto 1", "Juan 10:11"… como encabezado arriba.
     val showLabel = (state.isBible || state.sermon) && label.isNotEmpty()
@@ -216,8 +216,8 @@ private fun SlideText(state: PresentationState, text: String, label: String, the
     val availH = with(density) { (height - pad * 2).roundToPx() }.coerceAtLeast(1)
     // fontScale > 1 solo sube el tope (si el texto cabe); < 1 achica lo calculado.
     val maxSize = 110f * theme.fontScale.coerceAtLeast(1f)
-    val size = remember(text, label, showLabel, availW, availH, maxSize, density) {
-        fitFontSizeMeasured(measurer, density, text, if (showLabel) label else null, availW, availH, maxSize)
+    val size = remember(text, label, showLabel, availW, availH, maxSize, density, text2) {
+        fitFontSizeMeasured(measurer, density, text, if (showLabel) label else null, availW, availH, maxSize, text2 = text2.ifEmpty { null })
     } * theme.fontScale.coerceAtMost(1f)
     val shadow = if (theme.shadow) Shadow(Color.Black.copy(alpha = 0.9f), Offset(2f, 3f), blurRadius = size / 5) else null
 
@@ -231,6 +231,11 @@ private fun SlideText(state: PresentationState, text: String, label: String, the
             Spacer(Modifier.height(with(density) { (size * LABEL_GAP).sp.toDp() }))
         }
         Text(text, style = slideStyle(size).copy(color = color, shadow = shadow))
+        if (text2.isNotEmpty()) {
+            // Segunda traducción: debajo, un poco más chica y en cursiva.
+            Spacer(Modifier.height(with(density) { (size * LABEL_GAP).sp.toDp() }))
+            Text(text2, style = secondStyle(size).copy(color = color.copy(alpha = 0.85f), shadow = shadow))
+        }
         if (showLabel && !labelOnTop) {
             Spacer(Modifier.height(with(density) { (size * LABEL_GAP).sp.toDp() }))
             Text(label, style = labelStyle(size).copy(color = color.copy(alpha = 0.75f), shadow = shadow))
@@ -246,6 +251,9 @@ internal fun slideStyle(size: Float) = TextStyle(
     fontWeight = FontWeight.SemiBold,
     textAlign = TextAlign.Center,
 )
+
+/** Segunda traducción: 80 % del tamaño y en cursiva. */
+internal fun secondStyle(size: Float) = slideStyle(size * 0.8f).copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic, fontWeight = FontWeight.Normal)
 
 internal fun labelStyle(size: Float) = TextStyle(fontSize = (size * 0.55f).sp, textAlign = TextAlign.Center)
 
@@ -263,6 +271,7 @@ internal fun fitFontSizeMeasured(
     heightPx: Int,
     maxSize: Float = 110f,
     minSize: Float = 8f,
+    text2: String? = null,
 ): Float {
     val longestWords = text.split(Regex("\\s+")).filter { it.isNotEmpty() }.sortedByDescending { it.length }.take(3)
     val unbounded = Constraints()
@@ -272,6 +281,10 @@ internal fun fitFontSizeMeasured(
         var h = measurer.measure(text, style, constraints = Constraints(maxWidth = widthPx), density = density).size.height
         if (label != null) {
             h += measurer.measure(label, labelStyle(sp), constraints = Constraints(maxWidth = widthPx), density = density).size.height
+            h += with(density) { (sp * LABEL_GAP).sp.roundToPx() }
+        }
+        if (text2 != null) {
+            h += measurer.measure(text2, secondStyle(sp), constraints = Constraints(maxWidth = widthPx), density = density).size.height
             h += with(density) { (sp * LABEL_GAP).sp.roundToPx() }
         }
         return h <= heightPx

@@ -86,6 +86,12 @@ class RemoteClient(private val scope: CoroutineScope) {
     val bibleName: StateFlow<String?> = _bibleName.asStateFlow()
 
     /** Libros de la Biblia del PC (para el explorador). */
+    /** Traducciones del PC y la segunda elegida. */
+    private val _bibleNames = MutableStateFlow<List<String>>(emptyList())
+    val bibleNames: StateFlow<List<String>> = _bibleNames.asStateFlow()
+    private val _secondBible = MutableStateFlow<String?>(null)
+    val secondBible: StateFlow<String?> = _secondBible.asStateFlow()
+
     /** Predicaciones del PC. */
     private val _sermons = MutableStateFlow<List<SongSummary>>(emptyList())
     val sermons: StateFlow<List<SongSummary>> = _sermons.asStateFlow()
@@ -221,6 +227,8 @@ class RemoteClient(private val scope: CoroutineScope) {
                 _songs.value = m.songs; _bibleName.value = m.bibleName; _bibleBooks.value = m.bibleBooks
                 _announcements.value = m.announcements
                 _sermons.value = m.sermons
+                _bibleNames.value = m.bibleNames
+                _secondBible.value = m.secondBible
             }
             is ServerMessage.BibleChapter -> _bibleChapter.value = m
             is ServerMessage.State -> {

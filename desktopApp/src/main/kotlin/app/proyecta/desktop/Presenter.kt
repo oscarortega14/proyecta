@@ -84,9 +84,16 @@ class Presenter(
         } catch (e: IllegalArgumentException) {
             return e.message
         }
-        _state.update { it.keepingOverlays(PresentationState(passage.title, passage.slides, 0, isBible = true)) }
+        _state.update { it.keepingOverlays(PresentationState(passage.title, withSecond(passage.slides, reference), 0, isBible = true)) }
         onShown?.invoke(HistoryEntry.Kind.BIBLE, passage.title, passage.title)
         return null
+    }
+
+    /** Si hay segunda traducción, cada versículo lleva también su texto en ella (se emparejan por la cita). */
+    private fun withSecond(slides: List<app.proyecta.shared.Slide>, reference: String): List<app.proyecta.shared.Slide> {
+        val second = library.secondBible ?: return slides
+        val other = runCatching { second.lookup(reference).slides }.getOrNull()?.associate { it.label to it.text } ?: return slides
+        return slides.map { s -> other[s.label]?.let { s.copy(text2 = it) } ?: s }
     }
 
     private fun showSermon(id: String): String? {

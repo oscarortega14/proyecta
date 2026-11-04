@@ -63,6 +63,7 @@
   .row.three { margin:8px 0 4px; } .row.three .btn { flex:1; }
   .link { background:none; border:0; color:var(--accent); font-size:15px; padding:8px 4px; }
   .link:disabled { opacity:.35; }
+  .sel { flex:1; min-width:0; padding:10px; font-size:15px; border-radius:10px; border:1px solid #5a5560; background:#1e1c22; color:var(--text); }
   .crumbs { display:flex; align-items:center; gap:4px; padding:8px 0; font-size:17px; min-width:0; }
   .crumbs a { color:var(--accent); cursor:pointer; }
   .crumbs span { color:var(--muted); } .crumbs b { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -117,6 +118,10 @@
     <div id="songList"></div>
   </section>
   <section id="bible" class="tab">
+    <div class="row" id="bibleSel" hidden style="margin-bottom:8px">
+      <select id="bible1" class="sel"></select>
+      <select id="bible2" class="sel"></select>
+    </div>
     <input id="ref" type="text" placeholder="Cita o frase (ej. Juan 3:16 · amó Dios)" enterkeyhint="go">
     <div class="row three">
       <button class="btn small" id="showRef">Mostrar</button>
@@ -581,6 +586,19 @@ P.on("state", renderSermons);
 P.on("state", renderAnnouncements);
 P.on("plan", renderPlan);
 P.on("bibleResults", renderHits);
+// Traducción y segunda traducción
+function renderBibleChoice() {
+  const names = S.bibleNames || [];
+  $("bibleSel").hidden = names.length < 2;
+  const opt = (v, t, sel) => { const o = P.el("option", null, t); o.value = v; o.selected = sel; return o; };
+  $("bible1").replaceChildren(...names.map((n) => opt(n, n, n === S.bibleName)));
+  $("bible2").replaceChildren(opt("", "+ segunda: ninguna", !S.secondBible),
+    ...names.filter((n) => n !== S.bibleName).map((n) => opt(n, "+ " + n, n === S.secondBible)));
+}
+$("bible1").onchange = () => P.send("bible_select", { name: $("bible1").value });
+$("bible2").onchange = () => P.send("bible_second", { name: $("bible2").value || null });
+P.on("library", renderBibleChoice);
+
 let shownBible = null;
 P.on("library", () => {
   // Otra traducción: los capítulos guardados ya no sirven.

@@ -93,6 +93,14 @@ sealed interface ClientMessage {
     @Serializable @SerialName("timer_stop")
     data object StopTimer : ClientMessage
 
+    /** Elegir la traducción de la Biblia. */
+    @Serializable @SerialName("bible_select")
+    data class SelectBible(val name: String) : ClientMessage
+
+    /** Segunda traducción debajo de la primera (null = solo una). */
+    @Serializable @SerialName("bible_second")
+    data class SetSecondBible(val name: String?) : ClientMessage
+
     /** Clave de 4 números para poder controlar (si el PC la pide). Responde con ServerMessage.Auth. */
     @Serializable @SerialName("login")
     data class Login(val pin: String) : ClientMessage
@@ -151,6 +159,9 @@ sealed interface ServerMessage {
         val announcements: List<String> = emptyList(),
         /** Predicaciones preparadas. */
         val sermons: List<SongSummary> = emptyList(),
+        /** Traducciones disponibles y la segunda elegida (null = ninguna). */
+        val bibleNames: List<String> = emptyList(),
+        val secondBible: String? = null,
     ) : ServerMessage
 
     @Serializable @SerialName("state")

@@ -168,7 +168,13 @@ fun suggestedListName(today: java.time.LocalDate = java.time.LocalDate.now()): S
 
 /** Reparte cada orden: lo de la lista a [ServicePlan], el resto al [Presenter]. */
 class Commands(val presenter: Presenter, val plan: ServicePlan, val history: History? = null) {
+    /** Cambiar de traducción (Main también la guarda en ajustes). */
+    var onSelectBible: (String) -> Unit = {}
+    var onSelectSecondBible: (String?) -> Unit = {}
+
     fun handle(msg: ClientMessage): String? = when (msg) {
+        is ClientMessage.SelectBible -> { onSelectBible(msg.name); null }
+        is ClientMessage.SetSecondBible -> { onSelectSecondBible(msg.name); null }
         is ClientMessage.PlanAddSong, is ClientMessage.PlanAddBible, is ClientMessage.PlanRemove,
         is ClientMessage.PlanMove, is ClientMessage.PlanGo, ClientMessage.PlanNext, ClientMessage.PlanClear,
         is ClientMessage.PlanSave, is ClientMessage.PlanOpen, is ClientMessage.PlanAddMedia, is ClientMessage.PlanAddSermon,
@@ -182,7 +188,10 @@ class Commands(val presenter: Presenter, val plan: ServicePlan, val history: His
             val plan = ServicePlan(File(library.baseDir, "lista-del-culto.json"), library, presenter::handle)
             val history = History(File(library.baseDir, "historial.csv"))
             presenter.onShown = history::record
-            return Commands(presenter, plan, history)
+            return Commands(presenter, plan, history).apply {
+                onSelectBible = library::selectBible
+                onSelectSecondBible = library::selectSecondBible
+            }
         }
     }
 }

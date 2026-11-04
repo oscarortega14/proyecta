@@ -14,6 +14,8 @@ data class Settings(
     val projectorScreen: String? = null,
     /** Nombre de la Biblia elegida (null = la primera disponible). */
     val bible: String? = null,
+    /** Segunda traducción debajo de la primera (null = ninguna). */
+    val secondBible: String? = null,
     /** Ya se mostró la guía de bienvenida. */
     val welcomeDone: Boolean = false,
     /** Versión nueva que el usuario pidió no volver a avisar. */

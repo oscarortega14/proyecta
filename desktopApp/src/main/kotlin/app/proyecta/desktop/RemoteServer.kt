@@ -77,7 +77,7 @@ class RemoteServer(
                     launch { pin.collect { send(Frame.Text(auth().encode())) } }
                     launch {
                         library.catalog.collect { c ->
-                            send(Frame.Text(ServerMessage.Library(c.songs, c.bibleName, library.bible?.bookInfos().orEmpty(), c.announcements, c.sermons).encode()))
+                            send(Frame.Text(ServerMessage.Library(c.songs, c.bibleName, library.bible?.bookInfos().orEmpty(), c.announcements, c.sermons, c.bibleNames, c.secondBibleName).encode()))
                         }
                     }
                     launch {

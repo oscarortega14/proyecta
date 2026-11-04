@@ -79,6 +79,10 @@ fun BibleTab(
     onAdd: (String) -> Unit,
     /** Proyectar una cita y saltar a la diapositiva [slide] de ella. */
     onShow: (ref: String, slide: Int) -> Unit,
+    bibleNames: List<String> = emptyList(),
+    secondBible: String? = null,
+    onSelectBible: (String) -> Unit = {},
+    onSelectSecond: (String?) -> Unit = {},
 ) {
     val context = LocalContext.current
     val focus = LocalFocusManager.current
@@ -87,6 +91,12 @@ fun BibleTab(
     val show = { if (ref.isNotBlank()) { focus.clearFocus(); onShow(ref.trim(), 0) } }
 
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (bibleNames.size > 1) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Choice("Traducción", bibleName ?: "—", bibleNames, bibleName) { it?.let(onSelectBible) }
+                Choice("+ segunda", secondBible ?: "ninguna", listOf<String?>(null) + bibleNames.filter { it != bibleName }, secondBible, onSelectSecond)
+            }
+        }
         OutlinedTextField(
             ref, { ref = it },
             label = { Text("Cita o frase (ej. Juan 3:16 · amó Dios)") },
@@ -260,5 +270,21 @@ private fun Tile(text: String, onClick: () -> Unit) {
     ) {
         Text(text, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis,
             style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+@Composable
+private fun Choice(title: String, shown: String, options: List<String?>, current: String?, onPick: (String?) -> Unit) {
+    var open by androidx.compose.runtime.remember { mutableStateOf(false) }
+    Box {
+        TextButton({ open = true }, contentPadding = PaddingValues(horizontal = 4.dp)) { Text("$title: $shown ▾", maxLines = 1) }
+        androidx.compose.material3.DropdownMenu(open, { open = false }) {
+            for (o in options) {
+                androidx.compose.material3.DropdownMenuItem(
+                    text = { Text((if (o == current) "✓ " else "") + (o ?: "Ninguna (solo una)")) },
+                    onClick = { open = false; if (o != current) onPick(o) },
+                )
+            }
+        }
     }
 }

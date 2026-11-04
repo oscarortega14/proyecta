@@ -163,6 +163,8 @@ private fun RemoteApp(client: RemoteClient, savedHost: String, pcName: String, l
     val savedLists by client.savedLists.collectAsState()
     val announcements by client.announcements.collectAsState()
     val sermons by client.sermons.collectAsState()
+    val bibleNames by client.bibleNames.collectAsState()
+    val secondBible by client.secondBible.collectAsState()
     val bibleResults by client.bibleResults.collectAsState()
     val bibleBooks by client.bibleBooks.collectAsState()
     val bibleChapter by client.bibleChapter.collectAsState()
@@ -203,6 +205,9 @@ private fun RemoteApp(client: RemoteClient, savedHost: String, pcName: String, l
                     }
                     2 -> BibleTab(
                         bibleName, bibleBooks, bibleChapter, bibleResults, bibleNav,
+                        bibleNames = bibleNames, secondBible = secondBible,
+                        onSelectBible = { client.send(ClientMessage.SelectBible(it)) },
+                        onSelectSecond = { client.send(ClientMessage.SetSecondBible(it)) },
                         onNavigate = { bibleNav = it },
                         onSearch = { q -> client.send(ClientMessage.BibleSearch(q)) },
                         onClearSearch = client::clearBibleResults,

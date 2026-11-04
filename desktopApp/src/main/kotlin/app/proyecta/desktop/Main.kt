@@ -36,8 +36,16 @@ import java.io.File
 fun main() {
     val baseDir = File(System.getProperty("user.home"), "Proyecta")
     val settingsStore = SettingsStore(File(baseDir, "ajustes.json"))
-    val library = Library(baseDir).also { it.preferredBible = settingsStore.value.bible; it.reload() }
-    val commands = Commands.create(library)
+    val library = Library(baseDir).also {
+        it.preferredBible = settingsStore.value.bible
+        it.preferredSecondBible = settingsStore.value.secondBible
+        it.reload()
+    }
+    val commands = Commands.create(library).apply {
+        // Elegir traducción (desde el PC o un remoto): se cambia y se recuerda.
+        onSelectBible = { name -> library.selectBible(name); settingsStore.update { it.copy(bible = name) } }
+        onSelectSecondBible = { name -> library.selectSecondBible(name); settingsStore.update { it.copy(secondBible = name) } }
+    }
     val presenter = commands.presenter
     // Clave para controlar desde la red: se crea sola la primera vez (se puede cambiar o quitar).
     if (settingsStore.value.pin == null) settingsStore.update { it.copy(pin = Settings.randomPin()) }
@@ -151,10 +159,8 @@ fun main() {
                     lastSung = lastSung,
                     searchBible = { q -> library.bible?.search(q) },
                     bible = remember(catalog) { library.bible },
-                    onSelectBible = { name ->
-                        settingsStore.update { it.copy(bible = name) }
-                        scope.launch(Dispatchers.IO) { library.selectBible(name) }
-                    },
+                    onSelectBible = { name -> scope.launch(Dispatchers.IO) { commands.onSelectBible(name) } },
+                    onSelectSecondBible = { name -> scope.launch(Dispatchers.IO) { commands.onSelectSecondBible(name) } },
                     firewallOk = firewallOk,
                     onImport = { importSongs(library) },
                     onExport = { exportSongs(library) },

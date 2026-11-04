@@ -29,6 +29,8 @@ data class Catalog(
     val announcements: List<String> = emptyList(),
     /** Predicaciones (carpeta predicaciones), con el mismo formato que las canciones. */
     val sermons: List<SongSummary> = emptyList(),
+    /** Segunda traducción que sale debajo de la primera, o null. */
+    val secondBibleName: String? = null,
 )
 
 /**
@@ -52,6 +54,13 @@ class Library(val baseDir: File) {
 
     /** Traducción elegida por el operador (null = la primera de la carpeta, o la Reina-Valera 1909). */
     @Volatile var preferredBible: String? = null
+
+    /** Segunda traducción elegida (null = ninguna). */
+    @Volatile var preferredSecondBible: String? = null
+
+    /** Segunda traducción en uso (nunca la misma que la primera). */
+    @Volatile var secondBible: Bible? = null
+        private set
 
     /** Biblias de la carpeta biblia/, ya leídas. */
     @Volatile private var userBibles: Map<String, Bible> = emptyMap()
@@ -243,14 +252,23 @@ class Library(val baseDir: File) {
         refreshBible(_catalog.value.songs)
     }
 
+    /** Elegir la segunda traducción (null = ninguna). */
+    @Synchronized
+    fun selectSecondBible(name: String?) {
+        preferredSecondBible = name
+        refreshBible(_catalog.value.songs)
+    }
+
     private fun refreshBible(songs: List<SongSummary>) {
         val names = (userBibles.keys + BUNDLED_BIBLES).distinct()
         val active = preferredBible?.takeIf { it in names } ?: userBibles.keys.firstOrNull() ?: BUNDLED_BIBLES.first()
         bible = userBibles[active] ?: bundled(active)
+        secondBible = preferredSecondBible?.takeIf { it in names && it != active }?.let { userBibles[it] ?: bundled(it) }
         val error = bibleErrors ?: if (bible == null) "No hay Biblia. Copia un archivo .json o .txt (VPL) en ${bibleDir.absolutePath}" else null
         _catalog.value = Catalog(
             songs, bible?.name, error, names, BIBLE_NOTICES[bible?.name], scanAnnouncements(),
             sermons.values.sortedBy { normalizeText(it.title) }.map { it.summary() },
+            secondBible?.name,
         )
     }
 

@@ -95,6 +95,7 @@ fun OperatorScreen(
     searchBible: (String) -> Pair<List<BibleHit>, Int>?,
     bible: Bible? = null,
     onSelectBible: (String) -> Unit = {},
+    onSelectSecondBible: (String?) -> Unit = {},
     firewallOk: Boolean?,
     onImport: () -> String?,
     onExport: () -> String?,
@@ -133,7 +134,7 @@ fun OperatorScreen(
             HorizontalDivider()
             Row(Modifier.fillMaxSize().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 LeftPanel(
-                    catalog, lastSung, plan, savedLists, onDeleteSavedList, Modifier.width(350.dp).fillMaxHeight(), send, onReload, onOpenFolder, onEdit, searchBible, bible, onSelectBible,
+                    catalog, lastSung, plan, savedLists, onDeleteSavedList, Modifier.width(350.dp).fillMaxHeight(), send, onReload, onOpenFolder, onEdit, searchBible, bible, onSelectBible, onSelectSecondBible,
                     onImport = { onImport()?.let { message = it } }, onExport = { onExport()?.let { message = it } },
                     currentMedia = state.media,
                     onAddAnnouncements = { onAddAnnouncements()?.let { message = it } },
@@ -222,6 +223,7 @@ private fun LeftPanel(
     searchBible: (String) -> Pair<List<BibleHit>, Int>?,
     bible: Bible?,
     onSelectBible: (String) -> Unit,
+    onSelectSecondBible: (String?) -> Unit,
     onImport: () -> Unit,
     onExport: () -> Unit,
     currentMedia: String?,
@@ -250,7 +252,7 @@ private fun LeftPanel(
         }
         when (tab) {
             0 -> SongsTab(catalog, lastSung, Modifier.weight(1f), send, present, onReload, onOpenFolder, onEdit, onImport, onExport, onEditSermon)
-            1 -> BibleTab(catalog, bible, onSelectBible, Modifier.weight(1f), send, present, searchBible)
+            1 -> BibleTab(catalog, bible, onSelectBible, onSelectSecondBible, Modifier.weight(1f), send, present, searchBible)
             2 -> AnnouncementsTab(catalog.announcements, currentMedia, Modifier.weight(1f), send, present, onAddAnnouncements, onOpenAnnouncements)
             else -> PlanPanel(plan, savedLists, onDeleteSavedList, Modifier.weight(1f).fillMaxWidth(), send)
         }
@@ -330,6 +332,7 @@ private fun BibleTab(
     catalog: Catalog,
     bible: Bible?,
     onSelectBible: (String) -> Unit,
+    onSelectSecondBible: (String?) -> Unit,
     modifier: Modifier,
     send: (ClientMessage) -> Unit,
     present: (ClientMessage) -> Unit,
@@ -342,7 +345,7 @@ private fun BibleTab(
         else hits = searchBible(reference)
     }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        BibleChooser(catalog, onSelectBible)
+        BibleChooser(catalog, onSelectBible, onSelectSecondBible)
         OutlinedTextField(
             reference, { reference = it },
             label = { Text("Cita o frase (ej. Juan 3:16 · amó Dios)") },
@@ -694,34 +697,44 @@ private fun ProjectorMenu(p: ProjectorControl) {
     }
 }
 
-/** Traducción en uso, con menú para cambiarla, y los créditos que pide su licencia. */
+/** Traducción en uso y la segunda (opcional), con menús para cambiarlas, y los créditos que pide la licencia. */
 @Composable
-private fun BibleChooser(catalog: Catalog, onSelect: (String) -> Unit) {
-    var open by remember { mutableStateOf(false) }
+private fun BibleChooser(catalog: Catalog, onSelect: (String) -> Unit, onSelectSecond: (String?) -> Unit) {
     Column {
-        Box {
-            TextButton({ open = true }, enabled = catalog.bibleNames.size > 1, contentPadding = PaddingValues(horizontal = 4.dp)) {
-                Text(
-                    "Traducción: " + (catalog.bibleName ?: "ninguna") + if (catalog.bibleNames.size > 1) "  ▾" else "",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-            DropdownMenu(open, { open = false }) {
-                for (name in catalog.bibleNames) {
-                    DropdownMenuItem(
-                        text = { Text((if (name == catalog.bibleName) "✓ " else "    ") + name) },
-                        onClick = { open = false; if (name != catalog.bibleName) onSelect(name) },
-                        modifier = Modifier.hand(),
-                    )
-                }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            ChoiceMenu("Traducción", catalog.bibleName ?: "ninguna", catalog.bibleNames, catalog.bibleName) { it?.let(onSelect) }
+            if (catalog.bibleNames.size > 1) {
+                ChoiceMenu(
+                    "+ segunda", catalog.secondBibleName ?: "ninguna",
+                    listOf<String?>(null) + catalog.bibleNames.filter { it != catalog.bibleName }, catalog.secondBibleName,
+                ) { onSelectSecond(it) }
             }
         }
-        (catalog.bibleError ?: catalog.bibleNotice)?.let {
+        (catalog.bibleError ?: listOfNotNull(Library.BIBLE_NOTICES[catalog.bibleName], Library.BIBLE_NOTICES[catalog.secondBibleName]).distinct().joinToString(" · ").ifEmpty { null })?.let {
             Text(
                 it, style = MaterialTheme.typography.labelSmall,
                 color = if (catalog.bibleError != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 4.dp),
             )
+        }
+    }
+}
+
+@Composable
+private fun ChoiceMenu(title: String, shown: String, options: List<String?>, current: String?, onPick: (String?) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        TextButton({ open = true }, enabled = options.size > 1, contentPadding = PaddingValues(horizontal = 4.dp)) {
+            Text("$title: $shown" + if (options.size > 1) " ▾" else "", style = MaterialTheme.typography.bodySmall, maxLines = 1)
+        }
+        DropdownMenu(open, { open = false }) {
+            for (o in options) {
+                DropdownMenuItem(
+                    text = { Text((if (o == current) "✓ " else "    ") + (o ?: "Ninguna (solo una)")) },
+                    onClick = { open = false; if (o != current) onPick(o) },
+                    modifier = Modifier.hand(),
+                )
+            }
         }
     }
 }

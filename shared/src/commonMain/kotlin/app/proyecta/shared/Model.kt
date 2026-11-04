@@ -7,6 +7,8 @@ import kotlinx.serialization.Serializable
 data class Slide(
     val label: String = "",
     val text: String,
+    /** El mismo versículo en una segunda traducción (Biblia a dos traducciones), o "". */
+    val text2: String = "",
 )
 
 /** Resumen de una canción para listarla en el control remoto. */
