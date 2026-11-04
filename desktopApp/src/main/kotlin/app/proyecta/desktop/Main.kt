@@ -42,7 +42,6 @@ fun main() {
     val serverError = runCatching { server.start() }.exceptionOrNull()?.let {
         "No pude abrir el puerto ${server.port} para el control remoto: ${it.message}"
     }
-    val addresses = RemoteServer.localAddresses()
     val discovery = DiscoveryResponder().also { runCatching { it.start() } }
     val themes = ThemeStore(File(library.baseDir, "tema.json"))
 
@@ -53,6 +52,7 @@ fun main() {
         var projectorOn by remember { mutableStateOf(true) }
         var editing by remember { mutableStateOf<EditRequest?>(null) }
         var backgroundsOpen by remember { mutableStateOf(false) }
+        var connectOpen by remember { mutableStateOf(false) }
         // Firewall de Windows: se revisa al abrir; si falta la regla se ofrece crearla con un clic.
         var firewallOk by remember { mutableStateOf<Boolean?>(null) }
         var askFirewall by remember { mutableStateOf(false) }
@@ -81,8 +81,6 @@ fun main() {
                     state = state,
                     catalog = catalog,
                     plan = plan,
-                    addresses = addresses,
-                    port = server.port,
                     serverError = serverError,
                     projectorOn = projectorOn,
                     onToggleProjector = { projectorOn = !projectorOn },
@@ -91,11 +89,11 @@ fun main() {
                     onOpenFolder = { runCatching { Desktop.getDesktop().open(library.baseDir) } },
                     onEdit = { id -> editing = EditRequest(id) },
                     onOpenBackgrounds = { backgroundsOpen = true },
+                    onOpenConnect = { connectOpen = true },
+                    searchBible = { q -> library.bible?.search(q) },
                     firewallOk = firewallOk,
-                    onAllowFirewall = allowFirewall,
                     onImport = { importSongs(library) },
                     onExport = { exportSongs(library) },
-                    searchBible = { q -> library.bible?.search(q) },
                 )
                 if (askFirewall) {
                     AlertDialog(
@@ -113,6 +111,17 @@ fun main() {
                     )
                 }
             }
+        }
+
+        if (connectOpen) {
+            ConnectWindow(
+                addresses = RemoteServer.localAddresses(),
+                port = server.port,
+                pcName = discovery.name,
+                firewallOk = firewallOk,
+                onAllowFirewall = allowFirewall,
+                onClose = { connectOpen = false },
+            )
         }
 
         if (backgroundsOpen) {

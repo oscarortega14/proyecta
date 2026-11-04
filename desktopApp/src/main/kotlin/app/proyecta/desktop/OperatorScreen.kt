@@ -41,6 +41,10 @@ import androidx.compose.ui.unit.dp
 import app.proyecta.shared.ClientMessage
 import app.proyecta.shared.PresentationState
 import app.proyecta.shared.search
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.Tab
+import androidx.compose.material3.AlertDialog
 import app.proyecta.shared.BibleReference
 import app.proyecta.shared.BibleHit
 import androidx.compose.ui.input.key.type
@@ -62,8 +66,6 @@ fun OperatorScreen(
     state: PresentationState,
     catalog: Catalog,
     plan: ServicePlanState,
-    addresses: List<String>,
-    port: Int,
     serverError: String?,
     projectorOn: Boolean,
     onToggleProjector: () -> Unit,
@@ -72,15 +74,16 @@ fun OperatorScreen(
     onOpenFolder: () -> Unit,
     onEdit: (songId: String?) -> Unit,
     onOpenBackgrounds: () -> Unit,
+    onOpenConnect: () -> Unit,
     searchBible: (String) -> Pair<List<BibleHit>, Int>?,
     firewallOk: Boolean?,
-    onAllowFirewall: () -> Unit,
     onImport: () -> String?,
     onExport: () -> String?,
 ) {
     var message by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(message) { if (message != null) { delay(5000); message = null } }
+    LaunchedEffect(message) { if (message != null) { delay(6000); message = null } }
     val send: (ClientMessage) -> Unit = { m -> message = onCommand(m) }
+    var helpOpen by remember { mutableStateOf(false) }
 
     val focusManager = LocalFocusManager.current
     Surface(
@@ -92,24 +95,86 @@ fun OperatorScreen(
         },
         color = MaterialTheme.colorScheme.background,
     ) {
-        Row(Modifier.fillMaxSize().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            LibraryPanel(
-                catalog, Modifier.width(300.dp).fillMaxHeight(), send, onReload, onOpenFolder, onEdit, searchBible,
-                onImport = { onImport()?.let { message = it } }, onExport = { onExport()?.let { message = it } },
+        Column(Modifier.fillMaxSize()) {
+            TopBar(
+                message = serverError ?: message,
+                projectorOn = projectorOn,
+                connectAttention = firewallOk == false,
+                onToggleProjector = onToggleProjector,
+                onOpenBackgrounds = onOpenBackgrounds,
+                onOpenConnect = onOpenConnect,
+                onHelp = { helpOpen = true },
             )
-            PlanPanel(plan, Modifier.width(250.dp).fillMaxHeight(), send)
-            SlidesPanel(state, Modifier.weight(1f).fillMaxHeight(), send, onEdit)
-            ControlPanel(
-                state, addresses, port, serverError ?: message, projectorOn, onToggleProjector,
-                Modifier.width(300.dp).fillMaxHeight(), send, onOpenBackgrounds, firewallOk, onAllowFirewall,
+            HorizontalDivider()
+            Row(Modifier.fillMaxSize().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                LeftPanel(
+                    catalog, plan, Modifier.width(330.dp).fillMaxHeight(), send, onReload, onOpenFolder, onEdit, searchBible,
+                    onImport = { onImport()?.let { message = it } }, onExport = { onExport()?.let { message = it } },
+                )
+                SlidesPanel(state, Modifier.weight(1f).fillMaxHeight(), send, onEdit)
+                LivePanel(state, Modifier.width(320.dp).fillMaxHeight(), send)
+            }
+        }
+        if (helpOpen) {
+            AlertDialog(
+                onDismissRequest = { helpOpen = false },
+                title = { Text("Atajos de teclado") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        for ((keys, what) in SHORTCUTS) {
+                            Row { Text(keys, fontWeight = FontWeight.Bold, modifier = Modifier.width(170.dp)); Text(what) }
+                        }
+                    }
+                },
+                confirmButton = { TextButton({ helpOpen = false }) { Text("Entendido") } },
             )
         }
     }
 }
 
+/** Barra superior: lo que se usa de vez en cuando, fuera del camino durante el culto. */
 @Composable
-private fun LibraryPanel(
+private fun TopBar(
+    message: String?,
+    projectorOn: Boolean,
+    connectAttention: Boolean,
+    onToggleProjector: () -> Unit,
+    onOpenBackgrounds: () -> Unit,
+    onOpenConnect: () -> Unit,
+    onHelp: () -> Unit,
+) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text("Proyecta", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(
+            message.orEmpty(),
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f).padding(horizontal = 16.dp),
+        )
+        OutlinedButton(onOpenBackgrounds) { Text("Fondos y letra") }
+        OutlinedButton(onOpenConnect) {
+            if (connectAttention) Text("● ", color = MaterialTheme.colorScheme.error)
+            Text("Conectar dispositivos")
+        }
+        FilterChip(
+            selected = projectorOn,
+            onClick = onToggleProjector,
+            label = { Text(if (projectorOn) "Proyección: encendida" else "Proyección: apagada") },
+        )
+        TextButton(onHelp) { Text("?", style = MaterialTheme.typography.titleMedium) }
+    }
+}
+
+/** Izquierda: Canciones · Biblia · Lista del culto, en pestañas. */
+@Composable
+private fun LeftPanel(
     catalog: Catalog,
+    plan: ServicePlanState,
     modifier: Modifier,
     send: (ClientMessage) -> Unit,
     onReload: () -> Unit,
@@ -119,24 +184,94 @@ private fun LibraryPanel(
     onImport: () -> Unit,
     onExport: () -> Unit,
 ) {
-    var query by remember { mutableStateOf("") }
-    var reference by remember { mutableStateOf("") }
-    var bibleHits by remember { mutableStateOf<Pair<List<BibleHit>, Int>?>(null) }
-    val results = remember(query, catalog) { catalog.songs.search(query) }
+    var tab by remember { mutableIntStateOf(0) }
     val focusManager = LocalFocusManager.current
     // Al proyectar algo, el foco sale del campo para que las flechas vuelvan a mover la letra.
     val present: (ClientMessage) -> Unit = { m -> send(m); focusManager.clearFocus(); Typing.active = false }
-    val showOrSearch = {
-        if (BibleReference.parse(reference) != null) present(ClientMessage.ShowBible(reference))
-        else bibleHits = searchBible(reference)
-    }
 
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Biblia", style = MaterialTheme.typography.titleMedium)
+        TabRow(selectedTabIndex = tab) {
+            val titles = listOf("Canciones", "Biblia", "Lista" + if (plan.items.isNotEmpty()) " (${plan.items.size})" else "")
+            titles.forEachIndexed { i, t ->
+                Tab(selected = tab == i, onClick = { tab = i }, modifier = Modifier.hand(), text = { Text(t, maxLines = 1) })
+            }
+        }
+        when (tab) {
+            0 -> SongsTab(catalog, Modifier.weight(1f), send, present, onReload, onOpenFolder, onEdit, onImport, onExport)
+            1 -> BibleTab(catalog, Modifier.weight(1f), send, present, searchBible)
+            else -> PlanPanel(plan, Modifier.weight(1f).fillMaxWidth(), send)
+        }
+    }
+}
+
+@Composable
+private fun SongsTab(
+    catalog: Catalog,
+    modifier: Modifier,
+    send: (ClientMessage) -> Unit,
+    present: (ClientMessage) -> Unit,
+    onReload: () -> Unit,
+    onOpenFolder: () -> Unit,
+    onEdit: (songId: String?) -> Unit,
+    onImport: () -> Unit,
+    onExport: () -> Unit,
+) {
+    var query by remember { mutableStateOf("") }
+    val results = remember(query, catalog) { catalog.songs.search(query) }
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+            query, { query = it },
+            label = { Text("Buscar entre ${catalog.songs.size} canciones") },
+            singleLine = true, modifier = Modifier.fillMaxWidth().marksTyping(),
+        )
+        LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
+            items(results, key = { it.id }) { song ->
+                Row(
+                    Modifier.fillMaxWidth().handClickable { present(ClientMessage.SelectSong(song.id)) }.padding(start = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
+                        Text(song.title, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            song.firstLine, style = MaterialTheme.typography.bodySmall, maxLines = 1,
+                            overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    TextButton({ send(ClientMessage.PlanAddSong(song.id)) }, contentPadding = PaddingValues(6.dp)) { Text("+ Lista") }
+                    TextButton({ onEdit(song.id) }, contentPadding = PaddingValues(6.dp)) { Text("Editar") }
+                }
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Button({ onEdit(null) }, Modifier.weight(1f), contentPadding = PaddingValues(4.dp)) { Text("+ Nueva") }
+            OutlinedButton(onImport, Modifier.weight(1f), contentPadding = PaddingValues(4.dp)) { Text("Importar…") }
+            OutlinedButton(onExport, Modifier.weight(1f), contentPadding = PaddingValues(4.dp)) { Text("Exportar…") }
+        }
+        Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
+            TextButton(onReload) { Text("Recargar") }
+            TextButton(onOpenFolder) { Text("Abrir carpeta") }
+        }
+    }
+}
+
+@Composable
+private fun BibleTab(
+    catalog: Catalog,
+    modifier: Modifier,
+    send: (ClientMessage) -> Unit,
+    present: (ClientMessage) -> Unit,
+    searchBible: (String) -> Pair<List<BibleHit>, Int>?,
+) {
+    var reference by remember { mutableStateOf("") }
+    var hits by remember { mutableStateOf<Pair<List<BibleHit>, Int>?>(null) }
+    val showOrSearch = {
+        if (BibleReference.parse(reference) != null) present(ClientMessage.ShowBible(reference))
+        else hits = searchBible(reference)
+    }
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             catalog.bibleName ?: catalog.bibleError ?: "Sin Biblia",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         OutlinedTextField(
             reference, { reference = it },
@@ -150,62 +285,35 @@ private fun LibraryPanel(
             Button({ present(ClientMessage.ShowBible(reference)) }, Modifier.weight(1f), enabled = reference.isNotBlank(), contentPadding = PaddingValues(6.dp)) {
                 Text("Mostrar")
             }
-            OutlinedButton({ bibleHits = searchBible(reference) }, Modifier.weight(1f), enabled = reference.isNotBlank(), contentPadding = PaddingValues(6.dp)) {
-                Text("Buscar")
+            OutlinedButton({ hits = searchBible(reference) }, Modifier.weight(1f), enabled = reference.isNotBlank(), contentPadding = PaddingValues(6.dp)) {
+                Text("Buscar frase")
             }
             OutlinedButton({ send(ClientMessage.PlanAddBible(reference)) }, Modifier.weight(1f), enabled = reference.isNotBlank(), contentPadding = PaddingValues(6.dp)) {
                 Text("+ Lista")
             }
         }
-
-        HorizontalDivider(Modifier.padding(vertical = 4.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Canciones (${catalog.songs.size})", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-            TextButton({ onEdit(null) }) { Text("+ Nueva") }
-        }
-        OutlinedTextField(query, { query = it }, label = { Text("Buscar") }, singleLine = true, modifier = Modifier.fillMaxWidth().marksTyping())
-        bibleHits?.let { (hits, total) ->
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    if (total == 0) "La Biblia: sin resultados" else "La Biblia: $total resultados" + if (total > hits.size) " (primeros ${hits.size})" else "",
-                    style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f),
-                )
-                TextButton({ bibleHits = null }) { Text("✕") }
-            }
+        hits?.let { (list, total) ->
+            Text(
+                if (total == 0) "Sin resultados" else "$total resultados" + if (total > list.size) " (primeros ${list.size})" else "",
+                style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary,
+            )
         }
         LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
-            bibleHits?.let { (hits, _) ->
-                items(hits, key = { "b:" + it.reference }) { hit ->
-                    Column(Modifier.fillMaxWidth().handClickable { present(ClientMessage.ShowBible(hit.reference)) }.padding(vertical = 6.dp, horizontal = 4.dp)) {
+            items(hits?.first.orEmpty(), key = { it.reference }) { hit ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f).handClickable { present(ClientMessage.ShowBible(hit.reference)) }.padding(vertical = 6.dp, horizontal = 4.dp)) {
                         Text(hit.reference, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.primary)
                         Text(hit.text, style = MaterialTheme.typography.bodySmall, maxLines = 3, overflow = TextOverflow.Ellipsis)
                     }
-                }
-            }
-            if (bibleHits == null) items(results, key = { it.id }) { song ->
-                Row(
-                    Modifier.fillMaxWidth().handClickable { present(ClientMessage.SelectSong(song.id)) }.padding(start = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
-                        Text(song.title, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(
-                            song.firstLine, style = MaterialTheme.typography.bodySmall, maxLines = 1,
-                            overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    TextButton({ send(ClientMessage.PlanAddSong(song.id)) }) { Text("+ Lista") }
-                    TextButton({ onEdit(song.id) }) { Text("Editar") }
+                    TextButton({ send(ClientMessage.PlanAddBible(hit.reference)) }, contentPadding = PaddingValues(6.dp)) { Text("+ Lista") }
                 }
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            OutlinedButton(onImport, Modifier.weight(1f), contentPadding = PaddingValues(4.dp)) { Text("Importar…") }
-            OutlinedButton(onExport, Modifier.weight(1f), contentPadding = PaddingValues(4.dp)) { Text("Exportar…") }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            OutlinedButton(onReload, Modifier.weight(1f), contentPadding = PaddingValues(4.dp)) { Text("Recargar") }
-            OutlinedButton(onOpenFolder, Modifier.weight(1f), contentPadding = PaddingValues(4.dp)) { Text("Abrir carpeta") }
+        if (hits == null) {
+            Text(
+                "Escribe una cita (Juan 3:16, Sal 23, 1 Co 13:4-7) y presiona Enter para mostrarla, o unas palabras para buscarlas en toda la Biblia.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -240,11 +348,11 @@ private fun SlidesPanel(
                     ),
                     border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
                 ) {
-                    Column(Modifier.padding(12.dp)) {
+                    Column(Modifier.padding(14.dp)) {
                         if (slide.label.isNotEmpty()) {
                             Text(slide.label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                         }
-                        Text(slide.text)
+                        Text(slide.text, style = MaterialTheme.typography.bodyLarge)
                     }
                 }
             }
@@ -252,28 +360,29 @@ private fun SlidesPanel(
     }
 }
 
+/** Derecha: solo lo "en vivo". Los avisos van plegados para no estorbar. */
 @Composable
-private fun ControlPanel(
-    state: PresentationState,
-    addresses: List<String>,
-    port: Int,
-    message: String?,
-    projectorOn: Boolean,
-    onToggleProjector: () -> Unit,
-    modifier: Modifier,
-    send: (ClientMessage) -> Unit,
-    onOpenBackgrounds: () -> Unit,
-    firewallOk: Boolean?,
-    onAllowFirewall: () -> Unit,
-) {
-    Column(modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+private fun LivePanel(state: PresentationState, modifier: Modifier, send: (ClientMessage) -> Unit) {
+    var avisosOpen by remember { mutableStateOf(false) }
+    val avisosActivos = listOfNotNull(
+        "alerta".takeIf { state.alert.isNotEmpty() },
+        "cuenta regresiva".takeIf { state.countdownEnd != null },
+        "mensaje".takeIf { state.stageMessage.isNotEmpty() },
+    )
+    Column(modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("En pantalla", style = MaterialTheme.typography.titleMedium)
         Surface(Modifier.fillMaxWidth().aspectRatio(16f / 9f), shape = MaterialTheme.shapes.small) {
             ProjectorScreen(state, look = LocalLook.current.copy(preview = true))
         }
+        state.next?.let { next ->
+            Column {
+                Text("SIGUE" + if (next.label.isNotEmpty() && !state.isBible) " · ${next.label}" else "", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(next.text, style = MaterialTheme.typography.bodySmall, maxLines = 3, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button({ send(ClientMessage.Prev) }, Modifier.weight(1f)) { Text("◀ Anterior") }
-            Button({ send(ClientMessage.Next) }, Modifier.weight(1f)) { Text("Siguiente ▶") }
+            Button({ send(ClientMessage.Prev) }, Modifier.weight(1f).height(56.dp)) { Text("◀", style = MaterialTheme.typography.titleLarge) }
+            Button({ send(ClientMessage.Next) }, Modifier.weight(2f).height(56.dp)) { Text("Siguiente ▶", style = MaterialTheme.typography.titleMedium) }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton({ send(ClientMessage.SetBlank(!state.blank)) }, Modifier.weight(1f)) {
@@ -283,50 +392,24 @@ private fun ControlPanel(
                 Text(if (state.logo) "Quitar logo" else "Logo (L)")
             }
         }
-        OutlinedButton(onOpenBackgrounds, Modifier.fillMaxWidth()) { Text("Fondos y letra…") }
-        OutlinedButton(onToggleProjector, Modifier.fillMaxWidth()) {
-            Text(if (projectorOn) "Cerrar ventana de proyección" else "Abrir ventana de proyección")
-        }
-        Text(
-            SHORTCUTS_HELP,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        if (message != null) {
-            Text(message, color = MaterialTheme.colorScheme.error)
-        }
         HorizontalDivider()
-        AlertBox(state.alert, send)
-        HorizontalDivider()
-        CountdownBox(state, send)
-        HorizontalDivider()
-        StageMessageBox(state.stageMessage, send)
-        HorizontalDivider()
-        Text("Control remoto", style = MaterialTheme.typography.titleMedium)
-        if (firewallOk == false) {
-            Text(
-                "Las tablets y celulares todavía no pueden conectarse: falta el permiso de Windows.",
-                color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall,
-            )
-            Button(onAllowFirewall, Modifier.fillMaxWidth()) { Text("Permitir conexiones") }
-        }
-        if (addresses.isEmpty()) {
-            Text("No encontré una red local. Conecta este equipo al Wi-Fi o al router.")
-        } else {
-            Text("App de la tablet: escribe", style = MaterialTheme.typography.bodySmall)
-            for (a in addresses) Text(a, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            val a = addresses.first()
-            Text("Desde cualquier navegador:", style = MaterialTheme.typography.bodySmall)
-            SelectionContainer {
-                Column {
-                    Text("http://$a:$port  (control)", style = MaterialTheme.typography.bodySmall)
-                    Text("http://$a:$port/escenario.html", style = MaterialTheme.typography.bodySmall)
-                    Text("http://$a:$port/obs.html  (OBS)", style = MaterialTheme.typography.bodySmall)
-                }
+        Row(
+            Modifier.fillMaxWidth().handClickable { avisosOpen = !avisosOpen }.padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(if (avisosOpen) "▾ " else "▸ ", style = MaterialTheme.typography.titleMedium)
+            Text("Avisos", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            if (avisosActivos.isNotEmpty()) {
+                Text("● " + avisosActivos.joinToString(", "), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
             }
         }
-        Spacer(Modifier.height(4.dp))
+        if (avisosOpen) {
+            AlertBox(state.alert, send)
+            HorizontalDivider()
+            CountdownBox(state, send)
+            HorizontalDivider()
+            StageMessageBox(state.stageMessage, send)
+        }
     }
 }
 
@@ -351,7 +434,7 @@ private fun SectionJumps(state: PresentationState, send: (ClientMessage) -> Unit
 private fun PlanPanel(plan: ServicePlanState, modifier: Modifier, send: (ClientMessage) -> Unit) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Lista del culto", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            Text("Orden del culto", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
             if (plan.items.isNotEmpty()) TextButton({ send(ClientMessage.PlanClear) }) { Text("Vaciar") }
         }
         Button({ send(ClientMessage.PlanNext) }, Modifier.fillMaxWidth(), enabled = plan.current < plan.items.lastIndex) {

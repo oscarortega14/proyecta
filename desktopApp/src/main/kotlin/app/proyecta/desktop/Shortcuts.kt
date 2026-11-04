@@ -21,6 +21,19 @@ object Typing {
 /** Marca un campo de texto para que los atajos no le roben las teclas. */
 fun Modifier.marksTyping(): Modifier = onFocusChanged { Typing.active = it.isFocused }
 
+/** Atajos para la ventana de ayuda (?). */
+val SHORTCUTS = listOf(
+    "→  ↓  Espacio" to "Siguiente estrofa",
+    "←  ↑" to "Estrofa anterior",
+    "Av Pág / Re Pág" to "Siguiente / anterior (clickers de presentación)",
+    "C" to "Ir al coro",
+    "1 … 9" to "Ir a la sección 1, 2, 3…",
+    "B  o  Ctrl+B" to "Pantalla negra",
+    "L" to "Logo de la iglesia",
+    "N" to "Siguiente elemento de la lista del culto",
+    "Esc" to "Mostrar la letra (o salir de un campo de texto)",
+)
+
 /** Texto de ayuda que se muestra en la ventana del operador. */
 const val SHORTCUTS_HELP =
     "Teclado: → ↓ Espacio siguiente · ← ↑ anterior · C coro · 1–9 secciones · B negro · L logo · N siguiente de la lista · Esc mostrar letra"
