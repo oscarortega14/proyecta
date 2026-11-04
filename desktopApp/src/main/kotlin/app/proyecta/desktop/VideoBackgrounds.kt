@@ -76,23 +76,36 @@ object VideoBackgrounds {
         else runCatching { MediaPlayerFactory("--no-audio", "--quiet", "--no-video-title-show", "--avcodec-hw=any") }.getOrNull()
     }
 
+    /** Para los anuncios: con sonido. */
+    private val audioFactory: MediaPlayerFactory? by lazy {
+        if (!available) null
+        else runCatching { MediaPlayerFactory("--quiet", "--no-video-title-show", "--avcodec-hw=any") }.getOrNull()
+    }
+
     private class Entry(val loop: VideoLoop, var users: Int)
     private val loops = HashMap<String, Entry>()
 
-    /** Un solo reproductor por archivo, compartido por el videobeam y las vistas previas. */
+    /**
+     * Un solo reproductor por archivo, compartido por el videobeam y las vistas previas.
+     * [announcement]: con sonido, una sola vez y a mayor resolución (es lo principal en pantalla).
+     */
     @Synchronized
-    fun acquire(file: File): VideoLoop? {
-        val f = factory ?: return null
-        val key = file.absolutePath
+    fun acquire(file: File, announcement: Boolean = false): VideoLoop? {
+        val f = (if (announcement) audioFactory else factory) ?: return null
+        val key = key(file, announcement)
         loops[key]?.let { it.users++; return it.loop }
-        val loop = runCatching { VideoLoop(file, f, MAX_WIDTH) }.getOrNull() ?: return null
+        val loop = runCatching {
+            if (announcement) VideoLoop(file, f, 1920, repeat = false, audio = true) else VideoLoop(file, f, MAX_WIDTH)
+        }.getOrNull() ?: return null
         loops[key] = Entry(loop, 1)
         return loop
     }
 
+    private fun key(file: File, announcement: Boolean) = file.absolutePath + if (announcement) "|anuncio" else ""
+
     @Synchronized
-    fun release(file: File) {
-        val key = file.absolutePath
+    fun release(file: File, announcement: Boolean = false) {
+        val key = key(file, announcement)
         val e = loops[key] ?: return
         if (--e.users <= 0) {
             loops.remove(key)
@@ -121,7 +134,13 @@ private const val POOL_SIZE = 6
  * y no se crea ni destruye memoria en cada cuadro. Los píxeles se copian en el hilo de la interfaz,
  * el mismo que dibuja, así nunca se lee una imagen a medio escribir.
  */
-class VideoLoop(file: File, factory: MediaPlayerFactory, maxWidth: Int) : AutoCloseable {
+class VideoLoop(
+    file: File,
+    factory: MediaPlayerFactory,
+    maxWidth: Int,
+    private val repeat: Boolean = true,
+    audio: Boolean = false,
+) : AutoCloseable {
     val frame: MutableState<VideoFrame?> = mutableStateOf(null)
 
     private val player: EmbeddedMediaPlayer = factory.mediaPlayers().newEmbeddedMediaPlayer()
@@ -168,8 +187,9 @@ class VideoLoop(file: File, factory: MediaPlayerFactory, maxWidth: Int) : AutoCl
             }
         }
         player.videoSurface().set(factory.videoSurfaces().newVideoSurface(format, render, true))
-        player.controls().setRepeat(true)
-        player.media().play(file.absolutePath, ":no-audio", ":input-repeat=65535")
+        player.controls().setRepeat(repeat)
+        if (repeat) player.media().play(file.absolutePath, ":no-audio", ":input-repeat=65535")
+        else player.media().play(file.absolutePath, *(if (audio) emptyArray() else arrayOf(":no-audio")))
     }
 
     /** En el EDT: copia el cuadro a la siguiente imagen del grupo y lo publica. */
@@ -220,9 +240,9 @@ class VideoLoop(file: File, factory: MediaPlayerFactory, maxWidth: Int) : AutoCl
  * [maxFps] limita cuántas veces por segundo se redibuja este lugar (las vistas previas usan menos).
  */
 @Composable
-fun VideoBackground(file: File, modifier: Modifier = Modifier, maxFps: Int = 30) {
-    val loop = remember(file) { VideoBackgrounds.acquire(file) }
-    DisposableEffect(file) { onDispose { if (loop != null) VideoBackgrounds.release(file) } }
+fun VideoBackground(file: File, modifier: Modifier = Modifier, maxFps: Int = 30, announcement: Boolean = false) {
+    val loop = remember(file, announcement) { VideoBackgrounds.acquire(file, announcement) }
+    DisposableEffect(file, announcement) { onDispose { if (loop != null) VideoBackgrounds.release(file, announcement) } }
     if (loop == null) return
     val shown = remember(loop) { mutableStateOf(loop.frame.value) }
     LaunchedEffect(loop, maxFps) {
@@ -235,6 +255,17 @@ fun VideoBackground(file: File, modifier: Modifier = Modifier, maxFps: Int = 30)
     }
     Canvas(modifier.fillMaxSize()) {
         val f = shown.value ?: return@Canvas
+        if (announcement) {
+            // El anuncio se ve entero (como ContentScale.Fit), con franjas negras si hace falta.
+            val s = minOf(size.width / f.width, size.height / f.height)
+            val w = (f.width * s).roundToInt(); val h = (f.height * s).roundToInt()
+            drawImage(
+                f.image, srcOffset = IntOffset.Zero, srcSize = IntSize(f.width, f.height),
+                dstOffset = IntOffset(((size.width - w) / 2).roundToInt(), ((size.height - h) / 2).roundToInt()),
+                dstSize = IntSize(w, h), filterQuality = FilterQuality.Medium,
+            )
+            return@Canvas
+        }
         // Recortar para llenar (como ContentScale.Crop), centrado.
         val scale = maxOf(size.width / f.width, size.height / f.height)
         val srcW = (size.width / scale).roundToInt().coerceIn(1, f.width)

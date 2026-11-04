@@ -86,6 +86,13 @@ sealed interface ClientMessage {
     @Serializable @SerialName("countdown_stop")
     data object StopCountdown : ClientMessage
 
+    /** Mostrar un anuncio (imagen o video de la carpeta anuncios). */
+    @Serializable @SerialName("media")
+    data class ShowMedia(val name: String) : ClientMessage
+
+    @Serializable @SerialName("plan_add_media")
+    data class PlanAddMedia(val name: String) : ClientMessage
+
     /** Buscar una frase en la Biblia; responde con ServerMessage.BibleResults. */
     @Serializable @SerialName("bible_search")
     data class BibleSearch(val query: String) : ClientMessage
@@ -100,7 +107,7 @@ sealed interface ClientMessage {
 data class BibleBookInfo(val name: String, val chapters: Int)
 
 @Serializable
-enum class PlanKind { SONG, BIBLE }
+enum class PlanKind { SONG, BIBLE, MEDIA }
 
 /** Un elemento de la lista del culto: una canción (ref = id) o una cita (ref = referencia). */
 @Serializable
@@ -122,6 +129,8 @@ sealed interface ServerMessage {
         val songs: List<SongSummary>,
         val bibleName: String? = null,
         val bibleBooks: List<BibleBookInfo> = emptyList(),
+        /** Anuncios (imágenes y videos) que se pueden mostrar. */
+        val announcements: List<String> = emptyList(),
     ) : ServerMessage
 
     @Serializable @SerialName("state")

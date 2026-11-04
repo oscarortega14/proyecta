@@ -36,7 +36,7 @@ if (params.get("bg") === "1") box.classList.add("bg");
 function render() {
   const st = S.state, cur = st.slides[st.index];
   const counting = (P.countdownSeconds(st) || 0) > 0;
-  const visible = S.connected && cur && !st.blank && !st.logo && !counting;
+  const visible = S.connected && cur && !st.blank && !st.logo && !counting && !st.media; // un anuncio no es letra
   wrap.classList.toggle("hidden", !visible);
   if (!visible) return;
   box.replaceChildren(document.createTextNode(cur.text));

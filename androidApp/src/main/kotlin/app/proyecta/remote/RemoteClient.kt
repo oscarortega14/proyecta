@@ -86,6 +86,10 @@ class RemoteClient(private val scope: CoroutineScope) {
     val bibleName: StateFlow<String?> = _bibleName.asStateFlow()
 
     /** Libros de la Biblia del PC (para el explorador). */
+    /** Anuncios (imágenes y videos) del PC. */
+    private val _announcements = MutableStateFlow<List<String>>(emptyList())
+    val announcements: StateFlow<List<String>> = _announcements.asStateFlow()
+
     private val _bibleBooks = MutableStateFlow<List<BibleBookInfo>>(emptyList())
     val bibleBooks: StateFlow<List<BibleBookInfo>> = _bibleBooks.asStateFlow()
 
@@ -192,6 +196,7 @@ class RemoteClient(private val scope: CoroutineScope) {
                 // Otra traducción: el capítulo guardado ya no sirve.
                 if (m.bibleName != _bibleName.value) _bibleChapter.value = null
                 _songs.value = m.songs; _bibleName.value = m.bibleName; _bibleBooks.value = m.bibleBooks
+                _announcements.value = m.announcements
             }
             is ServerMessage.BibleChapter -> _bibleChapter.value = m
             is ServerMessage.State -> {

@@ -134,6 +134,11 @@
   </section>
   <section id="more" class="tab">
     <button class="btn wide" id="logo">Mostrar logo</button>
+    <div id="annBox" hidden>
+      <hr>
+      <h2>Anuncios</h2>
+      <div id="annList"></div>
+    </div>
     <hr>
     <h2>Alerta en pantalla</h2>
     <input id="alertText" type="text" placeholder="Ej. Se busca al dueño del carro ABC123" enterkeyhint="send">
@@ -242,6 +247,20 @@ function renderHits(m) {
     add.onclick = () => addBible(h.reference);
     row.append(t, add);
     box.appendChild(row);
+  });
+}
+
+function renderAnnouncements() {
+  const list = S.announcements || [];
+  $("annBox").hidden = !list.length;
+  const box = $("annList"); box.replaceChildren();
+  list.forEach((name) => {
+    const row = P.el("div", "item" + (name === S.state.media ? " on" : ""));
+    const t = P.el("div", "t"); t.appendChild(P.el("b", null, (name === S.state.media ? "▶ " : "") + name.replace(/\.[^.]+$/, "")));
+    t.onclick = () => { P.send("media", { name }); showTab("live"); };
+    const add = P.el("button", "icon", "+ Lista");
+    add.onclick = () => { P.send("plan_add_media", { name }); toast("Agregado a la lista"); };
+    row.append(t, add); box.appendChild(row);
   });
 }
 
@@ -386,7 +405,7 @@ function renderPlan() {
     const row = P.el("div", "item" + (i === S.plan.current ? " on" : ""));
     const t = P.el("div", "t");
     t.appendChild(P.el("b", null, (i + 1) + ". " + it.title));
-    t.appendChild(P.el("small", null, it.kind === "BIBLE" ? "Lectura" : "Canción"));
+    t.appendChild(P.el("small", null, it.kind === "BIBLE" ? "Lectura" : it.kind === "MEDIA" ? "Anuncio" : "Canción"));
     t.onclick = () => { P.send("plan_go", { index: i }); showTab("live"); };
     const up = P.el("button", "icon", "▲"); up.onclick = () => P.send("plan_move", { from: i, to: i - 1 });
     const down = P.el("button", "icon", "▼"); down.onclick = () => P.send("plan_move", { from: i, to: i + 1 });
@@ -462,6 +481,8 @@ $("closeInstall").onclick = () => { $("installBanner").style.display = "none"; s
 P.on("status", renderStatus);
 P.on("state", renderLive);
 P.on("library", renderSongs);
+P.on("library", renderAnnouncements);
+P.on("state", renderAnnouncements);
 P.on("plan", renderPlan);
 P.on("bibleResults", renderHits);
 let shownBible = null;

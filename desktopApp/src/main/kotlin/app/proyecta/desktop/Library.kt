@@ -25,6 +25,8 @@ data class Catalog(
     val bibleNames: List<String> = emptyList(),
     /** Créditos que exige la licencia de la traducción en uso. */
     val bibleNotice: String? = null,
+    /** Archivos de la carpeta anuncios (imágenes y videos). */
+    val announcements: List<String> = emptyList(),
 )
 
 /**
@@ -36,6 +38,7 @@ class Library(val baseDir: File) {
     val songsDir = File(baseDir, "canciones")
     val bibleDir = File(baseDir, "biblia")
     val backgroundsDir = File(baseDir, "fondos")
+    val announcementsDir = File(baseDir, "anuncios")
 
     @Volatile private var songs: Map<String, Song> = emptyMap()
     @Volatile var bible: Bible? = null
@@ -194,6 +197,7 @@ class Library(val baseDir: File) {
         songsDir.mkdirs()
         bibleDir.mkdirs()
         backgroundsDir.mkdirs()
+        announcementsDir.mkdirs()
         if (songsDir.listFiles { f -> f.isSongFile() }.isNullOrEmpty()) writeExampleSong()
 
         val loaded = songsDir.listFiles { f -> f.isSongFile() }.orEmpty()
@@ -231,7 +235,34 @@ class Library(val baseDir: File) {
         val active = preferredBible?.takeIf { it in names } ?: userBibles.keys.firstOrNull() ?: BUNDLED_BIBLES.first()
         bible = userBibles[active] ?: bundled(active)
         val error = bibleErrors ?: if (bible == null) "No hay Biblia. Copia un archivo .json o .txt (VPL) en ${bibleDir.absolutePath}" else null
-        _catalog.value = Catalog(songs, bible?.name, error, names, BIBLE_NOTICES[bible?.name])
+        _catalog.value = Catalog(songs, bible?.name, error, names, BIBLE_NOTICES[bible?.name], scanAnnouncements())
+    }
+
+    private fun scanAnnouncements(): List<String> = announcementsDir.listFiles { f -> f.isFile && isMediaFile(f.name) }.orEmpty()
+        .sortedBy { normalizeText(it.name) }.map { it.name }
+
+    /** Archivo de un anuncio, solo si está dentro de la carpeta (nada de "../"). */
+    fun announcementFile(name: String): File? =
+        File(announcementsDir, name).takeIf { it.isFile && it.parentFile == announcementsDir && isMediaFile(name) }
+
+    /** Copia imágenes o videos a la carpeta de anuncios. Devuelve cuántos se agregaron. */
+    @Synchronized
+    fun addAnnouncements(files: List<File>): Int {
+        announcementsDir.mkdirs()
+        var n = 0
+        for (f in files.filter { it.isFile && isMediaFile(it.name) }) {
+            var target = File(announcementsDir, f.name)
+            var i = 2
+            while (target.exists() && target.length() != f.length()) target = File(announcementsDir, "${f.nameWithoutExtension} ($i).${f.extension}").also { i++ }
+            if (!target.exists()) { f.copyTo(target); n++ }
+        }
+        refreshAnnouncements()
+        return n
+    }
+
+    @Synchronized
+    fun refreshAnnouncements() {
+        _catalog.value = _catalog.value.copy(announcements = scanAnnouncements())
     }
 
     private fun File.isSongFile() = isFile && extension.equals("txt", true)
@@ -291,6 +322,8 @@ class Library(val baseDir: File) {
 
         /** Lo que se puede importar: .txt (Proyecta), .xml (OpenLyrics/OpenLP), .json (Holyrics) y .zip con esos. */
         val IMPORT_EXTENSIONS = setOf("txt", "xml", "json")
+
+        fun isMediaFile(name: String) = name.substringAfterLast('.', "").lowercase().let { it in IMAGE_EXTENSIONS || it in VIDEO_EXTENSIONS }
 
         val IMAGE_EXTENSIONS = setOf("jpg", "jpeg", "png", "webp", "bmp")
         private val FONDO_LINE = Regex("""^fondo\s*:.*$""", RegexOption.IGNORE_CASE)

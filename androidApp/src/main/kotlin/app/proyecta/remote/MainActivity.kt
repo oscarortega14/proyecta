@@ -155,6 +155,7 @@ private fun RemoteApp(client: RemoteClient, savedHost: String, pcName: String, l
     val bibleName by client.bibleName.collectAsState()
     val plan by client.plan.collectAsState()
     val savedLists by client.savedLists.collectAsState()
+    val announcements by client.announcements.collectAsState()
     val bibleResults by client.bibleResults.collectAsState()
     val bibleBooks by client.bibleBooks.collectAsState()
     val bibleChapter by client.bibleChapter.collectAsState()
@@ -197,7 +198,7 @@ private fun RemoteApp(client: RemoteClient, savedHost: String, pcName: String, l
                         },
                     )
                     3 -> PlanTab(plan, savedLists, state.stageMessage, client::send) { tab = 0 }
-                    4 -> MoreTab(state, client.serverOffset, client::send)
+                    4 -> MoreTab(state, announcements, client.serverOffset, client::send) { tab = 0 }
                 }
             }
             Controls(state, client::send)
@@ -392,7 +393,7 @@ private fun PlanTab(plan: ServicePlanState, saved: List<String>, stageMessage: S
                 Row(Modifier.padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f).padding(vertical = 10.dp)) {
                         Text("${i + 1}. ${item.title}", fontSize = 17.sp, fontWeight = FontWeight.Medium)
-                        Text(if (item.kind == PlanKind.BIBLE) "Lectura" else "Canción", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(when (item.kind) { PlanKind.BIBLE -> "Lectura"; PlanKind.MEDIA -> "Anuncio"; else -> "Canción" }, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     TextButton({ send(ClientMessage.PlanMove(i, i - 1)) }, enabled = i > 0) { Text("▲") }
                     TextButton({ send(ClientMessage.PlanMove(i, i + 1)) }, enabled = i < plan.items.lastIndex) { Text("▼") }
@@ -422,7 +423,8 @@ private fun PlanTab(plan: ServicePlanState, saved: List<String>, stageMessage: S
 }
 
 @Composable
-private fun MoreTab(state: PresentationState, serverOffset: Long, send: (ClientMessage) -> Unit) {
+private fun MoreTab(state: PresentationState, announcements: List<String>, serverOffset: Long, send: (ClientMessage) -> Unit, onShown: () -> Unit) {
+    val context = LocalContext.current
     var alert by rememberSaveable { mutableStateOf("") }
     var minutes by rememberSaveable { mutableStateOf("5") }
     var cdText by rememberSaveable { mutableStateOf("Comenzamos en") }
@@ -436,6 +438,23 @@ private fun MoreTab(state: PresentationState, serverOffset: Long, send: (ClientM
         item {
             Button({ send(ClientMessage.ShowLogo(!state.logo)) }, Modifier.fillMaxWidth().height(56.dp)) {
                 Text(if (state.logo) "Quitar logo" else "Mostrar logo de la iglesia", fontSize = 17.sp)
+            }
+        }
+        if (announcements.isNotEmpty()) {
+            item { Text("Anuncios", style = MaterialTheme.typography.titleMedium) }
+            items(announcements, key = { "anuncio:$it" }) { name ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        (if (name == state.media) "▶ " else "") + name.substringBeforeLast('.'),
+                        Modifier.weight(1f).clickable { send(ClientMessage.ShowMedia(name)); onShown() }.padding(vertical = 10.dp),
+                        color = if (name == state.media) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        fontSize = 17.sp,
+                    )
+                    TextButton({
+                        send(ClientMessage.PlanAddMedia(name))
+                        Toast.makeText(context, "Agregado a la lista", Toast.LENGTH_SHORT).show()
+                    }) { Text("+ Lista") }
+                }
             }
         }
         item {

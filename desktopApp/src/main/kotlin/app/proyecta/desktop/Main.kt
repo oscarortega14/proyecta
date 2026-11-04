@@ -63,6 +63,13 @@ fun main() {
             }
         }
         val projectorScreen = chooseProjectorScreen(screens, settings.projectorScreen)
+        // Anuncios copiados a mano a la carpeta: aparecen solos.
+        LaunchedEffect(Unit) {
+            while (true) {
+                kotlinx.coroutines.delay(5000)
+                withContext(Dispatchers.IO) { library.refreshAnnouncements() }
+            }
+        }
         var confirmProjectorOff by remember { mutableStateOf(false) }
         var confirmExit by remember { mutableStateOf(false) }
         var editing by remember { mutableStateOf<EditRequest?>(null) }
@@ -93,7 +100,7 @@ fun main() {
             scope.launch { firewallOk = withContext(Dispatchers.IO) { FirewallSetup.requestRule() } }
         }
         val theme by themes.theme.collectAsState()
-        val look = Look(theme, backgroundFile = { name -> library.backgroundFile(name) })
+        val look = Look(theme, backgroundFile = { name -> library.backgroundFile(name) }, mediaFile = { name -> library.announcementFile(name) })
 
         ProvideLook(look) {
         Window(
@@ -140,6 +147,8 @@ fun main() {
                     firewallOk = firewallOk,
                     onImport = { importSongs(library) },
                     onExport = { exportSongs(library) },
+                    onAddAnnouncements = { addAnnouncements(library) },
+                    onOpenAnnouncements = { library.announcementsDir.mkdirs(); runCatching { Desktop.getDesktop().open(library.announcementsDir) } },
                 )
                 // La primera vez: guía corta. Después del aviso del firewall, para no encimar ventanas.
                 if (!settings.welcomeDone && !askFirewall) {
@@ -277,6 +286,20 @@ private fun importSongs(library: Library): String? {
         if (r.skipped > 0) append(" · ya estaban: ${r.skipped}")
         if (r.renamed > 0) append(" · con nombre nuevo (texto distinto): ${r.renamed}")
     }
+}
+
+/** Elegir imágenes o videos y copiarlos a la carpeta de anuncios. */
+private fun addAnnouncements(library: Library): String? {
+    val dialog = java.awt.FileDialog(null as java.awt.Frame?, "Agregar anuncios (imágenes o videos)", java.awt.FileDialog.LOAD).apply {
+        isMultipleMode = true
+        setFilenameFilter { _, name -> Library.isMediaFile(name) }
+        file = (Library.IMAGE_EXTENSIONS + VIDEO_EXTENSIONS).joinToString(";") { "*.$it" }
+        isVisible = true
+    }
+    val files = dialog.files?.toList().orEmpty()
+    if (files.isEmpty()) return null
+    val n = runCatching { library.addAnnouncements(files) }.getOrElse { return "No pude agregar: ${it.message}" }
+    return if (n == 0) "Esos anuncios ya estaban" else "Agregados $n anuncios"
 }
 
 /** Guardar todas las canciones en un .zip (respaldo o para otro PC). */

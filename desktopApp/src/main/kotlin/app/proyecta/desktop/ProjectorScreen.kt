@@ -54,6 +54,8 @@ data class Look(
     val frozenTime: Float? = null,
     /** Vista previa (miniatura): el video se redibuja menos veces por segundo. */
     val preview: Boolean = false,
+    /** Archivo de un anuncio (carpeta anuncios). */
+    val mediaFile: (String) -> File? = { null },
 )
 
 val LocalLook = staticCompositionLocalOf { Look() }
@@ -74,14 +76,18 @@ fun ProjectorScreen(state: PresentationState, modifier: Modifier = Modifier, loo
     val logo = rememberBackground(theme.logo?.let(look.backgroundFile))
     val now = rememberClock(active = state.countdownEnd != null)
     val seconds = state.countdownSeconds(now)
+    val media = state.media?.let(look.mediaFile)
 
     BoxWithConstraints(modifier.fillMaxSize().background(Color.Black)) {
         val slide = state.current
         if (!state.blank) {
-            Background(theme, image, video, look.frozenTime, look.preview)
+            // Un anuncio ocupa toda la pantalla (sin fondo ni letra); la cuenta regresiva y el logo van primero.
+            val showMedia = media != null && !state.logo && (seconds == null || seconds <= 0)
+            if (!showMedia) Background(theme, image, video, look.frozenTime, look.preview)
             when {
                 seconds != null && seconds > 0 -> Countdown(state.countdownText, seconds, theme, maxWidth, maxHeight)
                 state.logo -> if (logo != null) Logo(logo, maxHeight)
+                showMedia -> Announcement(media!!, look.preview)
                 slide != null -> {
                     // Con alerta, la letra deja libre la franja de abajo.
                     val w = maxWidth
@@ -94,6 +100,17 @@ fun ProjectorScreen(state: PresentationState, modifier: Modifier = Modifier, loo
             }
             if (state.alert.isNotEmpty()) AlertBar(state.alert, maxHeight)
         }
+    }
+}
+
+/** Imagen entera (con franjas negras si no es 16:9) o video con sonido. */
+@Composable
+private fun Announcement(file: File, preview: Boolean) {
+    if (isVideoFile(file.name)) {
+        if (VideoBackgrounds.available) VideoBackground(file, maxFps = if (preview) 10 else 30, announcement = true)
+    } else {
+        val img = rememberBackground(file)
+        if (img != null) Image(img, contentDescription = "Anuncio", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
     }
 }
 

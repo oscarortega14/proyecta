@@ -39,6 +39,8 @@ data class PresentationState(
     val countdownEnd: Long? = null,
     /** Texto sobre la cuenta regresiva, ej. "Comenzamos en". */
     val countdownText: String = "",
+    /** Anuncio en pantalla: imagen o video (archivo en Proyecta/anuncios) en vez de letra, o null. */
+    val media: String? = null,
 ) {
     /** Segundos que faltan de la cuenta regresiva (0 si terminó), o null si no hay. */
     fun countdownSeconds(now: Long): Long? = countdownEnd?.let { ((it - now + 999) / 1000).coerceAtLeast(0) }

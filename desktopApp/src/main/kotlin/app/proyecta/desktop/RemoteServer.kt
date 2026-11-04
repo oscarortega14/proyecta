@@ -69,7 +69,7 @@ class RemoteServer(
                 val pushJob = launch {
                     launch {
                         library.catalog.collect { c ->
-                            send(Frame.Text(ServerMessage.Library(c.songs, c.bibleName, library.bible?.bookInfos().orEmpty()).encode()))
+                            send(Frame.Text(ServerMessage.Library(c.songs, c.bibleName, library.bible?.bookInfos().orEmpty(), c.announcements).encode()))
                         }
                     }
                     launch {

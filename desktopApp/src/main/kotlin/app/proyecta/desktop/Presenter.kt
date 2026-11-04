@@ -30,6 +30,7 @@ class Presenter(
         ClientMessage.Prev -> { _state.update { s -> s.copy(index = (s.index - 1).coerceAtLeast(if (s.slides.isEmpty()) -1 else 0)) }; null }
         is ClientMessage.SetBlank -> { _state.update { it.copy(blank = msg.blank) }; null }
         is ClientMessage.ShowBible -> showBible(msg.reference)
+        is ClientMessage.ShowMedia -> showMedia(msg.name)
         is ClientMessage.StageMessage -> { _state.update { it.copy(stageMessage = msg.text.trim()) }; null }
         is ClientMessage.ShowLogo -> { _state.update { it.copy(logo = msg.show, blank = if (msg.show) false else it.blank) }; null }
         is ClientMessage.SetAlert -> { _state.update { it.copy(alert = msg.text.trim()) }; null }
@@ -79,6 +80,12 @@ class Presenter(
         }
         _state.update { it.keepingOverlays(PresentationState(passage.title, passage.slides, 0, isBible = true)) }
         onShown?.invoke(HistoryEntry.Kind.BIBLE, passage.title, passage.title)
+        return null
+    }
+
+    private fun showMedia(name: String): String? {
+        library.announcementFile(name) ?: return "No encontré el anuncio \"$name\" en la carpeta anuncios"
+        _state.update { it.keepingOverlays(PresentationState("Anuncio: ${name.substringBeforeLast('.')}", listOf(app.proyecta.shared.Slide("Anuncio", name)), 0, media = name)) }
         return null
     }
 

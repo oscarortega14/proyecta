@@ -95,6 +95,8 @@ fun OperatorScreen(
     firewallOk: Boolean?,
     onImport: () -> String?,
     onExport: () -> String?,
+    onAddAnnouncements: () -> String? = { null },
+    onOpenAnnouncements: () -> Unit = {},
 ) {
     var message by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(message) { if (message != null) { delay(6000); message = null } }
@@ -126,8 +128,11 @@ fun OperatorScreen(
             HorizontalDivider()
             Row(Modifier.fillMaxSize().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 LeftPanel(
-                    catalog, lastSung, plan, savedLists, onDeleteSavedList, Modifier.width(330.dp).fillMaxHeight(), send, onReload, onOpenFolder, onEdit, searchBible, bible, onSelectBible,
+                    catalog, lastSung, plan, savedLists, onDeleteSavedList, Modifier.width(350.dp).fillMaxHeight(), send, onReload, onOpenFolder, onEdit, searchBible, bible, onSelectBible,
                     onImport = { onImport()?.let { message = it } }, onExport = { onExport()?.let { message = it } },
+                    currentMedia = state.media,
+                    onAddAnnouncements = { onAddAnnouncements()?.let { message = it } },
+                    onOpenAnnouncements = onOpenAnnouncements,
                 )
                 SlidesPanel(state, Modifier.weight(1f).fillMaxHeight(), send, onEdit)
                 LivePanel(state, Modifier.width(320.dp).fillMaxHeight(), send)
@@ -211,6 +216,9 @@ private fun LeftPanel(
     onSelectBible: (String) -> Unit,
     onImport: () -> Unit,
     onExport: () -> Unit,
+    currentMedia: String?,
+    onAddAnnouncements: () -> Unit,
+    onOpenAnnouncements: () -> Unit,
 ) {
     var tab by remember { mutableIntStateOf(0) }
     val focusManager = LocalFocusManager.current
@@ -219,14 +227,22 @@ private fun LeftPanel(
 
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         TabRow(selectedTabIndex = tab) {
-            val titles = listOf("Canciones", "Biblia", "Lista" + if (plan.items.isNotEmpty()) " (${plan.items.size})" else "")
+            val titles = listOf("Canciones", "Biblia", "Anuncios", "Lista" + if (plan.items.isNotEmpty()) " (${plan.items.size})" else "")
             titles.forEachIndexed { i, t ->
-                Tab(selected = tab == i, onClick = { tab = i }, modifier = Modifier.hand(), text = { Text(t, maxLines = 1) })
+                // Contenido propio (sin el margen grande de Tab) para que quepan las 4 pestañas.
+                Tab(selected = tab == i, onClick = { tab = i }, modifier = Modifier.hand()) {
+                    Text(
+                        t, maxLines = 1, softWrap = false, style = MaterialTheme.typography.labelLarge,
+                        color = if (tab == i) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 2.dp, vertical = 14.dp),
+                    )
+                }
             }
         }
         when (tab) {
             0 -> SongsTab(catalog, lastSung, Modifier.weight(1f), send, present, onReload, onOpenFolder, onEdit, onImport, onExport)
             1 -> BibleTab(catalog, bible, onSelectBible, Modifier.weight(1f), send, present, searchBible)
+            2 -> AnnouncementsTab(catalog.announcements, currentMedia, Modifier.weight(1f), send, present, onAddAnnouncements, onOpenAnnouncements)
             else -> PlanPanel(plan, savedLists, onDeleteSavedList, Modifier.weight(1f).fillMaxWidth(), send)
         }
     }
@@ -516,7 +532,7 @@ private fun PlanPanel(
                         Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
                             Text("${i + 1}. ${item.title}", maxLines = 2, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
                             Text(
-                                if (item.kind == PlanKind.BIBLE) "Lectura" else "Canción",
+                                when (item.kind) { PlanKind.BIBLE -> "Lectura"; PlanKind.MEDIA -> "Anuncio"; else -> "Canción" },
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
