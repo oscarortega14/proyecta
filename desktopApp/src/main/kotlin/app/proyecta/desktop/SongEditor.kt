@@ -165,7 +165,8 @@ fun SongEditorWindow(
                         } else {
                             "Formato: la primera línea es \"# Título\". Una línea en blanco separa diapositivas. " +
                                 "\"Coro:\", \"Pregón 1:\"… al inicio de un bloque crean una sección para saltar rápido. " +
-                                "\"Orden: Inicio, Coro, Pregón 1, Coro\" (debajo del título) repite secciones al avanzar."
+                                "\"Orden: Inicio, Coro, Pregón 1, Coro\" (debajo del título) repite secciones al avanzar. " +
+                                "Acordes: \"[G]Cuán grande es [C]Él\" (en el videobeam sale solo la letra; los músicos los ven en la vista de escenario)."
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

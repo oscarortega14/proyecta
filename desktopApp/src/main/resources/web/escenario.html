@@ -31,11 +31,20 @@
   #timer .small { font-size:4vh; color:#aaa; font-weight:600; }
   #timer.warn .big { color:#ffd54f; }
   #timer.over .big { color:#ff5252; }
+  #chordBar { display:none; gap:.6vw; align-items:center; }
+  #chordBar button { background:#222; color:#ddd; border:1px solid #444; border-radius:8px; font-size:2.4vh; padding:.3vh .8vw; }
+  #chordBar button.on { background:#ffd54f; color:#000; border-color:#ffd54f; }
+  #key { color:#ffd54f; font-size:2.4vh; min-width:3vw; text-align:center; }
+  .ln { display:block; white-space:nowrap; }
+  .seg { display:inline-block; vertical-align:bottom; white-space:pre; }
+  .ch { display:block; color:#ffd54f; font-size:.62em; font-weight:700; line-height:1.15; min-height:1.15em; }
   #status { position:fixed; right:1vw; bottom:1vh; color:#c62828; font-size:2vh; }
 </style>
 </head>
 <body>
-<div id="top"><span id="title"></span><span id="section"></span><span id="badge">NEGRO</span><span id="clock"></span></div>
+<div id="top"><span id="title"></span><span id="section"></span>
+  <span id="chordBar"><button id="chordsBtn">Acordes</button><button id="down">♭</button><span id="key"></span><button id="up">♯</button></span>
+  <span id="badge">NEGRO</span><span id="clock"></span></div>
 <div id="msg"></div>
 <div id="alert"></div>
 <div id="cd"></div>
@@ -58,16 +67,60 @@ function fit(box, maxVh) {
   }
 }
 
+// --- Acordes (para los músicos): "[G]Cuán grande es [C]Él" → el acorde arriba de la sílaba, y transponer ---
+const store = { get: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } },
+                set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
+let showChords = store.get("acordes") === "1";
+const transpose = {}; // semitonos por canción (songId)
+const NOTES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+const FLAT = { Db: "C#", Eb: "D#", Gb: "F#", Ab: "G#", Bb: "A#", Cb: "B", Fb: "E" };
+function moveNote(n, k) {
+  const i = NOTES.indexOf(FLAT[n] || n);
+  return i < 0 ? n : NOTES[((i + k) % 12 + 12) % 12];
+}
+function transposeChord(ch, k) {
+  if (!k) return ch;
+  return ch.replace(/^([A-G][#b]?)/, (m) => moveNote(m, k)).replace(/\/([A-G][#b]?)/, (m, b) => "/" + moveNote(b, k));
+}
+const esc = (t) => t.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+function chordHtml(text, k) {
+  return '<div>' + text.split("\n").map((line) => {
+    const parts = line.split(/\[([A-G][^\]\s]{0,11})\]/);
+    let html = parts[0] ? '<span class="seg"><span class="ch"></span>' + esc(parts[0]) + "</span>" : "";
+    for (let i = 1; i < parts.length; i += 2) {
+      html += '<span class="seg"><span class="ch">' + esc(transposeChord(parts[i], k)) + " </span>" + (esc(parts[i + 1] || "") || "&nbsp;") + "</span>";
+    }
+    return '<span class="ln">' + html + "</span>";
+  }).join("") + "</div>";
+}
+function songKey(st) {
+  const first = st.slides.map((s) => s.chords).find((c) => c);
+  const m = first && first.match(/\[([A-G][#b]?m?)/);
+  return m ? transposeChord(m[1], transpose[st.songId] || 0) : "";
+}
+$("chordsBtn").onclick = () => { showChords = !showChords; store.set("acordes", showChords ? "1" : "0"); render(); };
+$("up").onclick = () => { const id = S.state.songId; transpose[id] = (transpose[id] || 0) + 1; render(); };
+$("down").onclick = () => { const id = S.state.songId; transpose[id] = (transpose[id] || 0) - 1; render(); };
+function setSlide(box, slide) {
+  if (showChords && slide && slide.chords) box.innerHTML = chordHtml(slide.chords, transpose[S.state.songId] || 0);
+  else box.textContent = slide ? slide.text : "";
+}
+
 function render() {
   const st = S.state;
   const cur = st.slides[st.index];
   const next = st.slides[st.index + 1];
+  const hasChords = st.slides.some((s) => s.chords);
+  $("chordBar").style.display = hasChords ? "inline-flex" : "none";
+  $("chordsBtn").classList.toggle("on", showChords);
+  $("down").style.display = $("up").style.display = showChords ? "" : "none";
+  $("key").textContent = showChords ? songKey(st) : "";
   $("title").textContent = st.title || "";
   const sec = P.sections(st)[P.currentSection(st)];
   $("section").textContent = st.isBible ? (cur ? cur.label : "") : (sec ? sec.label : "");
   $("badge").style.display = st.blank ? "inline" : "none";
-  $("current").textContent = cur ? cur.text : "";
-  $("next").textContent = next ? next.text : "";
+  setSlide($("current"), cur);
+  setSlide($("next"), next);
   $("nextLbl").style.visibility = next ? "visible" : "hidden";
   $("msg").textContent = st.stageMessage || "";
   $("msg").style.display = st.stageMessage ? "block" : "none";

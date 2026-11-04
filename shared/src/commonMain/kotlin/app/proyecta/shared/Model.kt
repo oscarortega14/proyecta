@@ -9,6 +9,8 @@ data class Slide(
     val text: String,
     /** El mismo versículo en una segunda traducción (Biblia a dos traducciones), o "". */
     val text2: String = "",
+    /** La letra con acordes en línea ("[G]Cuán grande es [C]Él") para los músicos, o "" si no tiene. */
+    val chords: String = "",
 )
 
 /** Resumen de una canción para listarla en el control remoto. */

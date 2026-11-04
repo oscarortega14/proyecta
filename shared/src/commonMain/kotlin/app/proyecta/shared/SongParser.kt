@@ -20,6 +20,9 @@ package app.proyecta.shared
  *   primera etiqueta. Los nombres que no existen se ignoran (y se reportan en unknownOrder).
  * - Opcional, también antes de la primera estrofa: "Fondo: montañas.jpg" usa esa imagen
  *   (de la carpeta Proyecta/fondos) solo para esta canción.
+ * - Acordes (formato ChordPro) justo antes de la sílaba: "[G]Cuán grande es [C]Él". En el videobeam
+ *   sale solo la letra; los músicos los ven en la vista de escenario. Una línea solo de acordes
+ *   ("[G] [D] [Em]") no se proyecta.
  */
 object SongParser {
     private const val MAX_LABEL = 30
@@ -62,14 +65,27 @@ object SongParser {
 
         val slides = blocks.map { block ->
             val first = block.first()
-            if (block.size > 1 && first.endsWith(":") && first.length <= MAX_LABEL) {
-                Slide(label = first.dropLast(1).trim(), text = block.drop(1).joinToString("\n"))
+            val (label, lines) = if (block.size > 1 && first.endsWith(":") && first.length <= MAX_LABEL) {
+                first.dropLast(1).trim() to block.drop(1)
             } else {
-                Slide(text = block.joinToString("\n"))
+                "" to block
             }
+            withChords(label, lines)
         }
         val song = if (order.isNullOrEmpty()) Song(id, title, slides) else expand(id, title, slides, order)
         return song.copy(background = background)
+    }
+
+    /** Acorde entre corchetes: empieza con una nota (A–G), sin espacios. "[coro x2]" no es acorde. */
+    val CHORD = Regex("""\[([A-G][^\]\s]{0,11})\]""")
+
+    /** La letra sin acordes (para proyectar). */
+    fun stripChords(line: String): String = line.replace(CHORD, "").replace(Regex(" {2,}"), " ").trim()
+
+    private fun withChords(label: String, lines: List<String>): Slide {
+        if (lines.none { CHORD.containsMatchIn(it) }) return Slide(label, lines.joinToString("\n"))
+        val text = lines.map(::stripChords).filter { it.isNotEmpty() }.joinToString("\n")
+        return Slide(label, text, chords = lines.joinToString("\n"))
     }
 
     private fun expand(id: String, title: String, slides: List<Slide>, order: List<String>): Song {

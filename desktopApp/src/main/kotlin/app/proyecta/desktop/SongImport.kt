@@ -118,6 +118,11 @@ object SongImport {
                 n.nodeType == Node.TEXT_NODE || n.nodeType == Node.CDATA_SECTION_NODE -> sb.append(n.nodeValue)
                 n.nodeType == Node.ELEMENT_NODE && n.localName == "br" -> sb.append('\u0000')
                 n.nodeType == Node.ELEMENT_NODE && n.localName == "comment" -> {}
+                // Acordes de OpenLyrics → formato ChordPro "[D]" (los músicos los ven en la vista de escenario)
+                n.nodeType == Node.ELEMENT_NODE && n.localName == "chord" -> {
+                    (n as Element).getAttribute("name").trim().takeIf { it.isNotEmpty() }?.let { sb.append('[').append(it).append(']') }
+                    var c = n.firstChild; while (c != null) { walk(c); c = c.nextSibling }
+                }
                 else -> { var c = n.firstChild; while (c != null) { walk(c); c = c.nextSibling } }
             }
         }

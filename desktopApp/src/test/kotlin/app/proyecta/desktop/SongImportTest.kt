@@ -60,6 +60,7 @@ class SongImportTest {
         assertEquals(1, song.slides.size)
         assertEquals("Coro", song.slides[0].label)
         assertEquals("Alabaré, alabaré\nalabaré a mi Señor", song.slides[0].text)
+        assertEquals("[D]Alabaré, [G]alabaré\nalabaré a mi Señor", song.slides[0].chords) // los acordes quedan para los músicos
     }
 
     @Test
