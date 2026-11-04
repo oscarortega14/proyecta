@@ -116,7 +116,7 @@ En la tablet o el celular: abrir la app. Encuentra sola al PC en la red (si el r
 
 - Doble monitor: la proyección se abre a pantalla completa en el segundo monitor (el videobeam).
 - Teclado y clickers de presentación: **Av Pág / Re Pág** para avanzar o retroceder, **Ctrl+B** pantalla negra.
-- En la tablet, escribe la dirección IP que muestra el computador (abajo a la derecha).
+- La app de la tablet o el celular busca sola a Proyecta en la red y muestra el nombre del computador; no hay que escribir direcciones.
 - No pongas el código del programa en una carpeta llamada `Proyecta` dentro de la carpeta personal: Windows no distingue mayúsculas y se mezclaría con la biblioteca.
 
 ## Compilar

@@ -59,6 +59,7 @@ import app.proyecta.shared.ClientMessage
 import app.proyecta.shared.PresentationState
 import app.proyecta.shared.SongSummary
 import app.proyecta.shared.search
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.ScrollableTabRow
 import app.proyecta.shared.ServerMessage
@@ -89,12 +90,15 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme(colorScheme = darkColorScheme()) {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                    var pcName by remember { mutableStateOf(prefs.getString("name", "").orEmpty()) }
                     RemoteApp(
                         client = client,
                         savedHost = prefs.getString("host", "").orEmpty(),
-                        onConnect = { host ->
-                            prefs.edit().putString("host", host).apply()
-                            client.connect(host)
+                        pcName = pcName,
+                        onConnect = { server ->
+                            prefs.edit().putString("host", server.host).putString("name", server.name).apply()
+                            pcName = server.name
+                            client.connect(server.host)
                         },
                     )
                 }
@@ -109,7 +113,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun RemoteApp(client: RemoteClient, savedHost: String, onConnect: (String) -> Unit) {
+private fun RemoteApp(client: RemoteClient, savedHost: String, pcName: String, onConnect: (FoundServer) -> Unit) {
     val status by client.status.collectAsState()
     val state by client.state.collectAsState()
     val songs by client.songs.collectAsState()
@@ -120,10 +124,10 @@ private fun RemoteApp(client: RemoteClient, savedHost: String, onConnect: (Strin
     var tab by rememberSaveable { mutableIntStateOf(0) }
 
     Column(Modifier.fillMaxSize()) {
-        StatusBar(status, onEdit = { editingHost = true })
+        StatusBar(status, pcName, showSearch = !editingHost, onEdit = { editingHost = true })
         // Ojo: nada de "return" temprano dentro de Column (es inline y rompe la recomposición).
         if (editingHost) {
-            ConnectForm(savedHost, client) { host -> editingHost = false; onConnect(host) }
+            SearchScreen(client) { server -> editingHost = false; onConnect(server) }
         } else {
             // Desplazable: en celulares angostos las pestañas no parten las palabras.
             ScrollableTabRow(selectedTabIndex = tab, edgePadding = 0.dp) {
@@ -154,63 +158,66 @@ private fun RemoteApp(client: RemoteClient, savedHost: String, onConnect: (Strin
 }
 
 @Composable
-private fun StatusBar(status: ConnectionStatus, onEdit: () -> Unit) {
+private fun StatusBar(status: ConnectionStatus, pcName: String, showSearch: Boolean, onEdit: () -> Unit) {
+    val pc = pcName.ifEmpty { "el computador" }
     val (text, color) = when (status) {
-        ConnectionStatus.Idle -> "Sin configurar" to MaterialTheme.colorScheme.onSurfaceVariant
-        is ConnectionStatus.Connecting -> "Conectando a ${status.host}…" to MaterialTheme.colorScheme.tertiary
-        is ConnectionStatus.Connected -> "Conectado a ${status.host}" to MaterialTheme.colorScheme.primary
-        is ConnectionStatus.Failed -> "Sin conexión con ${status.host} — reintentando" to MaterialTheme.colorScheme.error
+        ConnectionStatus.Idle -> "Sin conectar" to MaterialTheme.colorScheme.onSurfaceVariant
+        is ConnectionStatus.Connecting -> "Conectando a $pc…" to MaterialTheme.colorScheme.tertiary
+        is ConnectionStatus.Connected -> "Conectado a $pc" to MaterialTheme.colorScheme.primary
+        is ConnectionStatus.Failed -> "Sin conexión con $pc — reintentando" to MaterialTheme.colorScheme.error
     }
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onEdit).padding(horizontal = 12.dp, vertical = 8.dp),
+        Modifier.fillMaxWidth().clickable(enabled = showSearch, onClick = onEdit).padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(text, color = color, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text("Cambiar", color = MaterialTheme.colorScheme.primary)
+        if (showSearch) Text("Buscar otro", color = MaterialTheme.colorScheme.primary)
     }
 }
 
 @Composable
-private fun ConnectForm(initial: String, client: RemoteClient, onConnect: (String) -> Unit) {
-    var host by rememberSaveable { mutableStateOf(initial) }
-    var searching by remember { mutableStateOf(false) }
-    var found by remember { mutableStateOf<List<FoundServer>?>(null) }
-    var attempt by remember { mutableIntStateOf(0) }
-    val connect = { if (host.isNotBlank()) onConnect(host.trim()) }
+private fun SearchScreen(client: RemoteClient, onConnect: (FoundServer) -> Unit) {
+    var found by remember { mutableStateOf<List<FoundServer>>(emptyList()) }
+    var rounds by remember { mutableIntStateOf(0) }
+    var restart by remember { mutableIntStateOf(0) }
 
-    // Al abrir: buscar a Proyecta en la red. Si hay uno solo, conectarse sin preguntar.
-    LaunchedEffect(attempt) {
-        searching = true
-        val result = client.discover()
-        searching = false
-        found = result
-        if (result.size == 1 && attempt == 0 && initial.isEmpty()) onConnect(result[0].host)
+    // Busca y vuelve a buscar cada pocos segundos hasta encontrar Proyecta en la red.
+    // Si hay un solo computador se conecta sin preguntar.
+    LaunchedEffect(restart) {
+        rounds = 0
+        found = emptyList()
+        while (true) {
+            val result = client.discover()
+            rounds++
+            found = result
+            if (result.size == 1) { onConnect(result[0]); return@LaunchedEffect }
+            if (result.size > 1) return@LaunchedEffect // que la persona elija
+            kotlinx.coroutines.delay(2_500)
+        }
     }
 
-    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        when {
-            searching -> Text("Buscando Proyecta en la red…", style = MaterialTheme.typography.titleMedium)
-            found.isNullOrEmpty() -> Text(
-                "No encontré Proyecta en esta red. Revisa que el computador tenga Proyecta abierto y esté en el mismo Wi-Fi.",
-                color = MaterialTheme.colorScheme.error,
-            )
-            else -> Text("Elige el computador:", style = MaterialTheme.typography.titleMedium)
+    Column(
+        Modifier.fillMaxWidth().padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        if (found.isEmpty()) {
+            CircularProgressIndicator(Modifier.padding(top = 24.dp))
+            Text("Buscando Proyecta…", style = MaterialTheme.typography.headlineSmall)
+            if (rounds >= 3) {
+                Text(
+                    "Revisa que:\n• Proyecta esté abierto en el computador\n• este equipo esté conectado al mismo Wi-Fi",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 17.sp,
+                )
+            }
+        } else {
+            Text("¿A qué computador te conectas?", style = MaterialTheme.typography.headlineSmall)
+            found.forEach { s ->
+                Button({ onConnect(s) }, Modifier.fillMaxWidth().height(64.dp)) { Text(s.name, fontSize = 20.sp, maxLines = 1) }
+            }
+            OutlinedButton({ restart++ }, Modifier.fillMaxWidth()) { Text("Buscar de nuevo") }
         }
-        found.orEmpty().forEach { s ->
-            Button({ onConnect(s.host) }, Modifier.fillMaxWidth().height(56.dp)) { Text("${s.name}  (${s.host})", maxLines = 1) }
-        }
-        OutlinedButton({ attempt++ }, Modifier.fillMaxWidth(), enabled = !searching) { Text("Buscar de nuevo") }
-
-        Text("O escribe la dirección que muestra Proyecta (ej. 192.168.1.20):", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        OutlinedTextField(
-            host, { host = it },
-            label = { Text("Dirección del computador") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
-            keyboardActions = KeyboardActions(onGo = { connect() }),
-        )
-        OutlinedButton(onClick = connect, modifier = Modifier.fillMaxWidth(), enabled = host.isNotBlank()) { Text("Conectar a esta dirección") }
     }
 }
 
