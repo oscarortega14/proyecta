@@ -87,11 +87,14 @@ val prepareVlc by tasks.registering(Sync::class) {
 compose.desktop {
     application {
         mainClass = "app.proyecta.desktop.MainKt"
+        // Tope de memoria: sin él Java puede crecer hasta 1/4 de la RAM antes de limpiar.
+        // Con 512 MB sobra para proyectar con video y la app nunca se infla en un PC modesto.
+        jvmArgs += listOf("-Xmx512m", "-XX:MaxMetaspaceSize=192m")
         nativeDistributions {
             appResourcesRootDir.set(appResources)
             targetFormats(TargetFormat.Msi, TargetFormat.Deb)
             packageName = "Proyecta"
-            packageVersion = "1.4.0"
+            packageVersion = "1.4.1"
             description = "Proyección de canciones y Biblia con control remoto"
             vendor = "Proyecta"
             copyright = "MIT License"

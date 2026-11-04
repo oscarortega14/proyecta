@@ -192,7 +192,7 @@ fun BackgroundsWindow(
                     Column(Modifier.width(440.dp).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text("Vista previa", style = MaterialTheme.typography.titleMedium)
                         Surface(Modifier.fillMaxWidth().aspectRatio(16f / 9f), shape = MaterialTheme.shapes.small) {
-                            ProjectorScreen(preview, look = LocalLook.current.copy(theme = theme))
+                            ProjectorScreen(preview, look = LocalLook.current.copy(theme = theme, preview = true))
                         }
                         if (state.background != null) {
                             Text(

@@ -4,17 +4,19 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import com.sun.jna.NativeLibrary
+import androidx.compose.ui.graphics.asComposeImageBitmap
+import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.ColorAlphaType
 import org.jetbrains.skia.ColorType
-import org.jetbrains.skia.Image as SkiaImage
 import org.jetbrains.skia.ImageInfo
 import uk.co.caprica.vlcj.factory.MediaPlayerFactory
 import uk.co.caprica.vlcj.factory.discovery.NativeDiscovery
@@ -95,6 +97,8 @@ object VideoBackgrounds {
 }
 
 /** Un video reproduciéndose en bucle, sin sonido; cada cuadro nuevo se publica en [frame]. */
+private const val MIN_FRAME_NANOS = 32_000_000L // ~30 cuadros por segundo
+
 class VideoLoop(file: File, factory: MediaPlayerFactory, maxWidth: Int) : AutoCloseable {
     val frame: MutableState<ImageBitmap?> = mutableStateOf(null)
 
@@ -102,6 +106,9 @@ class VideoLoop(file: File, factory: MediaPlayerFactory, maxWidth: Int) : AutoCl
     @Volatile private var info: ImageInfo? = null
     @Volatile private var bytes = ByteArray(0)
     private val pending = AtomicBoolean(false)
+    @Volatile private var lastFrameNanos = 0L
+    /** Cuadros ya reemplazados, que se liberan un par de cuadros después (por si aún se están dibujando). */
+    private val retired = ArrayDeque<Bitmap>()
 
     init {
         val format = object : BufferFormatCallbackAdapter() {
@@ -116,15 +123,29 @@ class VideoLoop(file: File, factory: MediaPlayerFactory, maxWidth: Int) : AutoCl
         }
         val render = RenderCallback { _: MediaPlayer, buffers: Array<ByteBuffer>, _: BufferFormat ->
             val i = info ?: return@RenderCallback
+            // Máximo ~30 cuadros por segundo: muchos loops vienen a 60 y detrás de la letra no se nota.
+            val now = System.nanoTime()
+            if (now - lastFrameNanos < MIN_FRAME_NANOS) return@RenderCallback
+            lastFrameNanos = now
             // Si la pantalla todavía no dibujó el cuadro anterior, se descarta este (no se acumula trabajo).
             if (!pending.compareAndSet(false, true)) return@RenderCallback
             val buf = buffers[0]
             buf.rewind()
             val dst = bytes
             buf.get(dst, 0, min(dst.size, buf.remaining()))
-            val image = runCatching { SkiaImage.makeRaster(i, dst, i.width * 4).toComposeImageBitmap() }.getOrNull()
+            // Un solo mapa de bits por cuadro (sin copias intermedias), que se libera a mano después.
+            val bitmap = Bitmap()
+            if (!bitmap.installPixels(i, dst, i.width * 4)) {
+                bitmap.close(); pending.set(false); return@RenderCallback
+            }
+            bitmap.setImmutable()
+            val image = bitmap.asComposeImageBitmap()
             SwingUtilities.invokeLater {
-                if (image != null) frame.value = image
+                if (closed) { bitmap.close(); return@invokeLater }
+                frame.value = image
+                retired.addLast(bitmap)
+                // Liberar de inmediato la memoria de los cuadros viejos en vez de esperar al recolector de Java.
+                while (retired.size > 3) retired.removeFirst().close()
                 pending.set(false)
             }
         }
@@ -133,17 +154,37 @@ class VideoLoop(file: File, factory: MediaPlayerFactory, maxWidth: Int) : AutoCl
         player.media().play(file.absolutePath, ":no-audio", ":input-repeat=65535")
     }
 
+    @Volatile private var closed = false
+
     override fun close() {
+        closed = true
         runCatching { player.controls().stop() }
         runCatching { player.release() }
+        SwingUtilities.invokeLater {
+            frame.value = null
+            while (retired.isNotEmpty()) retired.removeFirst().close()
+        }
     }
 }
 
-/** Video de fondo a pantalla completa (recortado para llenar). No dibuja nada si no se puede reproducir. */
+/**
+ * Video de fondo a pantalla completa (recortado para llenar). No dibuja nada si no se puede reproducir.
+ * [maxFps] limita cuántas veces por segundo se redibuja este lugar (las vistas previas usan menos).
+ */
 @Composable
-fun VideoBackground(file: File, modifier: Modifier = Modifier) {
+fun VideoBackground(file: File, modifier: Modifier = Modifier, maxFps: Int = 30) {
     val loop = remember(file) { VideoBackgrounds.acquire(file) }
     DisposableEffect(file) { onDispose { if (loop != null) VideoBackgrounds.release(file) } }
-    val img = loop?.frame?.value ?: return
+    if (loop == null) return
+    val shown = remember(loop) { mutableStateOf(loop.frame.value) }
+    LaunchedEffect(loop, maxFps) {
+        val minGap = 1_000L / maxFps.coerceIn(1, 60)
+        var last = 0L
+        snapshotFlow { loop.frame.value }.collect { f ->
+            val now = System.currentTimeMillis()
+            if (now - last >= minGap || shown.value == null) { shown.value = f; last = now }
+        }
+    }
+    val img = shown.value ?: return
     Image(img, contentDescription = null, modifier = modifier.fillMaxSize(), contentScale = ContentScale.Crop)
 }

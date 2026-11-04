@@ -274,7 +274,7 @@ private fun ControlPanel(
     Column(modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("En pantalla", style = MaterialTheme.typography.titleMedium)
         Surface(Modifier.fillMaxWidth().aspectRatio(16f / 9f), shape = MaterialTheme.shapes.small) {
-            ProjectorScreen(state)
+            ProjectorScreen(state, look = LocalLook.current.copy(preview = true))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button({ send(ClientMessage.Prev) }, Modifier.weight(1f)) { Text("◀ Anterior") }

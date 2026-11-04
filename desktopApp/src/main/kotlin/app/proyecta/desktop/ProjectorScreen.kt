@@ -52,6 +52,8 @@ data class Look(
     val backgroundFile: (String) -> File? = { null },
     /** Si no es null, la animación queda fija en este instante (pruebas y miniaturas). */
     val frozenTime: Float? = null,
+    /** Vista previa (miniatura): el video se redibuja menos veces por segundo. */
+    val preview: Boolean = false,
 )
 
 val LocalLook = staticCompositionLocalOf { Look() }
@@ -76,7 +78,7 @@ fun ProjectorScreen(state: PresentationState, modifier: Modifier = Modifier, loo
     BoxWithConstraints(modifier.fillMaxSize().background(Color.Black)) {
         val slide = state.current
         if (!state.blank) {
-            Background(theme, image, video, look.frozenTime)
+            Background(theme, image, video, look.frozenTime, look.preview)
             when {
                 seconds != null && seconds > 0 -> Countdown(state.countdownText, seconds, theme, maxWidth, maxHeight)
                 state.logo -> if (logo != null) Logo(logo, maxHeight)
@@ -153,7 +155,7 @@ private fun AlertBar(text: String, height: Dp) {
 }
 
 @Composable
-private fun Background(theme: Theme, image: ImageBitmap?, video: File?, frozenTime: Float?) {
+private fun Background(theme: Theme, image: ImageBitmap?, video: File?, frozenTime: Float?, preview: Boolean) {
     val top = hexColor(theme.color)
     val bottom = theme.color2?.let(::hexColor)
     val fill = if (bottom != null) Modifier.background(Brush.verticalGradient(listOf(top, bottom))) else Modifier.background(top)
@@ -161,7 +163,7 @@ private fun Background(theme: Theme, image: ImageBitmap?, video: File?, frozenTi
     // Prioridad: video o imagen (de la canción o del tema) > fondo incluido > color/degradado.
     val builtin = theme.builtin?.takeIf { BuiltinBackgrounds.has(it) }
     when {
-        video != null -> VideoBackground(video)
+        video != null -> VideoBackground(video, maxFps = if (preview) 10 else 30)
         image != null -> Image(image, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
         builtin != null -> {
             val animated = theme.animate && frozenTime == null
