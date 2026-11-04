@@ -8,6 +8,16 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
+/** Los primeros 39 libros son el Antiguo Testamento. */
+const val OLD_TESTAMENT_BOOKS = 39
+
+/**
+ * Posición del versículo [verse] (1…) entre las diapositivas del capítulo ya proyectado
+ * (los versículos vacíos no se proyectan, así que no cuentan).
+ */
+fun slideIndexOfVerse(chapter: List<String>, verse: Int): Int =
+    chapter.take(verse - 1).count { it.isNotBlank() }
+
 /** Una cita ya interpretada, ej. "1 Corintios 13:4-7". */
 data class BibleReference(
     val book: String,
@@ -95,6 +105,13 @@ class Bible(val name: String, val books: List<Book>) {
         val (exact, rest) = matches.partition { (_, norm) -> phrase in norm }
         return (exact + rest).take(limit).map { it.first } to matches.size
     }
+
+    /** Libros con su número de capítulos, para los exploradores de los remotos. */
+    fun bookInfos(): List<BibleBookInfo> = books.map { BibleBookInfo(it.name, it.chapters.size) }
+
+    /** Versículos de un capítulo, o null si no existe. */
+    fun chapter(book: String, chapter: Int): List<String>? =
+        findBook(book)?.let { books[it].chapters.getOrNull(chapter - 1) }
 
     fun findBook(query: String): Int? {
         val q = normalizeKey(query)

@@ -1,5 +1,6 @@
 package app.proyecta.remote
 
+import app.proyecta.shared.BibleBookInfo
 import app.proyecta.shared.ClientMessage
 import java.net.SocketTimeoutException
 import java.net.InetAddress
@@ -79,6 +80,14 @@ class RemoteClient(private val scope: CoroutineScope) {
 
     private val _bibleName = MutableStateFlow<String?>(null)
     val bibleName: StateFlow<String?> = _bibleName.asStateFlow()
+
+    /** Libros de la Biblia del PC (para el explorador). */
+    private val _bibleBooks = MutableStateFlow<List<BibleBookInfo>>(emptyList())
+    val bibleBooks: StateFlow<List<BibleBookInfo>> = _bibleBooks.asStateFlow()
+
+    /** Último capítulo pedido con [ClientMessage.BibleChapter]. */
+    private val _bibleChapter = MutableStateFlow<ServerMessage.BibleChapter?>(null)
+    val bibleChapter: StateFlow<ServerMessage.BibleChapter?> = _bibleChapter.asStateFlow()
 
     private val _errors = MutableSharedFlow<String>(extraBufferCapacity = 4)
     val errors: SharedFlow<String> = _errors.asSharedFlow()
@@ -167,13 +176,16 @@ class RemoteClient(private val scope: CoroutineScope) {
         }.getOrNull()
     }
 
+    fun clearBibleResults() { _bibleResults.value = null }
+
     fun send(msg: ClientMessage) {
         if (_status.value is ConnectionStatus.Connected) queue.trySend(msg)
     }
 
     private fun onMessage(m: ServerMessage) {
         when (m) {
-            is ServerMessage.Library -> { _songs.value = m.songs; _bibleName.value = m.bibleName }
+            is ServerMessage.Library -> { _songs.value = m.songs; _bibleName.value = m.bibleName; _bibleBooks.value = m.bibleBooks }
+            is ServerMessage.BibleChapter -> _bibleChapter.value = m
             is ServerMessage.State -> {
                 if (m.serverNow > 0) serverOffset = m.serverNow - System.currentTimeMillis()
                 _state.value = m.state

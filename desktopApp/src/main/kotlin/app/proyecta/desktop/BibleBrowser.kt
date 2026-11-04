@@ -35,13 +35,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.proyecta.shared.Bible
 import app.proyecta.shared.ClientMessage
-
-/** Los primeros 39 libros son el Antiguo Testamento. */
-private const val OLD_TESTAMENT_BOOKS = 39
-
-/** Posición del versículo [verse] (1…) entre las diapositivas del capítulo (los versículos vacíos no se proyectan). */
-internal fun slideIndexOfVerse(chapter: List<String>, verse: Int): Int =
-    chapter.take(verse - 1).count { it.isNotBlank() }
+import app.proyecta.shared.OLD_TESTAMENT_BOOKS
+import app.proyecta.shared.slideIndexOfVerse
 
 /**
  * Explorador de la Biblia: libros → capítulos → versículos.

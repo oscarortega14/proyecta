@@ -155,6 +155,10 @@ private fun RemoteApp(client: RemoteClient, savedHost: String, pcName: String, l
     val bibleName by client.bibleName.collectAsState()
     val plan by client.plan.collectAsState()
     val bibleResults by client.bibleResults.collectAsState()
+    val bibleBooks by client.bibleBooks.collectAsState()
+    val bibleChapter by client.bibleChapter.collectAsState()
+    // Dónde quedó el explorador de la Biblia (se conserva al cambiar de pestaña).
+    var bibleNav by rememberSaveable(stateSaver = BibleNav.Saver) { mutableStateOf(BibleNav()) }
     var editingHost by rememberSaveable { mutableStateOf(savedHost.isEmpty()) }
     // Si llegó un enlace con la dirección, no hace falta buscar.
     LaunchedEffect(linkKey) { if (linkKey != null) editingHost = false }
@@ -179,12 +183,18 @@ private fun RemoteApp(client: RemoteClient, savedHost: String, pcName: String, l
                         client.send(ClientMessage.SelectSong(id)); tab = 0
                     }
                     2 -> BibleTab(
-                        bibleName, bibleResults,
+                        bibleName, bibleBooks, bibleChapter, bibleResults, bibleNav,
+                        onNavigate = { bibleNav = it },
                         onSearch = { q -> client.send(ClientMessage.BibleSearch(q)) },
+                        onClearSearch = client::clearBibleResults,
+                        onRequestChapter = { book, c -> client.send(ClientMessage.BibleChapter(book, c)) },
                         onAdd = { ref -> client.send(ClientMessage.PlanAddBible(ref)) },
-                    ) { ref ->
-                        client.send(ClientMessage.ShowBible(ref)); tab = 0
-                    }
+                        onShow = { ref, slide ->
+                            client.send(ClientMessage.ShowBible(ref))
+                            if (slide > 0) client.send(ClientMessage.GoTo(slide))
+                            tab = 0
+                        },
+                    )
                     3 -> PlanTab(plan, state.stageMessage, client::send) { tab = 0 }
                     4 -> MoreTab(state, client.serverOffset, client::send)
                 }
@@ -324,60 +334,6 @@ private fun SongsTab(songs: List<SongSummary>, onAdd: (String) -> Unit, onSelect
             }
         }
     }
-}
-
-@Composable
-private fun BibleTab(
-    bibleName: String?,
-    results: ServerMessage.BibleResults?,
-    onSearch: (String) -> Unit,
-    onAdd: (String) -> Unit,
-    onShow: (String) -> Unit,
-) {
-    val context = LocalContext.current
-    var ref by rememberSaveable { mutableStateOf("") }
-    val show = { if (ref.isNotBlank()) onShow(ref.trim()) }
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) { item {
-        Text(bibleName ?: "El computador no tiene Biblia cargada", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        OutlinedTextField(
-            ref, { ref = it },
-            label = { Text("Cita o frase (ej. Juan 3:16 · amó Dios)") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
-            keyboardActions = KeyboardActions(onGo = { show() }),
-        )
-        Button(onClick = show, modifier = Modifier.fillMaxWidth()) { Text("Mostrar en pantalla") }
-        OutlinedButton(
-            onClick = {
-                if (ref.isNotBlank()) {
-                    onAdd(ref.trim())
-                    Toast.makeText(context, "Agregada a la lista", Toast.LENGTH_SHORT).show()
-                }
-            },
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text("Agregar a la lista") }
-        OutlinedButton({ if (ref.isNotBlank()) onSearch(ref.trim()) }, Modifier.fillMaxWidth()) { Text("Buscar frase") }
-        results?.let { r ->
-            Text(
-                if (r.total == 0) "Sin resultados para «${r.query}»"
-                else "${r.total} resultados" + if (r.total > r.hits.size) " (primeros ${r.hits.size})" else "",
-                color = MaterialTheme.colorScheme.primary,
-            )
-        }
-    }
-    items(results?.hits.orEmpty(), key = { it.reference }) { hit ->
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f).clickable { onShow(hit.reference) }.padding(vertical = 6.dp)) {
-                Text(hit.reference, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.primary)
-                Text(hit.text, maxLines = 3, overflow = TextOverflow.Ellipsis)
-            }
-            OutlinedButton({
-                onAdd(hit.reference)
-                Toast.makeText(context, "Agregada a la lista", Toast.LENGTH_SHORT).show()
-            }) { Text("+") }
-        }
-    } }
 }
 
 @Composable

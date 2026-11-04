@@ -10,6 +10,8 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.use
 import app.proyecta.shared.Bible
 import app.proyecta.shared.ClientMessage
+import app.proyecta.shared.slideIndexOfVerse
+import app.proyecta.shared.encode
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import kotlin.test.Test
@@ -43,6 +45,27 @@ class BibleBrowserTest {
         assertEquals(66, bible.books.size)
         assertEquals("Malaquías", bible.books[38].name) // último del Antiguo Testamento
         assertEquals("Mateo", bible.books[39].name)
+    }
+
+    @Test
+    fun serverSendsBooksAndChapterTextToRemotes() {
+        val dir = kotlin.io.path.createTempDirectory("proyecta-biblia").toFile()
+        val library = Library(dir).also { it.reload() }
+        val books = library.bible!!.bookInfos()
+        assertEquals(66, books.size)
+        assertEquals(app.proyecta.shared.BibleBookInfo("Salmos", 150), books[18])
+
+        val reply = RemoteServer.bibleChapter(library, "Juan", 3)
+        val chapter = reply as app.proyecta.shared.ServerMessage.BibleChapter
+        assertEquals(36, chapter.verses.size)
+        assertTrue(chapter.verses[15].contains("amó Dios"))
+        // Viaja bien por el protocolo
+        val round = app.proyecta.shared.decodeServerMessage(reply.encode())
+        assertEquals(reply, round)
+        assertTrue(RemoteServer.bibleChapter(library, "Juan", 99) is app.proyecta.shared.ServerMessage.Error)
+        val ask = app.proyecta.shared.ClientMessage.BibleChapter("Juan", 3)
+        assertEquals(ask, app.proyecta.shared.decodeClientMessage(ask.encode()))
+        dir.deleteRecursively()
     }
 
     /** PROYECTA_RENDER_DIR=/tmp/out ./gradlew :desktopApp:test --tests '*BibleBrowserTest*' */

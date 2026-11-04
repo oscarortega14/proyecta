@@ -81,7 +81,15 @@ sealed interface ClientMessage {
     /** Buscar una frase en la Biblia; responde con ServerMessage.BibleResults. */
     @Serializable @SerialName("bible_search")
     data class BibleSearch(val query: String) : ClientMessage
+
+    /** Pedir el texto de un capítulo (para el explorador); responde con ServerMessage.BibleChapter. */
+    @Serializable @SerialName("bible_chapter")
+    data class BibleChapter(val book: String, val chapter: Int) : ClientMessage
 }
+
+/** Un libro de la Biblia y cuántos capítulos tiene (para el explorador de los remotos). */
+@Serializable
+data class BibleBookInfo(val name: String, val chapters: Int)
 
 @Serializable
 enum class PlanKind { SONG, BIBLE }
@@ -97,7 +105,11 @@ data class ServicePlanState(val items: List<PlanItem> = emptyList(), val current
 @Serializable
 sealed interface ServerMessage {
     @Serializable @SerialName("library")
-    data class Library(val songs: List<SongSummary>, val bibleName: String? = null) : ServerMessage
+    data class Library(
+        val songs: List<SongSummary>,
+        val bibleName: String? = null,
+        val bibleBooks: List<BibleBookInfo> = emptyList(),
+    ) : ServerMessage
 
     @Serializable @SerialName("state")
     data class State(
@@ -108,6 +120,10 @@ sealed interface ServerMessage {
 
     @Serializable @SerialName("bible_results")
     data class BibleResults(val query: String, val hits: List<BibleHit>, val total: Int = hits.size) : ServerMessage
+
+    /** Versículos de un capítulo; los vacíos (numeración distinta) vienen como "". */
+    @Serializable @SerialName("bible_chapter")
+    data class BibleChapter(val book: String, val chapter: Int, val verses: List<String>) : ServerMessage
 
     @Serializable @SerialName("plan")
     data class Plan(val plan: ServicePlanState) : ServerMessage

@@ -69,7 +69,7 @@ class RemoteServer(
                 val pushJob = launch {
                     launch {
                         library.catalog.collect { c ->
-                            send(Frame.Text(ServerMessage.Library(c.songs, c.bibleName).encode()))
+                            send(Frame.Text(ServerMessage.Library(c.songs, c.bibleName, library.bible?.bookInfos().orEmpty()).encode()))
                         }
                     }
                     launch {
@@ -86,6 +86,10 @@ class RemoteServer(
                             send(Frame.Text(bibleSearch(library, msg.query).encode()))
                             continue
                         }
+                        if (msg is ClientMessage.BibleChapter) {
+                            send(Frame.Text(bibleChapter(library, msg.book, msg.chapter).encode()))
+                            continue
+                        }
                         commands.handle(msg)?.let { err -> send(Frame.Text(ServerMessage.Error(err).encode())) }
                     }
                 } finally {
@@ -100,6 +104,12 @@ class RemoteServer(
             val bible = library.bible ?: return ServerMessage.Error("No hay Biblia cargada")
             val (hits, total) = bible.search(query)
             return ServerMessage.BibleResults(query, hits, total)
+        }
+
+        fun bibleChapter(library: Library, book: String, chapter: Int): ServerMessage {
+            val bible = library.bible ?: return ServerMessage.Error("No hay Biblia cargada")
+            val verses = bible.chapter(book, chapter) ?: return ServerMessage.Error("$book no tiene capítulo $chapter")
+            return ServerMessage.BibleChapter(book, chapter, verses)
         }
 
         /** Direcciones IPv4 de la red local de este equipo (las que se escriben en la tablet). */
