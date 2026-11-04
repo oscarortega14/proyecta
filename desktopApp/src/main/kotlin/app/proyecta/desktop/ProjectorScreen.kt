@@ -87,7 +87,7 @@ fun ProjectorScreen(state: PresentationState, modifier: Modifier = Modifier, loo
             when {
                 seconds != null && seconds > 0 -> Countdown(state.countdownText, seconds, theme, maxWidth, maxHeight)
                 state.logo -> if (logo != null) Logo(logo, maxHeight)
-                showMedia -> Announcement(media!!, look.preview)
+                showMedia -> Announcement(media!!, look.preview, theme.light)
                 slide != null -> {
                     // Con alerta, la letra deja libre la franja de abajo.
                     val w = maxWidth
@@ -105,9 +105,9 @@ fun ProjectorScreen(state: PresentationState, modifier: Modifier = Modifier, loo
 
 /** Imagen entera (con franjas negras si no es 16:9) o video con sonido. */
 @Composable
-private fun Announcement(file: File, preview: Boolean) {
+private fun Announcement(file: File, preview: Boolean, light: Boolean) {
     if (isVideoFile(file.name)) {
-        if (VideoBackgrounds.available) VideoBackground(file, maxFps = if (preview) 10 else 30, announcement = true)
+        if (VideoBackgrounds.available) VideoBackground(file, maxFps = if (preview) 10 else 30, announcement = true, light = light)
     } else {
         val img = rememberBackground(file)
         if (img != null) Image(img, contentDescription = "Anuncio", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
@@ -180,19 +180,27 @@ private fun Background(theme: Theme, image: ImageBitmap?, video: File?, frozenTi
     // Prioridad: video o imagen (de la canción o del tema) > fondo incluido > color/degradado.
     val builtin = theme.builtin?.takeIf { BuiltinBackgrounds.has(it) }
     when {
-        video != null -> VideoBackground(video, maxFps = if (preview) 10 else 30)
+        video != null -> VideoBackground(video, maxFps = if (preview) 10 else videoQuality(false, theme.light).maxFps, light = theme.light)
         image != null -> Image(image, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
         builtin != null -> {
             val animated = theme.animate && frozenTime == null
-            // Con tarjeta gráfica: dibujo directo a 30 cuadros (60 con "fluidez máxima"). Sin ella: baja resolución a 24.
-            val gpu = RenderInfo.hardware && !preview
-            val clock = rememberAnimationTime(animated, fps = if (preview) 15 else if (gpu && theme.smooth) 60 else if (gpu) 30 else 24)
+            // Con tarjeta gráfica: dibujo directo a 30 cuadros (60 con "fluidez máxima"). Sin ella o en modo liviano: baja resolución a 24.
+            val gpu = RenderInfo.hardware && !preview && !theme.light
+            val clock = rememberAnimationTime(animated, fps = animationFps(preview, RenderInfo.hardware, theme.smooth, theme.light))
             BuiltinBackground(builtin, time = if (frozenTime != null) androidx.compose.runtime.mutableStateOf(frozenTime) else clock, direct = gpu)
         }
     }
     if (video != null || image != null || builtin != null) {
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = theme.dim)))
     }
+}
+
+/** Cuadros por segundo de los fondos animados incluidos. */
+internal fun animationFps(preview: Boolean, gpu: Boolean, smooth: Boolean, light: Boolean): Int = when {
+    preview -> 15
+    light || !gpu -> 24
+    smooth -> 60
+    else -> 30
 }
 
 @Composable

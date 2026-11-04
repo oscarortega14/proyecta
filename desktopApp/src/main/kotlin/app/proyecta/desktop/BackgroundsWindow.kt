@@ -224,7 +224,18 @@ fun BackgroundsWindow(
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("Fluidez máxima (60 cuadros/s). Apágala si el PC va lento", modifier = Modifier.weight(1f))
-                            Switch(theme.smooth, { v -> themes.update { it.copy(smooth = v) } }, enabled = theme.animate)
+                            Switch(theme.smooth, { v -> themes.update { it.copy(smooth = v) } }, enabled = theme.animate && !theme.light)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text("Modo liviano (para PCs lentos)")
+                                Text(
+                                    "Videos y fondos animados con menos resolución y cuadros: casi no se nota detrás de la letra y el PC trabaja mucho menos." +
+                                        if (!RenderInfo.hardware) " Recomendado: este PC dibuja sin tarjeta gráfica." else "",
+                                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Switch(theme.light, { v -> themes.update { it.copy(light = v) } })
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("Sombra detrás de la letra", modifier = Modifier.weight(1f))

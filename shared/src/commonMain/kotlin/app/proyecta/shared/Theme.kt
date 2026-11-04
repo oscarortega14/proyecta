@@ -20,6 +20,11 @@ data class Theme(
     val animate: Boolean = true,
     /** Fluidez máxima (60 cuadros/s) en los fondos animados; apagado, 30 (gasta menos en un PC modesto). */
     val smooth: Boolean = true,
+    /**
+     * Modo liviano para PCs lentos: los videos de fondo a 854 px y 20 cuadros/s, y los fondos
+     * animados a 24 cuadros/s en baja resolución. Detrás de la letra casi no se nota.
+     */
+    val light: Boolean = false,
     /** Cuánto oscurecer el fondo de imagen para que se lea la letra (0 = nada, 0.8 = casi negro). */
     val dim: Float = 0.3f,
     val textColor: String = "#FFFFFF",

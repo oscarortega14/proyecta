@@ -90,28 +90,47 @@ object VideoBackgrounds {
      * [announcement]: con sonido, una sola vez y a mayor resolución (es lo principal en pantalla).
      */
     @Synchronized
-    fun acquire(file: File, announcement: Boolean = false): VideoLoop? {
+    fun acquire(file: File, announcement: Boolean = false, light: Boolean = false): VideoLoop? {
         val f = (if (announcement) audioFactory else factory) ?: return null
-        val key = key(file, announcement)
+        val key = key(file, announcement, light)
         loops[key]?.let { it.users++; return it.loop }
+        val q = videoQuality(announcement, light)
         val loop = runCatching {
-            if (announcement) VideoLoop(file, f, 1920, repeat = false, audio = true) else VideoLoop(file, f, MAX_WIDTH)
+            VideoLoop(file, f, q.maxWidth, repeat = !announcement, audio = announcement, minFrameNanos = q.minFrameNanos)
         }.getOrNull() ?: return null
         loops[key] = Entry(loop, 1)
         return loop
     }
 
-    private fun key(file: File, announcement: Boolean) = file.absolutePath + if (announcement) "|anuncio" else ""
+    private fun key(file: File, announcement: Boolean, light: Boolean) =
+        file.absolutePath + (if (announcement) "|anuncio" else "") + (if (light) "|liviano" else "")
 
     @Synchronized
-    fun release(file: File, announcement: Boolean = false) {
-        val key = key(file, announcement)
+    fun release(file: File, announcement: Boolean = false, light: Boolean = false) {
+        val key = key(file, announcement, light)
         val e = loops[key] ?: return
         if (--e.users <= 0) {
             loops.remove(key)
             e.loop.close()
         }
     }
+}
+
+/** Resolución y cuadros por segundo con que VLC entrega el video. */
+data class VideoQuality(val maxWidth: Int, val maxFps: Int) {
+    /** Separación mínima entre cuadros (un poco menos que 1/fps, para no perder cuadros que llegan antes). */
+    val minFrameNanos: Long get() = (1_000_000_000L / maxFps) * 3 / 4
+}
+
+/**
+ * Fondo normal: 1280 px y hasta 30 cuadros. Modo liviano: 854 px y 20 cuadros (mucho menos trabajo).
+ * Anuncio: es lo principal en pantalla, va a 1920 px (o 1280 en modo liviano).
+ */
+fun videoQuality(announcement: Boolean, light: Boolean): VideoQuality = when {
+    announcement && light -> VideoQuality(1280, 30)
+    announcement -> VideoQuality(1920, 30)
+    light -> VideoQuality(854, 20)
+    else -> VideoQuality(1280, 30)
 }
 
 /** Un cuadro listo para dibujar. [seq] cambia en cada cuadro para que la pantalla se redibuje. */
@@ -140,6 +159,7 @@ class VideoLoop(
     maxWidth: Int,
     private val repeat: Boolean = true,
     audio: Boolean = false,
+    private val minFrameNanos: Long = MIN_FRAME_NANOS,
 ) : AutoCloseable {
     val frame: MutableState<VideoFrame?> = mutableStateOf(null)
 
@@ -170,7 +190,7 @@ class VideoLoop(
             val i = info ?: return@RenderCallback
             // Videos de 60 cuadros se reducen a 30 parejos; los de hasta 30 pasan completos.
             val now = System.nanoTime()
-            if (now - lastFrameNanos < MIN_FRAME_NANOS) return@RenderCallback
+            if (now - lastFrameNanos < minFrameNanos) return@RenderCallback
             // Si la pantalla todavía no tomó el cuadro anterior, se descarta este (no se acumula trabajo).
             if (!pending.compareAndSet(false, true)) return@RenderCallback
             lastFrameNanos = now
@@ -240,9 +260,9 @@ class VideoLoop(
  * [maxFps] limita cuántas veces por segundo se redibuja este lugar (las vistas previas usan menos).
  */
 @Composable
-fun VideoBackground(file: File, modifier: Modifier = Modifier, maxFps: Int = 30, announcement: Boolean = false) {
-    val loop = remember(file, announcement) { VideoBackgrounds.acquire(file, announcement) }
-    DisposableEffect(file, announcement) { onDispose { if (loop != null) VideoBackgrounds.release(file, announcement) } }
+fun VideoBackground(file: File, modifier: Modifier = Modifier, maxFps: Int = 30, announcement: Boolean = false, light: Boolean = false) {
+    val loop = remember(file, announcement, light) { VideoBackgrounds.acquire(file, announcement, light) }
+    DisposableEffect(file, announcement, light) { onDispose { if (loop != null) VideoBackgrounds.release(file, announcement, light) } }
     if (loop == null) return
     val shown = remember(loop) { mutableStateOf(loop.frame.value) }
     LaunchedEffect(loop, maxFps) {
