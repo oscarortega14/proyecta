@@ -429,7 +429,12 @@ P.on("state", renderLive);
 P.on("library", renderSongs);
 P.on("plan", renderPlan);
 P.on("bibleResults", renderHits);
-P.on("library", renderBrowser);
+let shownBible = null;
+P.on("library", () => {
+  // Otra traducción: los capítulos guardados ya no sirven.
+  if (S.bibleName !== shownBible) { shownBible = S.bibleName; for (const k in chapters) delete chapters[k]; }
+  renderBrowser();
+});
 P.on("bibleChapter", (m) => { chapters[m.book + "|" + m.chapter] = m.verses; renderBrowser(); });
 P.on("error", toast);
 P.connect();

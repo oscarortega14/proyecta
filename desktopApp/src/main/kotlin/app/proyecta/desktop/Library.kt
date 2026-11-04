@@ -21,12 +21,16 @@ data class Catalog(
     val songs: List<SongSummary> = emptyList(),
     val bibleName: String? = null,
     val bibleError: String? = null,
+    /** Traducciones para elegir (las de la carpeta biblia/ y las que vienen con el programa). */
+    val bibleNames: List<String> = emptyList(),
+    /** Créditos que exige la licencia de la traducción en uso. */
+    val bibleNotice: String? = null,
 )
 
 /**
  * Biblioteca en disco:
  *   <base>/canciones/  un archivo .txt por canción
- *   <base>/biblia/     archivos .json (se usa el primero en orden alfabético)
+ *   <base>/biblia/     Biblias propias (.json o .txt VPL), además de las que vienen con el programa
  */
 class Library(val baseDir: File) {
     val songsDir = File(baseDir, "canciones")
@@ -36,6 +40,13 @@ class Library(val baseDir: File) {
     @Volatile private var songs: Map<String, Song> = emptyMap()
     @Volatile var bible: Bible? = null
         private set
+
+    /** Traducción elegida por el operador (null = la primera de la carpeta, o la Reina-Valera 1909). */
+    @Volatile var preferredBible: String? = null
+
+    /** Biblias de la carpeta biblia/, ya leídas. */
+    @Volatile private var userBibles: Map<String, Bible> = emptyMap()
+    @Volatile private var bibleErrors: String? = null
 
     private val _catalog = MutableStateFlow(Catalog())
     val catalog: StateFlow<Catalog> = _catalog.asStateFlow()
@@ -181,26 +192,37 @@ class Library(val baseDir: File) {
             .sortedBy { normalizeText(it.title) }
         songs = loaded.associateBy { it.id }
 
-        var error: String? = null
+        val errors = mutableListOf<String>()
         // .json (formato propio) o .txt (formato VPL de eBible.org)
-        val bibleFile = bibleDir.listFiles { f -> f.isFile && f.extension.lowercase() in setOf("json", "txt") }
-            .orEmpty().minByOrNull { it.name.lowercase() }
-        bible = bibleFile?.let { f ->
-            runCatching {
-                val text = readTextSmart(f)
-                if (f.extension.equals("json", true)) Bible.fromJson(text, f.nameWithoutExtension)
-                else Bible.fromVpl(text, f.nameWithoutExtension)
+        userBibles = bibleDir.listFiles { f -> f.isFile && f.extension.lowercase() in setOf("json", "txt") }
+            .orEmpty().sortedBy { it.name.lowercase() }
+            .mapNotNull { f ->
+                runCatching {
+                    val text = readTextSmart(f)
+                    if (f.extension.equals("json", true)) Bible.fromJson(text, f.nameWithoutExtension)
+                    else Bible.fromVpl(text, f.nameWithoutExtension)
+                }
+                    .onFailure { errors += "No pude leer ${f.name}: ${it.message}" }
+                    .getOrNull()
             }
-                .onFailure { error = "No pude leer ${f.name}: ${it.message}" }
-                .getOrNull()
-        }
-        if (bibleFile == null) {
-            // Sin Biblia propia en la carpeta: se usa la Reina-Valera 1909 que viene con el programa.
-            bible = bundledBible
-            if (bible == null) error = "No hay Biblia. Copia un archivo .json o .txt (VPL) en ${bibleDir.absolutePath}"
-        }
+            .associateBy { it.name }
+        bibleErrors = errors.joinToString(" · ").ifEmpty { null }
+        refreshBible(loaded.map { it.summary() })
+    }
 
-        _catalog.value = Catalog(loaded.map { it.summary() }, bible?.name, error)
+    /** Cambiar de traducción (se recuerda en [preferredBible]). */
+    @Synchronized
+    fun selectBible(name: String) {
+        preferredBible = name
+        refreshBible(_catalog.value.songs)
+    }
+
+    private fun refreshBible(songs: List<SongSummary>) {
+        val names = (userBibles.keys + BUNDLED_BIBLES).distinct()
+        val active = preferredBible?.takeIf { it in names } ?: userBibles.keys.firstOrNull() ?: BUNDLED_BIBLES.first()
+        bible = userBibles[active] ?: bundled(active)
+        val error = bibleErrors ?: if (bible == null) "No hay Biblia. Copia un archivo .json o .txt (VPL) en ${bibleDir.absolutePath}" else null
+        _catalog.value = Catalog(songs, bible?.name, error, names, BIBLE_NOTICES[bible?.name])
     }
 
     private fun File.isSongFile() = isFile && extension.equals("txt", true)
@@ -226,12 +248,28 @@ class Library(val baseDir: File) {
     }
 
     companion object {
-        /** Reina-Valera 1909 (dominio público) incluida en el programa. */
-        val bundledBible: Bible? by lazy {
-            Library::class.java.getResourceAsStream("/biblia/Reina-Valera 1909.txt")?.use { input ->
-                runCatching { Bible.fromVpl(decodeSmart(input.readBytes()), "Reina-Valera 1909") }.getOrNull()
-            }
+        /** Biblias que vienen con el programa (archivos VPL en resources/biblia). */
+        val BUNDLED_BIBLES = listOf("Reina-Valera 1909", "Versión Biblia Libre")
+
+        /** Créditos que pide la licencia (CC BY-SA 4.0) de cada traducción incluida. */
+        val BIBLE_NOTICES = mapOf(
+            "Versión Biblia Libre" to "© 2018-2020 Jonathan Gallagher y Shelly Barrios de Avila · CC BY-SA 4.0 · eBible.org",
+        )
+
+        private val bundledCache = java.util.concurrent.ConcurrentHashMap<String, Bible>()
+
+        /** Una Biblia incluida, leída la primera vez que se usa. */
+        fun bundled(name: String): Bible? {
+            if (name !in BUNDLED_BIBLES) return null
+            bundledCache[name]?.let { return it }
+            val bible = Library::class.java.getResourceAsStream("/biblia/$name.txt")?.use { input ->
+                runCatching { Bible.fromVpl(decodeSmart(input.readBytes()), name) }.getOrNull()
+            } ?: return null
+            return bundledCache.putIfAbsent(name, bible) ?: bible
         }
+
+        /** Reina-Valera 1909 (dominio público) incluida en el programa. */
+        val bundledBible: Bible? get() = bundled("Reina-Valera 1909")
 
         fun decodeSmart(bytes: ByteArray): String = try {
             Charsets.UTF_8.newDecoder()

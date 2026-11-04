@@ -1,0 +1,13 @@
+Biblias incluidas en Proyecta
+=============================
+
+Reina-Valera 1909
+  Dominio público. Texto de eBible.org (spaRV1909).
+
+Versión Biblia Libre
+  The Holy Bible in Spanish, Free Bible Version
+  Copyright © 2018-2020 Jonathan Gallagher y Shelly Barrios de Avila
+  Colaboradores: Gustavo Sanabria y Rebekah Põldaas
+  Licencia: Creative Commons Atribución-CompartirIgual 4.0 (CC BY-SA 4.0)
+  https://creativecommons.org/licenses/by-sa/4.0/
+  Texto de eBible.org (spavbl), sin cambios en el texto.

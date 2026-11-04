@@ -34,7 +34,9 @@ import java.awt.Desktop
 import java.io.File
 
 fun main() {
-    val library = Library(File(System.getProperty("user.home"), "Proyecta")).also { it.reload() }
+    val baseDir = File(System.getProperty("user.home"), "Proyecta")
+    val settingsStore = SettingsStore(File(baseDir, "ajustes.json"))
+    val library = Library(baseDir).also { it.preferredBible = settingsStore.value.bible; it.reload() }
     val commands = Commands.create(library)
     val presenter = commands.presenter
     val server = RemoteServer(commands, library)
@@ -43,7 +45,6 @@ fun main() {
     }
     val discovery = DiscoveryResponder().also { runCatching { it.start() } }
     val themes = ThemeStore(File(library.baseDir, "tema.json"))
-    val settingsStore = SettingsStore(File(library.baseDir, "ajustes.json"))
 
     application {
         val state by presenter.state.collectAsState()
@@ -113,6 +114,10 @@ fun main() {
                     onOpenConnect = { connectOpen = true },
                     searchBible = { q -> library.bible?.search(q) },
                     bible = remember(catalog) { library.bible },
+                    onSelectBible = { name ->
+                        settingsStore.update { it.copy(bible = name) }
+                        scope.launch(Dispatchers.IO) { library.selectBible(name) }
+                    },
                     firewallOk = firewallOk,
                     onImport = { importSongs(library) },
                     onExport = { exportSongs(library) },

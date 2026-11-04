@@ -184,7 +184,11 @@ class RemoteClient(private val scope: CoroutineScope) {
 
     private fun onMessage(m: ServerMessage) {
         when (m) {
-            is ServerMessage.Library -> { _songs.value = m.songs; _bibleName.value = m.bibleName; _bibleBooks.value = m.bibleBooks }
+            is ServerMessage.Library -> {
+                // Otra traducción: el capítulo guardado ya no sirve.
+                if (m.bibleName != _bibleName.value) _bibleChapter.value = null
+                _songs.value = m.songs; _bibleName.value = m.bibleName; _bibleBooks.value = m.bibleBooks
+            }
             is ServerMessage.BibleChapter -> _bibleChapter.value = m
             is ServerMessage.State -> {
                 if (m.serverNow > 0) serverOffset = m.serverNow - System.currentTimeMillis()

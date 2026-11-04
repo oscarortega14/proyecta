@@ -204,7 +204,7 @@ private fun Browser(
         } else {
             val ref = "${book.name} $chapter"
             val loaded = chapterText?.takeIf { it.book == book.name && it.chapter == chapter }
-            LaunchedEffect(ref) { if (loaded == null) onRequestChapter(book.name, chapter) }
+            LaunchedEffect(ref, loaded == null) { if (loaded == null) onRequestChapter(book.name, chapter) }
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Button({ onShow(ref, 0) }, contentPadding = PaddingValues(horizontal = 12.dp)) { Text("Mostrar todo") }
                 OutlinedButton({ onAdd(ref) }, contentPadding = PaddingValues(horizontal = 12.dp)) { Text("+ Lista") }
