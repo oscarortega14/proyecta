@@ -132,9 +132,8 @@ class Library(val baseDir: File) {
     fun importSongs(sources: List<File>): ImportResult {
         songsDir.mkdirs()
         var added = 0; var skipped = 0; var renamed = 0
-        fun take(name: String, bytes: ByteArray) {
-            val base = File(name).nameWithoutExtension.trim().ifEmpty { return }
-            val text = decodeSmart(bytes)
+        fun take(name: String, text: String) {
+            val base = cleanListName(name) ?: return
             var target = File(songsDir, "$base.txt")
             if (target.exists()) {
                 if (readTextSmart(target).trim() == text.trim()) { skipped++; return }
@@ -146,15 +145,25 @@ class Library(val baseDir: File) {
             target.writeText(text, Charsets.UTF_8)
             added++
         }
+        // .txt de Proyecta, .xml OpenLyrics (OpenLP) y .json de Holyrics
+        fun takeFile(name: String, bytes: ByteArray) {
+            val ext = name.substringAfterLast('.', "").lowercase()
+            when (ext) {
+                "txt" -> take(File(name).nameWithoutExtension, decodeSmart(bytes))
+                "xml" -> SongImport.fromOpenLyrics(decodeSmart(bytes))?.let { take(it.title, it.text) }
+                "json" -> SongImport.fromHolyricsJson(decodeSmart(bytes)).forEach { take(it.title, it.text) }
+            }
+        }
+        fun isSongSource(name: String) = name.substringAfterLast('.', "").lowercase() in IMPORT_EXTENSIONS
         for (src in sources) {
             when {
-                src.isDirectory -> src.listFiles { f -> f.isFile && f.extension.equals("txt", true) }.orEmpty().forEach { take(it.name, it.readBytes()) }
+                src.isDirectory -> src.listFiles { f -> f.isFile && isSongSource(f.name) }.orEmpty().forEach { takeFile(it.name, it.readBytes()) }
                 src.extension.equals("zip", true) -> java.util.zip.ZipFile(src).use { zip ->
                     zip.entries().asSequence()
-                        .filter { !it.isDirectory && it.name.endsWith(".txt", true) && !it.name.contains("__MACOSX") }
-                        .forEach { e -> take(e.name.substringAfterLast('/'), zip.getInputStream(e).readBytes()) }
+                        .filter { !it.isDirectory && isSongSource(it.name) && !it.name.contains("__MACOSX") }
+                        .forEach { e -> takeFile(e.name.substringAfterLast('/'), zip.getInputStream(e).readBytes()) }
                 }
-                src.extension.equals("txt", true) -> take(src.name, src.readBytes())
+                isSongSource(src.name) -> takeFile(src.name, src.readBytes())
             }
         }
         reload()
@@ -279,6 +288,9 @@ class Library(val baseDir: File) {
         } catch (_: CharacterCodingException) {
             String(bytes, Charset.forName("windows-1252"))
         }.removePrefix("\uFEFF")
+
+        /** Lo que se puede importar: .txt (Proyecta), .xml (OpenLyrics/OpenLP), .json (Holyrics) y .zip con esos. */
+        val IMPORT_EXTENSIONS = setOf("txt", "xml", "json")
 
         val IMAGE_EXTENSIONS = setOf("jpg", "jpeg", "png", "webp", "bmp")
         private val FONDO_LINE = Regex("""^fondo\s*:.*$""", RegexOption.IGNORE_CASE)

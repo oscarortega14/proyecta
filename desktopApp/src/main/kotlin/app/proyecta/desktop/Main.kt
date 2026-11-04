@@ -229,10 +229,12 @@ private fun ApplicationScope.ProjectorWindow(
 
 /** Elegir archivos .txt o .zip (o varios) e importarlos a la biblioteca. */
 private fun importSongs(library: Library): String? {
-    val dialog = java.awt.FileDialog(null as java.awt.Frame?, "Importar canciones (.txt o .zip)", java.awt.FileDialog.LOAD).apply {
+    val dialog = java.awt.FileDialog(
+        null as java.awt.Frame?, "Importar canciones: .txt, .zip, OpenLP (.xml) u Holyrics (.json)", java.awt.FileDialog.LOAD,
+    ).apply {
         isMultipleMode = true
-        setFilenameFilter { _, name -> name.endsWith(".txt", true) || name.endsWith(".zip", true) }
-        file = "*.txt;*.zip"
+        setFilenameFilter { _, name -> name.substringAfterLast('.', "").lowercase() in Library.IMPORT_EXTENSIONS + "zip" }
+        file = "*.txt;*.zip;*.xml;*.json"
         isVisible = true
     }
     val files = dialog.files?.toList().orEmpty()
