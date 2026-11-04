@@ -97,7 +97,11 @@ object VideoBackgrounds {
 }
 
 /** Un video reproduciéndose en bucle, sin sonido; cada cuadro nuevo se publica en [frame]. */
-private const val MIN_FRAME_NANOS = 32_000_000L // ~30 cuadros por segundo
+/**
+ * Separación mínima entre cuadros: 24 ms. Un video de 24/25/30 cuadros (33-41 ms entre cuadros) pasa
+ * completo aunque un cuadro llegue un poco antes; uno de 60 queda en 30 parejos (se toma uno sí, uno no).
+ */
+private const val MIN_FRAME_NANOS = 24_000_000L
 
 class VideoLoop(file: File, factory: MediaPlayerFactory, maxWidth: Int) : AutoCloseable {
     val frame: MutableState<ImageBitmap?> = mutableStateOf(null)
@@ -123,7 +127,7 @@ class VideoLoop(file: File, factory: MediaPlayerFactory, maxWidth: Int) : AutoCl
         }
         val render = RenderCallback { _: MediaPlayer, buffers: Array<ByteBuffer>, _: BufferFormat ->
             val i = info ?: return@RenderCallback
-            // Máximo ~30 cuadros por segundo: muchos loops vienen a 60 y detrás de la letra no se nota.
+            // Videos de 60 cuadros se reducen a 30 parejos; los de hasta 30 pasan completos.
             val now = System.nanoTime()
             if (now - lastFrameNanos < MIN_FRAME_NANOS) return@RenderCallback
             lastFrameNanos = now

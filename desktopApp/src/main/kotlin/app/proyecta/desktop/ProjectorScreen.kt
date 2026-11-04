@@ -167,8 +167,10 @@ private fun Background(theme: Theme, image: ImageBitmap?, video: File?, frozenTi
         image != null -> Image(image, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
         builtin != null -> {
             val animated = theme.animate && frozenTime == null
-            val clock = rememberAnimationTime(animated)
-            BuiltinBackground(builtin, time = if (frozenTime != null) androidx.compose.runtime.mutableStateOf(frozenTime) else clock)
+            // Con tarjeta gráfica: dibujo directo a 30 cuadros (60 con "fluidez máxima"). Sin ella: baja resolución a 24.
+            val gpu = RenderInfo.hardware && !preview
+            val clock = rememberAnimationTime(animated, fps = if (preview) 15 else if (gpu && theme.smooth) 60 else if (gpu) 30 else 24)
+            BuiltinBackground(builtin, time = if (frozenTime != null) androidx.compose.runtime.mutableStateOf(frozenTime) else clock, direct = gpu)
         }
     }
     if (video != null || image != null || builtin != null) {

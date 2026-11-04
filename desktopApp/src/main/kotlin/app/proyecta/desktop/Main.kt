@@ -24,9 +24,7 @@ import androidx.compose.ui.window.rememberWindowState
 import app.proyecta.shared.ClientMessage
 import app.proyecta.shared.PresentationState
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -160,6 +158,8 @@ private fun ApplicationScope.ProjectorWindow(
         focusable = bounds == null,
         onPreviewKeyEvent = onKey,
     ) {
+        // ¿La ventana se dibuja con la tarjeta gráfica? Así los fondos animados van fluidos y livianos.
+        LaunchedEffect(Unit) { RenderInfo.hardware = !window.renderApi.name.startsWith("SOFTWARE") }
         ProjectorScreen(state)
     }
 }

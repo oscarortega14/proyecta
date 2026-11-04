@@ -1,7 +1,6 @@
 package app.proyecta.desktop
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,20 +13,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -181,7 +176,7 @@ private fun LibraryPanel(
         LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
             bibleHits?.let { (hits, _) ->
                 items(hits, key = { "b:" + it.reference }) { hit ->
-                    Column(Modifier.fillMaxWidth().clickable { present(ClientMessage.ShowBible(hit.reference)) }.padding(vertical = 6.dp, horizontal = 4.dp)) {
+                    Column(Modifier.fillMaxWidth().handClickable { present(ClientMessage.ShowBible(hit.reference)) }.padding(vertical = 6.dp, horizontal = 4.dp)) {
                         Text(hit.reference, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.primary)
                         Text(hit.text, style = MaterialTheme.typography.bodySmall, maxLines = 3, overflow = TextOverflow.Ellipsis)
                     }
@@ -189,7 +184,7 @@ private fun LibraryPanel(
             }
             if (bibleHits == null) items(results, key = { it.id }) { song ->
                 Row(
-                    Modifier.fillMaxWidth().clickable { present(ClientMessage.SelectSong(song.id)) }.padding(start = 4.dp),
+                    Modifier.fillMaxWidth().handClickable { present(ClientMessage.SelectSong(song.id)) }.padding(start = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
@@ -239,7 +234,7 @@ private fun SlidesPanel(
             itemsIndexed(state.slides) { i, slide ->
                 val selected = i == state.index
                 Card(
-                    Modifier.fillMaxWidth().clickable { send(ClientMessage.GoTo(i)) },
+                    Modifier.fillMaxWidth().handClickable { send(ClientMessage.GoTo(i)) },
                     colors = CardDefaults.cardColors(
                         containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
                     ),
@@ -373,7 +368,7 @@ private fun PlanPanel(plan: ServicePlanState, modifier: Modifier, send: (ClientM
             itemsIndexed(plan.items) { i, item ->
                 val selected = i == plan.current
                 Card(
-                    Modifier.fillMaxWidth().clickable { send(ClientMessage.PlanGo(i)) },
+                    Modifier.fillMaxWidth().handClickable { send(ClientMessage.PlanGo(i)) },
                     colors = CardDefaults.cardColors(
                         containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
                     ),

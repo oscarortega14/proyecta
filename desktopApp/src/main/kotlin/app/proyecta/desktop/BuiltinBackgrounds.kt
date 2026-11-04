@@ -50,6 +50,11 @@ object BuiltinBackgrounds {
     fun draw(scope: DrawScope, key: String, t: Float) { painters[key]?.invoke(scope, t) }
 }
 
+/** Cómo dibuja la ventana de proyección: con tarjeta gráfica (lo normal) o solo con el procesador. */
+object RenderInfo {
+    @Volatile var hardware: Boolean = false
+}
+
 /** Ancho al que se dibujan los fondos incluidos antes de ampliarlos (son suaves: no se nota). */
 private const val RENDER_WIDTH = 640f
 
@@ -70,11 +75,16 @@ private class LowResBuffer {
  * no trabe un PC modesto.
  */
 @Composable
-fun BuiltinBackground(key: String, modifier: Modifier = Modifier, time: State<Float>? = null) {
+fun BuiltinBackground(key: String, modifier: Modifier = Modifier, time: State<Float>? = null, direct: Boolean = false) {
     val buffer = remember { LowResBuffer() }
     Canvas(modifier.fillMaxSize()) {
         // Leer el tiempo dentro del dibujo: solo se repinta, no se recompone la pantalla.
         val t = time?.value ?: 0f
+        if (direct) {
+            // Con tarjeta gráfica: se dibuja directo a resolución completa (la GPU hace el trabajo).
+            BuiltinBackgrounds.draw(this, key, t)
+            return@Canvas
+        }
         val scale = ((RENDER_WIDTH_BY_KEY[key] ?: RENDER_WIDTH) / size.width).coerceAtMost(1f)
         val bw = (size.width * scale).toInt().coerceAtLeast(1)
         val bh = (size.height * scale).toInt().coerceAtLeast(1)
@@ -86,14 +96,19 @@ fun BuiltinBackground(key: String, modifier: Modifier = Modifier, time: State<Fl
     }
 }
 
-/** Reloj de animación en segundos, a ~20 cuadros por segundo: los movimientos son lentos, se ve suave y es liviano. */
+/**
+ * Reloj de animación en segundos. Con [fps] >= 60 avanza en cada refresco de pantalla (suave en el
+ * videobeam); con menos (vistas previas) espera entre cuadros para gastar menos.
+ */
 @Composable
-fun rememberAnimationTime(running: Boolean): State<Float> = produceState(0f, running) {
+fun rememberAnimationTime(running: Boolean, fps: Int = 60): State<Float> = produceState(0f, running, fps) {
     if (!running) return@produceState
     val start = withFrameNanos { it }
+    // 60: cada refresco de pantalla. Menos: se espera lo que falte para el próximo cuadro.
+    val gap = if (fps >= 60) 0L else 1_000L / fps.coerceAtLeast(1) - 8
     while (true) {
         withFrameNanos { value = (it - start) / 1_000_000_000f }
-        delay(45)
+        if (gap > 0) delay(gap)
     }
 }
 

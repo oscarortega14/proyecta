@@ -4,7 +4,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,15 +19,9 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -230,6 +223,10 @@ fun BackgroundsWindow(
                             Switch(theme.animate, { v -> themes.update { it.copy(animate = v) } })
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Fluidez máxima (60 cuadros/s, gasta más)", modifier = Modifier.weight(1f))
+                            Switch(theme.smooth, { v -> themes.update { it.copy(smooth = v) } }, enabled = theme.animate)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("Sombra detrás de la letra", modifier = Modifier.weight(1f))
                             Switch(theme.shadow, { v -> themes.update { it.copy(shadow = v) } })
                         }
@@ -254,7 +251,7 @@ private fun androidx.compose.foundation.lazy.grid.LazyGridScope.header(text: Str
 
 @Composable
 private fun Tile(name: String, selected: Boolean, onClick: () -> Unit, content: @Composable () -> Unit) {
-    Column(Modifier.clickable(onClick = onClick)) {
+    Column(Modifier.handClickable(onClick = onClick)) {
         Box(
             Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(6.dp))
                 .border(
