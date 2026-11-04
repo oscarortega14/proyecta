@@ -9,6 +9,7 @@ const Proyecta = (() => {
     state: { title: "", slides: [], index: -1, blank: false, isBible: false, songId: null, stageMessage: "" },
     songs: [],
     bibleName: null,
+    bibleBooks: [], // [{name, chapters}] para el explorador de la Biblia
     plan: { items: [], current: -1 },
     serverOffset: 0, // hora del PC - hora local, para la cuenta regresiva
   };
@@ -32,7 +33,8 @@ const Proyecta = (() => {
         emit("state");
       }
       else if (m.type === "bible_results") emit("bibleResults", m);
-      else if (m.type === "library") { S.songs = m.songs; S.bibleName = m.bibleName; emit("library"); }
+      else if (m.type === "library") { S.songs = m.songs; S.bibleName = m.bibleName; S.bibleBooks = m.bibleBooks || []; emit("library"); }
+      else if (m.type === "bible_chapter") emit("bibleChapter", m);
       else if (m.type === "plan") { S.plan = m.plan; emit("plan"); }
       else if (m.type === "error") emit("error", m.message);
     };

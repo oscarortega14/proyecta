@@ -96,7 +96,7 @@ compose.desktop {
             appResourcesRootDir.set(appResources)
             targetFormats(TargetFormat.Msi, TargetFormat.Deb)
             packageName = "Proyecta"
-            packageVersion = "1.8.0"
+            packageVersion = "1.9.0"
             description = "Proyección de canciones y Biblia con control remoto"
             vendor = "Proyecta"
             copyright = "MIT License"

@@ -68,6 +68,14 @@ class BibleBrowserTest {
         dir.deleteRecursively()
     }
 
+    @Test
+    fun webControlHasTheBibleBrowser() {
+        val page = javaClass.getResource("/web/index.html")!!.readText()
+        val js = javaClass.getResource("/web/proyecta.js")!!.readText()
+        assertTrue("bible_chapter" in page && "renderBrowser" in page)
+        assertTrue("bible_chapter" in js && "bibleBooks" in js)
+    }
+
     /** PROYECTA_RENDER_DIR=/tmp/out ./gradlew :desktopApp:test --tests '*BibleBrowserTest*' */
     @Test
     fun renderBrowser() {

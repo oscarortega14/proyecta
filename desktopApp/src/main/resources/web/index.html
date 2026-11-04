@@ -55,6 +55,22 @@
   .muted { color:var(--muted); font-size:14px; }
   #toast { position:fixed; left:12px; right:12px; bottom:96px; background:#601410; color:#fff; padding:12px; border-radius:10px; display:none; }
   hr { border:0; border-top:1px solid #3a3640; margin:16px 0; }
+  .row.three { margin:8px 0 4px; } .row.three .btn { flex:1; }
+  .link { background:none; border:0; color:var(--accent); font-size:15px; padding:8px 4px; }
+  .link:disabled { opacity:.35; }
+  .crumbs { display:flex; align-items:center; gap:4px; padding:8px 0; font-size:17px; min-width:0; }
+  .crumbs a { color:var(--accent); cursor:pointer; }
+  .crumbs span { color:var(--muted); } .crumbs b { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .grid { display:grid; gap:6px; grid-template-columns:repeat(auto-fill, minmax(104px, 1fr)); }
+  .grid.nums { grid-template-columns:repeat(auto-fill, minmax(52px, 1fr)); }
+  .grid .gh { grid-column:1 / -1; color:var(--accent); font-size:13px; font-weight:600; padding-top:8px; }
+  .tile { height:44px; border-radius:8px; border:0; background:var(--card); color:var(--text); font-size:15px; padding:0 4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tile:active, .verse .t:active { background:var(--accent-bg); }
+  .chbar { display:flex; gap:6px; align-items:center; margin-bottom:6px; }
+  .verse { display:flex; align-items:flex-start; gap:6px; border-bottom:1px solid #2e2b33; }
+  .verse .t { flex:1; display:flex; gap:8px; padding:9px 0; border-radius:6px; }
+  .verse .n { color:var(--accent); font-weight:700; min-width:26px; text-align:right; }
+  .verse .icon { margin-top:6px; }
 </style>
 </head>
 <body>
@@ -75,7 +91,7 @@
   <button data-tab="plan">Lista</button>
   <button data-tab="more">Más</button>
 </nav>
-<main>
+<main id="main">
   <section id="live" class="tab on">
     <h2 id="title">Nada en pantalla</h2>
     <div class="chips" id="chips"></div>
@@ -86,13 +102,20 @@
     <div id="songList"></div>
   </section>
   <section id="bible" class="tab">
-    <p class="muted" id="bibleName"></p>
-    <input id="ref" type="text" placeholder="Cita (ej. Juan 3:16, Sal 23, 1 Co 13:4-7)" enterkeyhint="go">
-    <button class="btn wide" id="showRef">Mostrar en pantalla</button>
-    <button class="btn outline wide" id="searchRef">Buscar frase</button>
-    <button class="btn outline wide" id="addRef">Agregar a la lista</button>
-    <p class="muted" id="hitsInfo"></p>
-    <div id="hits"></div>
+    <input id="ref" type="text" placeholder="Cita o frase (ej. Juan 3:16 · amó Dios)" enterkeyhint="go">
+    <div class="row three">
+      <button class="btn small" id="showRef">Mostrar</button>
+      <button class="btn small outline" id="addRef">+ Lista</button>
+      <button class="btn small outline" id="searchRef">Buscar</button>
+    </div>
+    <div id="hitsBox" hidden>
+      <div class="row"><p class="muted" id="hitsInfo" style="flex:1"></p><button class="link" id="closeHits">✕ Ver libros</button></div>
+      <div id="hits"></div>
+    </div>
+    <div id="browser">
+      <div class="crumbs" id="crumbs"></div>
+      <div id="bView"></div>
+    </div>
   </section>
   <section id="plan" class="tab">
     <div class="row"><h2 style="flex:1">Lista del culto</h2><button class="btn small" id="planNext">Siguiente ▶</button></div>
@@ -195,6 +218,7 @@ function renderCountdown() {
 setInterval(renderCountdown, 500);
 
 function renderHits(m) {
+  $("hitsBox").hidden = false; $("browser").hidden = true;
   $("hitsInfo").textContent = m.total === 0 ? "Sin resultados para «" + m.query + "»"
     : m.total + " resultados" + (m.total > m.hits.length ? " (primeros " + m.hits.length + ")" : "");
   const box = $("hits"); box.replaceChildren();
@@ -203,11 +227,110 @@ function renderHits(m) {
     const t = P.el("div", "t");
     t.appendChild(P.el("b", null, h.reference));
     const sm = P.el("small", null, h.text); sm.style.whiteSpace = "normal"; t.appendChild(sm);
-    t.onclick = () => { P.send("bible", { reference: h.reference }); showTab("live"); };
+    t.onclick = () => showBible(h.reference, 0);
     const add = P.el("button", "icon", "+");
-    add.onclick = () => { P.send("plan_add_bible", { reference: h.reference }); toast("Agregada a la lista"); };
+    add.onclick = () => addBible(h.reference);
     row.append(t, add);
     box.appendChild(row);
+  });
+}
+
+// --- Explorador de la Biblia: libros → capítulos → versículos ---
+const OLD_TESTAMENT_BOOKS = 39;
+let nav = { book: null, chapter: null };
+try { nav = Object.assign(nav, JSON.parse(localStorage.getItem("bibleNav") || "{}")); } catch (e) {}
+const chapters = {}; // "Libro|cap" -> versículos (los pedidos ya recibidos)
+
+function showBible(reference, slide) {
+  P.send("bible", { reference });
+  if (slide > 0) P.send("goto", { index: slide });
+  showTab("live");
+}
+function addBible(reference) { P.send("plan_add_bible", { reference }); toast(reference + " agregado a la lista"); }
+// Posición del versículo entre las diapositivas (los versículos vacíos no se proyectan). Igual que shared/Bible.kt
+function slideIndexOfVerse(verses, v) { return verses.slice(0, v - 1).filter((t) => t.trim()).length; }
+
+function go(book, chapter) {
+  nav = { book, chapter };
+  try { localStorage.setItem("bibleNav", JSON.stringify(nav)); } catch (e) {}
+  renderBrowser();
+  $("main").scrollTop = 0;
+}
+
+function renderBrowser() {
+  const books = S.bibleBooks;
+  const view = $("bView"), crumbs = $("crumbs");
+  view.replaceChildren(); crumbs.replaceChildren();
+  if (!books.length) {
+    view.appendChild(P.el("p", "muted", S.bibleName
+      ? "Para ver los libros, actualiza Proyecta en el computador. Mientras tanto puedes escribir la cita arriba."
+      : "El computador no tiene Biblia cargada."));
+    return;
+  }
+  const book = nav.book != null ? books[nav.book] : null;
+  const chapter = book && nav.chapter >= 1 && nav.chapter <= book.chapters ? nav.chapter : null;
+
+  const crumb = (text, onclick) => {
+    const e = P.el(onclick ? "a" : "b", null, text);
+    if (onclick) e.onclick = onclick;
+    crumbs.appendChild(e);
+  };
+  crumb("Libros", book ? () => go(null, null) : null);
+  if (book) { crumbs.appendChild(P.el("span", null, "›")); crumb(book.name, chapter ? () => go(nav.book, null) : null); }
+  if (chapter) { crumbs.appendChild(P.el("span", null, "›")); crumb(String(chapter), null); }
+
+  if (!book) {
+    const grid = P.el("div", "grid");
+    [["Antiguo Testamento", 0, OLD_TESTAMENT_BOOKS], ["Nuevo Testamento", OLD_TESTAMENT_BOOKS, books.length]].forEach(([title, from, to]) => {
+      if (from >= to) return;
+      grid.appendChild(P.el("div", "gh", title));
+      for (let i = from; i < to; i++) {
+        const b = P.el("button", "tile", books[i].name);
+        // Libros de un solo capítulo (Abdías, Judas…): directo a los versículos.
+        b.onclick = () => go(i, books[i].chapters === 1 ? 1 : null);
+        grid.appendChild(b);
+      }
+    });
+    view.appendChild(grid);
+    return;
+  }
+  if (!chapter) {
+    const grid = P.el("div", "grid nums");
+    for (let c = 1; c <= book.chapters; c++) {
+      const b = P.el("button", "tile", String(c));
+      b.onclick = () => go(nav.book, c);
+      grid.appendChild(b);
+    }
+    view.appendChild(grid);
+    return;
+  }
+
+  const ref = book.name + " " + chapter;
+  const bar = P.el("div", "chbar");
+  const all = P.el("button", "btn small", "Mostrar todo"); all.onclick = () => showBible(ref, 0);
+  const add = P.el("button", "btn small outline", "+ Lista"); add.onclick = () => addBible(ref);
+  const sp = P.el("span"); sp.style.flex = "1";
+  const prev = P.el("button", "link", "‹ Ant."); prev.disabled = chapter <= 1; prev.onclick = () => go(nav.book, chapter - 1);
+  const next = P.el("button", "link", "Sig. ›"); next.disabled = chapter >= book.chapters; next.onclick = () => go(nav.book, chapter + 1);
+  bar.append(all, add, sp, prev, next);
+  view.appendChild(bar);
+
+  const verses = chapters[book.name + "|" + chapter];
+  if (!verses) {
+    view.appendChild(P.el("p", "muted", "Cargando…"));
+    P.send("bible_chapter", { book: book.name, chapter });
+    return;
+  }
+  verses.forEach((text, i) => {
+    if (!text.trim()) return;
+    const v = i + 1;
+    const row = P.el("div", "verse");
+    const t = P.el("div", "t");
+    t.append(P.el("span", "n", String(v)), P.el("span", null, text.trim()));
+    t.onclick = () => showBible(ref, slideIndexOfVerse(verses, v));
+    const plus = P.el("button", "icon", "+"); plus.onclick = () => addBible(ref + ":" + v);
+    row.append(t, plus);
+    view.appendChild(row);
   });
 }
 
@@ -225,7 +348,6 @@ function renderSongs() {
     row.append(t, add);
     list.appendChild(row);
   });
-  $("bibleName").textContent = S.bibleName || "El computador no tiene Biblia cargada";
 }
 
 function renderPlan() {
@@ -251,12 +373,13 @@ $("prev").onclick = () => P.send("prev");
 $("next").onclick = () => P.send("next");
 $("blank").onclick = () => P.send("blank", { blank: !S.state.blank });
 $("q").oninput = renderSongs;
-const showRef = () => { if ($("ref").value.trim()) { P.send("bible", { reference: $("ref").value.trim() }); showTab("live"); } };
+const showRef = () => { if ($("ref").value.trim()) { $("ref").blur(); showBible($("ref").value.trim(), 0); } };
 $("showRef").onclick = showRef;
 $("ref").onkeydown = (e) => { if (e.key === "Enter") showRef(); };
-$("addRef").onclick = () => { if ($("ref").value.trim()) { P.send("plan_add_bible", { reference: $("ref").value.trim() }); toast("Agregada a la lista"); } };
+$("addRef").onclick = () => { if ($("ref").value.trim()) addBible($("ref").value.trim()); };
+$("closeHits").onclick = () => { $("hitsBox").hidden = true; $("browser").hidden = false; };
 $("planNext").onclick = () => P.send("plan_next");
-$("searchRef").onclick = () => { if ($("ref").value.trim()) P.send("bible_search", { query: $("ref").value.trim() }); };
+$("searchRef").onclick = () => { if ($("ref").value.trim()) { $("ref").blur(); P.send("bible_search", { query: $("ref").value.trim() }); } };
 $("logo").onclick = () => P.send("logo", { show: !S.state.logo });
 const sendAlert = () => { if ($("alertText").value.trim()) P.send("alert", { text: $("alertText").value }); };
 $("sendAlert").onclick = sendAlert;
@@ -306,6 +429,8 @@ P.on("state", renderLive);
 P.on("library", renderSongs);
 P.on("plan", renderPlan);
 P.on("bibleResults", renderHits);
+P.on("library", renderBrowser);
+P.on("bibleChapter", (m) => { chapters[m.book + "|" + m.chapter] = m.verses; renderBrowser(); });
 P.on("error", toast);
 P.connect();
 </script>
