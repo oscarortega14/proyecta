@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -68,6 +69,8 @@ fun BackgroundsWindow(
     val theme by themes.theme.collectAsState()
     val state by presenter.state.collectAsState()
     var refresh by remember { mutableIntStateOf(0) }
+    var searchOpen by remember { mutableStateOf(false) }
+    val pixabay = remember { PixabayClient() }
     val images = remember(refresh) { library.backgrounds() }
     val videos = remember(refresh) { library.videos() }
     var message by remember { mutableStateOf<String?>(null) }
@@ -115,7 +118,12 @@ fun BackgroundsWindow(
                                 Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(top, bottom))))
                             }
                         }
-                        header("Videos en bucle (${videos.size})")
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Videos en bucle (${videos.size})", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                                Button({ searchOpen = true }) { Text("Buscar fondos en internet…") }
+                            }
+                        }
                         item(span = { GridItemSpan(maxLineSpan) }) {
                             Text(
                                 if (!VideoBackgrounds.available) {
@@ -235,6 +243,9 @@ fun BackgroundsWindow(
                 }
             }
         }
+    }
+    if (searchOpen) {
+        PixabayWindow(library, themes, pixabay, onDownloaded = { refresh++ }, onClose = { searchOpen = false; refresh++ })
     }
 }
 

@@ -29,6 +29,23 @@ dependencies {
     testImplementation("io.ktor:ktor-client-websockets:$ktor")
 }
 
+// --- Clave de la API de Pixabay (buscador de fondos) ---
+// No se sube al repositorio: se lee de desktopApp/pixabay.key o de la variable PIXABAY_KEY
+// y se escribe en un recurso generado al compilar.
+val generatedResources = layout.buildDirectory.dir("generated/proyecta-resources")
+val writeBuildConfig by tasks.registering {
+    val keyFile = layout.projectDirectory.file("pixabay.key").asFile
+    val key = (System.getenv("PIXABAY_KEY") ?: keyFile.takeIf { it.exists() }?.readText())?.trim().orEmpty()
+    inputs.property("pixabayKeyHash", key.hashCode())
+    outputs.dir(generatedResources)
+    doLast {
+        val f = generatedResources.get().file("proyecta-build.properties").asFile
+        f.parentFile.mkdirs()
+        f.writeText("pixabay.key=$key\n")
+    }
+}
+sourceSets.main { resources.srcDir(writeBuildConfig) }
+
 // --- VLC incluido (solo Windows): reproduce los fondos de video sin instalar nada aparte ---
 // Se descarga el VLC portable oficial una vez, se verifica su SHA-256 y se extrae solo lo
 // necesario para reproducir video (sin interfaz, idiomas, red ni codificadores).
@@ -74,7 +91,7 @@ compose.desktop {
             appResourcesRootDir.set(appResources)
             targetFormats(TargetFormat.Msi, TargetFormat.Deb)
             packageName = "Proyecta"
-            packageVersion = "1.3.0"
+            packageVersion = "1.4.0"
             description = "Proyección de canciones y Biblia con control remoto"
             vendor = "Proyecta"
             copyright = "MIT License"
