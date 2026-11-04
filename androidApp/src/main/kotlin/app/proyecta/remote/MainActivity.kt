@@ -78,6 +78,10 @@ class MainActivity : ComponentActivity() {
         val uri = intent?.data ?: return
         if (uri.scheme != "proyecta" || uri.host != "connect") return
         val host = uri.getQueryParameter("host")?.trim().orEmpty()
+        // El control web pasa también la clave que ya tiene, así la app no la pide otra vez.
+        uri.getQueryParameter("pin")?.trim()?.takeIf { it.matches(Regex("""\d{4}""")) }?.let { pin ->
+            getSharedPreferences("proyecta", Context.MODE_PRIVATE).edit().putString("pin", pin).apply()
+        }
         if (host.matches(Regex("""^[0-9A-Za-z.\-:]{1,64}$"""))) linkHost.value = host
     }
 
@@ -93,6 +97,8 @@ class MainActivity : ComponentActivity() {
 
         val prefs = getSharedPreferences("proyecta", Context.MODE_PRIVATE)
         client = RemoteClient(lifecycleScope)
+        client.savedPin = { prefs.getString("pin", null) }
+        client.onPinAccepted = { pin -> prefs.edit().putString("pin", pin).apply() }
         readLink(intent)
         prefs.getString("host", null)?.let { client.connect(it) }
         client.onHostChanged = { host -> prefs.edit().putString("host", host).apply() }
@@ -168,6 +174,16 @@ private fun RemoteApp(client: RemoteClient, savedHost: String, pcName: String, l
 
     Column(Modifier.fillMaxSize()) {
         StatusBar(status, pcName, showSearch = !editingHost, onEdit = { editingHost = true })
+        // El PC pide clave: se pregunta una vez y queda guardada.
+        val auth by client.auth.collectAsState()
+        var pinDismissed by remember(auth) { mutableStateOf(false) }
+        val needsPin = auth?.let { it.required && !it.ok } == true
+        if (needsPin && !editingHost && !pinDismissed) {
+            PinDialog(pcName, auth?.message, onDismiss = { pinDismissed = true }) { client.login(it) }
+        }
+        if (needsPin && !editingHost && pinDismissed) {
+            TextButton({ pinDismissed = false }, Modifier.fillMaxWidth()) { Text("Solo mirando · Escribir la clave para controlar") }
+        }
         // Ojo: nada de "return" temprano dentro de Column (es inline y rompe la recomposición).
         if (editingHost) {
             SearchScreen(client) { server -> editingHost = false; onConnect(server) }

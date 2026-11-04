@@ -39,7 +39,9 @@ fun main() {
     val library = Library(baseDir).also { it.preferredBible = settingsStore.value.bible; it.reload() }
     val commands = Commands.create(library)
     val presenter = commands.presenter
-    val server = RemoteServer(commands, library)
+    // Clave para controlar desde la red: se crea sola la primera vez (se puede cambiar o quitar).
+    if (settingsStore.value.pin == null) settingsStore.update { it.copy(pin = Settings.randomPin()) }
+    val server = RemoteServer(commands, library, pin = settingsStore.pin)
     val serverError = runCatching { server.start() }.exceptionOrNull()?.let {
         "No pude abrir el puerto ${server.port} para el control remoto: ${it.message}"
     }
@@ -207,6 +209,9 @@ fun main() {
                 pcName = discovery.name,
                 firewallOk = firewallOk,
                 onAllowFirewall = allowFirewall,
+                pin = settings.activePin,
+                onNewPin = { settingsStore.update { it.copy(pin = Settings.randomPin(), pinOff = false) } },
+                onPinOff = { off -> settingsStore.update { it.copy(pinOff = off) } },
                 onClose = { connectOpen = false },
             )
         }

@@ -78,8 +78,9 @@ class ServerTest {
                     }
                 }
 
-                // al conectar llegan biblioteca, lista del culto y estado (en cualquier orden)
-                val first = listOf(next(), next(), next())
+                // al conectar llegan biblioteca, lista del culto, estado y permiso (en cualquier orden)
+                val first = List(4) { next() }
+                assertEquals(ServerMessage.Auth(required = false, ok = true), first.filterIsInstance<ServerMessage.Auth>().single())
                 val lib = first.filterIsInstance<ServerMessage.Library>().single()
                 assertEquals(2, lib.songs.size)
                 assertNotNull(first.filterIsInstance<ServerMessage.State>().singleOrNull())

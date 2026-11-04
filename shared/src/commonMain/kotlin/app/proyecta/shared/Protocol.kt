@@ -86,6 +86,10 @@ sealed interface ClientMessage {
     @Serializable @SerialName("countdown_stop")
     data object StopCountdown : ClientMessage
 
+    /** Clave de 4 números para poder controlar (si el PC la pide). Responde con ServerMessage.Auth. */
+    @Serializable @SerialName("login")
+    data class Login(val pin: String) : ClientMessage
+
     /** Mostrar un anuncio (imagen o video de la carpeta anuncios). */
     @Serializable @SerialName("media")
     data class ShowMedia(val name: String) : ClientMessage
@@ -156,6 +160,13 @@ sealed interface ServerMessage {
 
     @Serializable @SerialName("error")
     data class Error(val message: String) : ServerMessage
+
+    /**
+     * ¿Puede este dispositivo controlar? Llega al conectarse, al mandar la clave y si la clave cambia.
+     * [required] el PC pide clave; [ok] ya la dio (o no hace falta); [message] por qué no.
+     */
+    @Serializable @SerialName("auth")
+    data class Auth(val required: Boolean, val ok: Boolean, val message: String? = null) : ServerMessage
 }
 
 val ProtocolJson = Json {

@@ -55,6 +55,11 @@
   .muted { color:var(--muted); font-size:14px; }
   #toast { position:fixed; left:12px; right:12px; bottom:96px; background:#601410; color:#fff; padding:12px; border-radius:10px; display:none; }
   hr { border:0; border-top:1px solid #3a3640; margin:16px 0; }
+  #pinBox { position:fixed; inset:0; background:rgba(10,8,14,.92); display:none; align-items:center; justify-content:center; padding:20px; z-index:10; }
+  #pinBox .card { background:var(--card); border-radius:16px; padding:20px; width:100%; max-width:360px; }
+  #pinBox input { font-size:32px; text-align:center; letter-spacing:12px; margin:12px 0; }
+  #pinErr { color:var(--danger); font-size:14px; min-height:18px; }
+  #watching { display:none; margin:6px 12px 0; }
   .row.three { margin:8px 0 4px; } .row.three .btn { flex:1; }
   .link { background:none; border:0; color:var(--accent); font-size:15px; padding:8px 4px; }
   .link:disabled { opacity:.35; }
@@ -84,6 +89,16 @@
   <span style="flex:1" id="installText"></span>
   <button id="closeInstall" aria-label="Cerrar">✕</button>
 </div>
+<div id="pinBox">
+  <div class="card">
+    <h2>Clave para controlar</h2>
+    <p class="muted">Está en el computador, en «Conectar dispositivos». Se pide una sola vez.</p>
+    <input id="pinInput" type="tel" inputmode="numeric" maxlength="4" autocomplete="off" enterkeyhint="done">
+    <p id="pinErr"></p>
+    <div class="row three"><button class="btn" id="pinOk">Entrar</button><button class="btn outline" id="pinLater">Solo mirar</button></div>
+  </div>
+</div>
+<button class="btn outline small" id="watching">Solo mirando · Escribir la clave para controlar</button>
 <nav>
   <button data-tab="live" class="on">En pantalla</button>
   <button data-tab="songs">Canciones</button>
@@ -446,6 +461,42 @@ $("sendMsg").onclick = sendMsg;
 $("msg").onkeydown = (e) => { if (e.key === "Enter") sendMsg(); };
 $("clearMsg").onclick = () => { $("msg").value = ""; P.send("stage_message", { text: "" }); };
 
+// --- Clave para controlar ---
+// El QR trae la clave después del "#": se guarda y se borra de la dirección.
+const pinStore = { get: () => { try { return localStorage.getItem("pin"); } catch (e) { return null; } },
+                   set: (v) => { try { localStorage.setItem("pin", v); } catch (e) {} } };
+const hashPin = (location.hash.match(/pin=(\d{4})/) || [])[1];
+if (hashPin) { pinStore.set(hashPin); history.replaceState(null, "", location.pathname + location.search); }
+let triedSavedPin = false, pendingPin = null;
+P.on("status", () => { if (S.connected) triedSavedPin = false; });
+function askPin(message) {
+  $("pinErr").textContent = message && !/Escribe la clave/.test(message) ? message : "";
+  $("pinBox").style.display = "flex"; $("watching").style.display = "none";
+  $("pinInput").value = ""; setTimeout(() => $("pinInput").focus(), 50);
+}
+function sendPin() {
+  const v = $("pinInput").value.replace(/\D/g, "");
+  if (v.length !== 4) { $("pinErr").textContent = "Son 4 números"; return; }
+  pendingPin = v; P.send("login", { pin: v });
+}
+$("pinOk").onclick = sendPin;
+$("pinInput").onkeydown = (e) => { if (e.key === "Enter") sendPin(); };
+$("pinLater").onclick = () => { $("pinBox").style.display = "none"; $("watching").style.display = "block"; };
+$("watching").onclick = () => askPin();
+P.on("auth", (m) => {
+  if (m.ok) {
+    if (pendingPin) pinStore.set(pendingPin);
+    pendingPin = null;
+    $("pinBox").style.display = "none"; $("watching").style.display = "none";
+    return;
+  }
+  if (!m.required) return;
+  // Primero la clave guardada, sin molestar.
+  if (!triedSavedPin && pinStore.get()) { triedSavedPin = true; pendingPin = pinStore.get(); P.send("login", { pin: pendingPin }); return; }
+  triedSavedPin = true;
+  askPin(m.message);
+});
+
 // --- Abrir en la app (Android) y sugerencia de instalar (iPhone) ---
 const store = { get: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } },
                 set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
@@ -457,6 +508,11 @@ fetch("/info").then((r) => r.json()).then((i) => { pcName = i.name || ""; render
 
 if (isAndroid && !standalone && store.get("noAppBanner") !== "1") {
   // Enlace propio de la app (funciona en Chrome, Via, el navegador de Lens…): la abre ya conectada a este PC.
+  $("openApp").onpointerdown = () => {
+    // La app recibe también la clave, así no la vuelve a pedir.
+    const pin = pinStore.get();
+    $("openApp").href = "proyecta://connect?host=" + encodeURIComponent(location.hostname) + (pin ? "&pin=" + pin : "");
+  };
   $("openApp").href = "proyecta://connect?host=" + encodeURIComponent(location.hostname);
   $("openApp").onclick = () => {
     // Si a los 2 s seguimos aquí, el celular no tiene la app: avisar y seguir en la web.

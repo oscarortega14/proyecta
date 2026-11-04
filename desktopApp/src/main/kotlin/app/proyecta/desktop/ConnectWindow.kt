@@ -75,6 +75,10 @@ fun ConnectWindow(
     pcName: String,
     firewallOk: Boolean?,
     onAllowFirewall: () -> Unit,
+    /** Clave para controlar (null = sin clave). */
+    pin: String?,
+    onNewPin: () -> Unit,
+    onPinOff: (Boolean) -> Unit,
     onClose: () -> Unit,
 ) {
     var selected by remember { mutableStateOf(addresses.firstOrNull()) }
@@ -115,17 +119,24 @@ fun ConnectWindow(
                         }
                     }
 
-                    // 2. App Android
+                    // 2. Clave
+                    PinSection(pin, onNewPin, onPinOff)
+
+                    // 3. App Android
                     Section("Tablet o celular con la app Proyecta Remoto") {
-                        Text("Solo hay que abrir la app: busca sola este computador ($pcName) y se conecta. No hay que escribir nada.")
+                        Text(
+                            "Solo hay que abrir la app: busca sola este computador ($pcName) y se conecta." +
+                                if (pin != null) " La primera vez pide la clave." else " No hay que escribir nada.",
+                        )
                     }
 
                     // 3 y 4. QR
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         QrCard(
                             "Control desde el navegador",
-                            "Cualquier celular (Android o iPhone), sin instalar nada: abre la cámara y escanea.",
-                            "http://$host:$port", Modifier.weight(1f),
+                            "Cualquier celular (Android o iPhone), sin instalar nada: abre la cámara y escanea." +
+                                if (pin != null) " El código ya lleva la clave." else "",
+                            controlUrl(host, port, pin), Modifier.weight(1f),
                         )
                         QrCard(
                             "Vista de escenario",
@@ -149,6 +160,38 @@ fun ConnectWindow(
                     )
                 }
             }
+        }
+    }
+}
+
+/** Dirección del control web; con clave, va en el "#" (no viaja a la red ni queda en el historial del servidor). */
+fun controlUrl(host: String, port: Int, pin: String?): String = "http://$host:$port" + if (pin != null) "/#pin=$pin" else ""
+
+@Composable
+private fun PinSection(pin: String?, onNewPin: () -> Unit, onPinOff: (Boolean) -> Unit) {
+    Section("Clave para controlar") {
+        if (pin != null) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text(pin.toList().joinToString("  "), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Column(Modifier.weight(1f)) {
+                    Text("Sin esta clave, un celular solo puede mirar (vista de escenario, OBS), no cambiar lo que se proyecta.")
+                    Text(
+                        "Así nadie conectado al Wi-Fi de la iglesia mueve la letra por curiosidad.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onNewPin) { Text("Cambiar clave") }
+                TextButton({ onPinOff(true) }) { Text("Quitar la clave") }
+            }
+            Text(
+                "Al cambiarla, los dispositivos conectados la vuelven a pedir.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            Text("Sin clave: cualquier celular conectado a la misma red puede controlar la proyección.", color = MaterialTheme.colorScheme.error)
+            Button({ onPinOff(false) }) { Text("Poner clave") }
         }
     }
 }

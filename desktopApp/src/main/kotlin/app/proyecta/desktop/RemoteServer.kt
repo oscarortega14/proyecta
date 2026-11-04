@@ -34,7 +34,10 @@ class RemoteServer(
     private val commands: Commands,
     private val library: Library,
     val port: Int = DEFAULT_PORT,
+    /** Clave para controlar (null = no se pide). */
+    private val pin: kotlinx.coroutines.flow.StateFlow<String?> = kotlinx.coroutines.flow.MutableStateFlow(null),
 ) {
+    private val guard = PinGuard(pin)
     private val presenter get() = commands.presenter
     private val pcName: String = runCatching { java.net.InetAddress.getLocalHost().hostName }.getOrDefault("Proyecta")
     private var engine: EmbeddedServer<*, *>? = null
@@ -65,8 +68,13 @@ class RemoteServer(
             staticResources("/", "web", index = "index.html")
 
             webSocket(WS_PATH) {
+                val address = call.request.local.remoteAddress
+                // Clave con la que esta conexión se autorizó (si la clave cambia, deja de valer).
+                var granted: String? = null
+                fun auth(message: String? = null) = ServerMessage.Auth(guard.required, guard.allows(granted), message)
                 // Envía biblioteca y estado al conectarse, y luego cada vez que cambien.
                 val pushJob = launch {
+                    launch { pin.collect { send(Frame.Text(auth().encode())) } }
                     launch {
                         library.catalog.collect { c ->
                             send(Frame.Text(ServerMessage.Library(c.songs, c.bibleName, library.bible?.bookInfos().orEmpty(), c.announcements).encode()))
@@ -89,6 +97,19 @@ class RemoteServer(
                         }
                         if (msg is ClientMessage.BibleChapter) {
                             send(Frame.Text(bibleChapter(library, msg.book, msg.chapter).encode()))
+                            continue
+                        }
+                        if (msg is ClientMessage.Login) {
+                            val reply = when (val r = guard.check(address, msg.pin)) {
+                                PinGuard.Result.Ok -> { granted = pin.value; auth() }
+                                is PinGuard.Result.Wrong -> auth("Clave incorrecta (te quedan ${r.triesLeft} intentos)")
+                                is PinGuard.Result.Locked -> auth("Demasiados intentos. Espera ${r.seconds} segundos.")
+                            }
+                            send(Frame.Text(reply.encode()))
+                            continue
+                        }
+                        if (!guard.allows(granted)) {
+                            send(Frame.Text(auth("Escribe la clave para controlar").encode()))
                             continue
                         }
                         commands.handle(msg)?.let { err -> send(Frame.Text(ServerMessage.Error(err).encode())) }

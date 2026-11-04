@@ -97,6 +97,23 @@ class RemoteClient(private val scope: CoroutineScope) {
     private val _bibleChapter = MutableStateFlow<ServerMessage.BibleChapter?>(null)
     val bibleChapter: StateFlow<ServerMessage.BibleChapter?> = _bibleChapter.asStateFlow()
 
+    /** ¿Este dispositivo puede controlar? (el PC puede pedir una clave de 4 números) */
+    private val _auth = MutableStateFlow<ServerMessage.Auth?>(null)
+    val auth: StateFlow<ServerMessage.Auth?> = _auth.asStateFlow()
+
+    /** La clave guardada en este dispositivo (se manda sola al conectarse). */
+    var savedPin: () -> String? = { null }
+    /** Se llama cuando el PC aceptó una clave, para guardarla. */
+    var onPinAccepted: (String) -> Unit = {}
+    @Volatile private var triedSavedPin = false
+    @Volatile private var pendingPin: String? = null
+
+    /** Mandar la clave que escribió el usuario. */
+    fun login(pin: String) {
+        pendingPin = pin.trim()
+        queue.trySend(ClientMessage.Login(pin.trim()))
+    }
+
     private val _errors = MutableSharedFlow<String>(extraBufferCapacity = 4)
     val errors: SharedFlow<String> = _errors.asSharedFlow()
 
@@ -117,6 +134,8 @@ class RemoteClient(private val scope: CoroutineScope) {
                     http.webSocket(host = host, port = DEFAULT_PORT, path = WS_PATH) {
                         _status.value = ConnectionStatus.Connected(host)
                         failures = 0
+                        triedSavedPin = false
+                        _auth.value = null
                         // descartar órdenes que se acumularon mientras no había conexión
                         while (queue.tryReceive().isSuccess) Unit
                         val sender = launch { for (m in queue) send(Frame.Text(m.encode())) }
@@ -206,6 +225,18 @@ class RemoteClient(private val scope: CoroutineScope) {
             is ServerMessage.BibleResults -> _bibleResults.value = m
             is ServerMessage.Plan -> { _plan.value = m.plan; _savedLists.value = m.saved }
             is ServerMessage.Error -> _errors.tryEmit(m.message)
+            is ServerMessage.Auth -> {
+                if (m.ok) {
+                    pendingPin?.let(onPinAccepted)
+                    pendingPin = null
+                } else if (m.required && !triedSavedPin) {
+                    // Primero se prueba la clave guardada, sin molestar al usuario.
+                    triedSavedPin = true
+                    val saved = savedPin()
+                    if (saved != null) { pendingPin = saved; queue.trySend(ClientMessage.Login(saved)); return }
+                }
+                _auth.value = m
+            }
         }
     }
 

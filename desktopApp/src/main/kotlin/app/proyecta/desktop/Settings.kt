@@ -18,9 +18,18 @@ data class Settings(
     val welcomeDone: Boolean = false,
     /** Versión nueva que el usuario pidió no volver a avisar. */
     val skippedUpdate: String? = null,
+    /** Clave de 4 números para controlar desde celulares y tablets (null = todavía no se creó). */
+    val pin: String? = null,
+    /** El operador quitó la clave a propósito: cualquiera en la red puede controlar. */
+    val pinOff: Boolean = false,
 ) {
+    /** La clave que se exige ahora (null = no se pide). */
+    val activePin: String? get() = pin?.takeIf { !pinOff }
+
     companion object {
         const val WINDOWED = "ventana"
+
+        fun randomPin(): String = (java.security.SecureRandom().nextInt(9000) + 1000).toString()
     }
 }
 
@@ -29,10 +38,15 @@ class SettingsStore(private val file: File) {
     val settings: StateFlow<Settings> = _settings.asStateFlow()
     val value: Settings get() = _settings.value
 
+    private val _pin = MutableStateFlow(_settings.value.activePin)
+    /** Clave en uso (para el servidor de los remotos). */
+    val pin: StateFlow<String?> = _pin.asStateFlow()
+
     fun update(f: (Settings) -> Settings) {
         val new = f(_settings.value)
         if (new == _settings.value) return
         _settings.value = new
+        _pin.value = new.activePin
         runCatching {
             file.parentFile?.mkdirs()
             file.writeText(ProtocolJson.encodeToString(Settings.serializer(), new), Charsets.UTF_8)

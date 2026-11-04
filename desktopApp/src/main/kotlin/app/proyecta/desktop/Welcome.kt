@@ -49,7 +49,8 @@ val WELCOME_STEPS = listOf(
     WelcomeStep(
         "Desde el celular o la tablet",
         "En \"Conectar dispositivos\" hay un código QR: escanéalo con la cámara del celular y tendrás el control en el navegador " +
-            "(en iPhone se puede agregar a la pantalla de inicio). En Android también está la app Proyecta Remoto, que encuentra este computador sola.",
+            "(en iPhone se puede agregar a la pantalla de inicio). En Android también está la app Proyecta Remoto, que encuentra este computador sola.\n\n" +
+            "Para controlar se pide una clave de 4 números que está ahí mismo (el QR ya la trae): así nadie más en el Wi-Fi mueve la letra.",
     ),
     WelcomeStep(
         "Últimos detalles",
