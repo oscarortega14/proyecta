@@ -84,6 +84,9 @@ fun OperatorScreen(
     onOpenConnect: () -> Unit,
     onOpenHistory: () -> Unit = {},
     onOpenWelcome: () -> Unit = {},
+    /** Versión nueva disponible (null = ninguna). */
+    updateVersion: String? = null,
+    onOpenUpdate: () -> Unit = {},
     /** Última vez que se cantó cada canción (id → fecha). */
     lastSung: Map<String, java.time.LocalDate> = emptyMap(),
     searchBible: (String) -> Pair<List<BibleHit>, Int>?,
@@ -116,6 +119,8 @@ fun OperatorScreen(
                 onOpenBackgrounds = onOpenBackgrounds,
                 onOpenConnect = onOpenConnect,
                 onOpenHistory = onOpenHistory,
+                updateVersion = updateVersion,
+                onOpenUpdate = onOpenUpdate,
                 onHelp = { helpOpen = true },
             )
             HorizontalDivider()
@@ -155,6 +160,8 @@ private fun TopBar(
     onOpenBackgrounds: () -> Unit,
     onOpenConnect: () -> Unit,
     onOpenHistory: () -> Unit,
+    updateVersion: String?,
+    onOpenUpdate: () -> Unit,
     onHelp: () -> Unit,
 ) {
     Row(
@@ -170,6 +177,11 @@ private fun TopBar(
             maxLines = 1, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f).padding(horizontal = 16.dp),
         )
+        updateVersion?.let { v ->
+            Button(onOpenUpdate, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)) {
+                Text("Nueva versión $v")
+            }
+        }
         OutlinedButton(onOpenHistory) { Text("Historial") }
         OutlinedButton(onOpenBackgrounds) { Text("Fondos y letra") }
         OutlinedButton(onOpenConnect) {

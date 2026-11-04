@@ -13,6 +13,9 @@ kotlin { jvmToolchain(17) }
 
 val ktor = "3.0.1"
 
+/** Versión de Proyecta: va al instalador y a la app (para avisar cuando hay una más nueva). */
+val appVersion = "1.9.0"
+
 dependencies {
     implementation(project(":shared"))
     implementation(compose.desktop.currentOs)
@@ -40,11 +43,12 @@ val writeBuildConfig by tasks.registering {
     val keyFile = layout.projectDirectory.file("pixabay.key").asFile
     val key = (System.getenv("PIXABAY_KEY") ?: keyFile.takeIf { it.exists() }?.readText())?.trim().orEmpty()
     inputs.property("pixabayKeyHash", key.hashCode())
+    inputs.property("appVersion", appVersion)
     outputs.dir(generatedResources)
     doLast {
         val f = generatedResources.get().file("proyecta-build.properties").asFile
         f.parentFile.mkdirs()
-        f.writeText("pixabay.key=$key\n")
+        f.writeText("pixabay.key=$key\nversion=$appVersion\n")
     }
 }
 sourceSets.main { resources.srcDir(writeBuildConfig) }
@@ -97,7 +101,7 @@ compose.desktop {
             appResourcesRootDir.set(appResources)
             targetFormats(TargetFormat.Msi, TargetFormat.Deb)
             packageName = "Proyecta"
-            packageVersion = "1.9.0"
+            packageVersion = appVersion
             description = "Proyección de canciones y Biblia con control remoto"
             vendor = "Proyecta"
             copyright = "MIT License"

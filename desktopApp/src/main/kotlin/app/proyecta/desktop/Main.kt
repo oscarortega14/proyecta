@@ -69,6 +69,14 @@ fun main() {
         var backgroundsOpen by remember { mutableStateOf(false) }
         var connectOpen by remember { mutableStateOf(false) }
         var historyOpen by remember { mutableStateOf(false) }
+        // Actualizaciones: se pregunta a GitHub un rato después de abrir (sin estorbar el arranque).
+        var release by remember { mutableStateOf<Release?>(null) }
+        var updateOpen by remember { mutableStateOf(false) }
+        LaunchedEffect(Unit) {
+            kotlinx.coroutines.delay(15_000)
+            release = Updater.latest()
+        }
+        val offerUpdate = Updater.shouldOffer(release, Updater.currentVersion, settings.skippedUpdate)
         val historyEntries by commands.history!!.entries.collectAsState()
         val lastSung = remember(historyEntries) { commands.history!!.lastSung() }
         // Firewall de Windows: se revisa al abrir; si falta la regla se ofrece crearla con un clic.
@@ -119,6 +127,8 @@ fun main() {
                     onOpenBackgrounds = { backgroundsOpen = true },
                     onOpenConnect = { connectOpen = true },
                     onOpenHistory = { historyOpen = true },
+                    updateVersion = release?.version?.takeIf { offerUpdate },
+                    onOpenUpdate = { updateOpen = true },
                     onOpenWelcome = { settingsStore.update { it.copy(welcomeDone = false) } },
                     lastSung = lastSung,
                     searchBible = { q -> library.bible?.search(q) },
@@ -134,6 +144,14 @@ fun main() {
                 // La primera vez: guía corta. Después del aviso del firewall, para no encimar ventanas.
                 if (!settings.welcomeDone && !askFirewall) {
                     WelcomeDialog(onDone = { settingsStore.update { it.copy(welcomeDone = true) } })
+                }
+                if (updateOpen && offerUpdate) {
+                    UpdateDialog(
+                        release!!,
+                        onLater = { updateOpen = false },
+                        onSkip = { updateOpen = false; settingsStore.update { it.copy(skippedUpdate = release!!.version) } },
+                        onExitForInstall = { server.stop(); discovery.stop(); exitApplication() },
+                    )
                 }
                 if (confirmProjectorOff) {
                     AlertDialog(
