@@ -528,5 +528,6 @@ private fun MoreTab(state: PresentationState, announcements: List<String>, sermo
                 )
             }
         }
+        item { PreacherTimer(state, serverOffset, send) }
     }
 }

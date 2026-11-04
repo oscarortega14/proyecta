@@ -179,6 +179,15 @@
     </div>
     <p class="muted" id="cdNow"></p>
     <hr>
+    <h2>Tiempo del predicador</h2>
+    <p class="muted">Se ve solo en la vista de escenario.</p>
+    <div class="row">
+      <input id="tmMin" type="text" inputmode="numeric" value="30" style="width:80px">
+      <button class="btn" id="tmStart" style="flex:1">Iniciar</button>
+      <button class="btn outline" id="tmStop">Detener</button>
+    </div>
+    <p class="muted" id="tmNow"></p>
+    <hr>
     <h2>Mensaje al escenario</h2>
     <p class="muted">Lo ven los músicos en la vista de escenario; no sale en el videobeam.</p>
     <input id="msg" type="text" placeholder="Ej. Repetir coro · 2 minutos" enterkeyhint="send">
@@ -476,6 +485,15 @@ $("alertText").onkeydown = (e) => { if (e.key === "Enter") sendAlert(); };
 $("clearAlert").onclick = () => { $("alertText").value = ""; P.send("alert", { text: "" }); };
 $("cdStart").onclick = () => { const m = parseInt($("cdMin").value, 10); if (m > 0) P.send("countdown_start", { seconds: m * 60, text: $("cdText").value }); };
 $("cdStop").onclick = () => P.send("countdown_stop");
+$("tmStart").onclick = () => P.send("timer_start", { minutes: parseInt($("tmMin").value, 10) || 0 });
+$("tmStop").onclick = () => P.send("timer_stop");
+setInterval(() => {
+  const st = S.state;
+  if (st.timerStart == null) { $("tmNow").textContent = ""; return; }
+  const el = Math.max(0, Math.floor((Date.now() + S.serverOffset - st.timerStart) / 1000));
+  const left = st.timerMinutes > 0 ? st.timerMinutes * 60 - el : null;
+  $("tmNow").textContent = "Lleva " + P.formatClock(el) + (left == null ? "" : left >= 0 ? " · quedan " + P.formatClock(left) : " · se pasó " + P.formatClock(-left));
+}, 1000);
 const sendMsg = () => P.send("stage_message", { text: $("msg").value });
 $("sendMsg").onclick = sendMsg;
 $("msg").onkeydown = (e) => { if (e.key === "Enter") sendMsg(); };

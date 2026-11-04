@@ -86,6 +86,13 @@ sealed interface ClientMessage {
     @Serializable @SerialName("countdown_stop")
     data object StopCountdown : ClientMessage
 
+    /** Temporizador del predicador (solo en la vista de escenario). [minutes] 0 = sin límite. */
+    @Serializable @SerialName("timer_start")
+    data class StartTimer(val minutes: Int) : ClientMessage
+
+    @Serializable @SerialName("timer_stop")
+    data object StopTimer : ClientMessage
+
     /** Clave de 4 números para poder controlar (si el PC la pide). Responde con ServerMessage.Auth. */
     @Serializable @SerialName("login")
     data class Login(val pin: String) : ClientMessage

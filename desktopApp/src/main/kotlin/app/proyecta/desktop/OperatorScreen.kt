@@ -33,6 +33,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -443,6 +444,7 @@ private fun LivePanel(state: PresentationState, modifier: Modifier, send: (Clien
         "alerta".takeIf { state.alert.isNotEmpty() },
         "cuenta regresiva".takeIf { state.countdownEnd != null },
         "mensaje".takeIf { state.stageMessage.isNotEmpty() },
+        "tiempo del predicador".takeIf { state.timerStart != null },
     )
     Column(modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("En pantalla", style = MaterialTheme.typography.titleMedium)
@@ -482,6 +484,8 @@ private fun LivePanel(state: PresentationState, modifier: Modifier, send: (Clien
             AlertBox(state.alert, send)
             HorizontalDivider()
             CountdownBox(state, send)
+            HorizontalDivider()
+            PreacherTimerBox(state, send)
             HorizontalDivider()
             StageMessageBox(state.stageMessage, send)
         }
@@ -790,5 +794,37 @@ private fun HelpMenu(onShortcuts: () -> Unit, onWelcome: () -> Unit, onBackups: 
             HorizontalDivider()
             Text("Proyecta ${Updater.currentVersion}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
         }
+    }
+}
+
+/** Tiempo del predicador: lo ve solo él (y los músicos) en la vista de escenario. */
+@Composable
+private fun PreacherTimerBox(state: PresentationState, send: (ClientMessage) -> Unit) {
+    var minutes by remember { mutableStateOf("30") }
+    val now by produceState(System.currentTimeMillis(), state.timerStart) {
+        while (state.timerStart != null) { value = System.currentTimeMillis(); kotlinx.coroutines.delay(500) }
+    }
+    Text("Tiempo del predicador", style = MaterialTheme.typography.titleSmall)
+    Text("Se ve solo en la vista de escenario, no en el videobeam.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        OutlinedTextField(
+            minutes, { v -> minutes = v.filter { it.isDigit() }.take(3) },
+            label = { Text("Min.") }, singleLine = true, modifier = Modifier.width(80.dp).marksTyping(),
+        )
+        Button({ send(ClientMessage.StartTimer(minutes.toIntOrNull() ?: 0)) }, Modifier.weight(1f)) {
+            Text(if (state.timerStart != null) "Reiniciar" else "Iniciar")
+        }
+        OutlinedButton({ send(ClientMessage.StopTimer) }, enabled = state.timerStart != null) { Text("Detener") }
+    }
+    state.timerElapsed(now)?.let { elapsed ->
+        val left = state.timerLeft(now)
+        Text(
+            "Lleva ${app.proyecta.shared.formatClock(elapsed)}" + when {
+                left == null -> ""
+                left >= 0 -> " · quedan ${app.proyecta.shared.formatClock(left)}"
+                else -> " · se pasó ${app.proyecta.shared.formatClock(-left)}"
+            },
+            color = if (left != null && left < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+        )
     }
 }

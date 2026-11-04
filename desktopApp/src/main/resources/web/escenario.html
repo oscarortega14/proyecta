@@ -26,6 +26,11 @@
   #nextLbl { color:#555; font-size:2.4vh; text-transform:uppercase; letter-spacing:.1em; }
   #cd { display:none; text-align:center; font-size:12vh; font-weight:700; font-variant-numeric:tabular-nums; color:#80deea; }
   #alert { display:none; background:#b71c1c; color:#fff; font-size:3.5vh; text-align:center; padding:.6vh 1vw; border-radius:8px; }
+  #timer { display:none; align-items:baseline; justify-content:center; gap:3vw; font-variant-numeric:tabular-nums; font-weight:700; }
+  #timer .big { font-size:11vh; }
+  #timer .small { font-size:4vh; color:#aaa; font-weight:600; }
+  #timer.warn .big { color:#ffd54f; }
+  #timer.over .big { color:#ff5252; }
   #status { position:fixed; right:1vw; bottom:1vh; color:#c62828; font-size:2vh; }
 </style>
 </head>
@@ -34,6 +39,7 @@
 <div id="msg"></div>
 <div id="alert"></div>
 <div id="cd"></div>
+<div id="timer"><span class="small" id="timerLbl"></span><span class="big" id="timerBig"></span><span class="small" id="timerSub"></span></div>
 <div id="current"></div>
 <div id="nextLbl">Sigue</div>
 <div id="next"></div>
@@ -68,6 +74,7 @@ function render() {
   $("alert").textContent = st.alert ? "Alerta en pantalla: " + st.alert : "";
   $("alert").style.display = st.alert ? "block" : "none";
   renderCountdown();
+  renderTimer();
   fit($("current"), 9);
   fit($("next"), 5);
 }
@@ -79,8 +86,28 @@ function renderCountdown() {
   if (on) $("cd").textContent = (S.state.countdownText ? S.state.countdownText + " " : "") + P.formatClock(left);
 }
 
+// Tiempo del predicador: grande lo que queda (o lo que lleva si no hay límite); amarillo los últimos 5 min, rojo al pasarse.
+function renderTimer() {
+  const st = S.state, box = $("timer");
+  if (st.timerStart == null) { box.style.display = "none"; return; }
+  const now = Date.now() + S.serverOffset;
+  const elapsed = Math.max(0, Math.floor((now - st.timerStart) / 1000));
+  box.style.display = "flex";
+  if (st.timerMinutes > 0) {
+    const left = st.timerMinutes * 60 - elapsed;
+    box.className = left < 0 ? "over" : left <= 300 ? "warn" : "";
+    $("timerLbl").textContent = left < 0 ? "Se pasó" : "Quedan";
+    $("timerBig").textContent = (left < 0 ? "+" : "") + P.formatClock(Math.abs(left));
+    $("timerSub").textContent = "lleva " + P.formatClock(elapsed);
+  } else {
+    box.className = "";
+    $("timerLbl").textContent = "Lleva"; $("timerBig").textContent = P.formatClock(elapsed); $("timerSub").textContent = "";
+  }
+}
+
 function tick() {
   renderCountdown();
+  renderTimer();
   const d = new Date();
   $("clock").textContent = d.toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
 }

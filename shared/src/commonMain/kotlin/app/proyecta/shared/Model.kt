@@ -45,7 +45,17 @@ data class PresentationState(
     val media: String? = null,
     /** Predicación en pantalla (songId es el id de la predicación): las etiquetas salen como encabezado. */
     val sermon: Boolean = false,
+    /** Temporizador del predicador: cuándo empezó (hora del PC) o null. Solo se ve en la vista de escenario. */
+    val timerStart: Long? = null,
+    /** Minutos que tiene el predicador (0 = sin límite, solo cuenta hacia arriba). */
+    val timerMinutes: Int = 0,
 ) {
+    /** Segundos que lleva el predicador, o null si el temporizador no está andando. */
+    fun timerElapsed(now: Long): Long? = timerStart?.let { ((now - it) / 1000).coerceAtLeast(0) }
+
+    /** Segundos que le quedan (negativo = se pasó), o null si no hay límite o no está andando. */
+    fun timerLeft(now: Long): Long? = timerElapsed(now)?.takeIf { timerMinutes > 0 }?.let { timerMinutes * 60L - it }
+
     /** Segundos que faltan de la cuenta regresiva (0 si terminó), o null si no hay. */
     fun countdownSeconds(now: Long): Long? = countdownEnd?.let { ((it - now + 999) / 1000).coerceAtLeast(0) }
 

@@ -37,6 +37,11 @@ class Presenter(
         is ClientMessage.SetAlert -> { _state.update { it.copy(alert = msg.text.trim()) }; null }
         is ClientMessage.StartCountdown -> startCountdown(msg.seconds, msg.text)
         ClientMessage.StopCountdown -> { _state.update { it.copy(countdownEnd = null, countdownText = "") }; null }
+        is ClientMessage.StartTimer -> {
+            if (msg.minutes !in 0..600) "El tiempo debe ser de 0 a 600 minutos"
+            else { _state.update { it.copy(timerStart = clock(), timerMinutes = msg.minutes) }; null }
+        }
+        ClientMessage.StopTimer -> { _state.update { it.copy(timerStart = null, timerMinutes = 0) }; null }
         // Las órdenes de la lista del culto las atiende ServicePlan (ver Commands).
         else -> "Orden no soportada aquí"
     }
@@ -124,6 +129,8 @@ class Presenter(
         alert = alert,
         countdownEnd = countdownEnd,
         countdownText = countdownText,
+        timerStart = timerStart,
+        timerMinutes = timerMinutes,
         logo = false,
     )
 }
