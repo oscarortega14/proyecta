@@ -66,4 +66,39 @@ class VideoBackgroundsTest {
             VideoBackgrounds.release(file)
         }
     }
+
+    /**
+     * Estrés (antes la app se caía al dibujar un cuadro ya liberado): el video real con VLC dibujado
+     * a la vez como videobeam (30 cps) y miniatura (10 cps), redibujando a 60 por segundo.
+     *   PROYECTA_VIDEO=… PROYECTA_STRESS_SECONDS=120 gradlew.bat :desktopApp:test --tests '*VideoBackgroundsTest*'
+     */
+    @Test
+    fun stressDrawingWhileVideoPlays() {
+        val path = System.getenv("PROYECTA_VIDEO") ?: return
+        val seconds = System.getenv("PROYECTA_STRESS_SECONDS")?.toLongOrNull() ?: return
+        val file = File(path)
+        lateinit var scene: ImageComposeScene
+        javax.swing.SwingUtilities.invokeAndWait {
+            scene = ImageComposeScene(960, 540, Density(1f)) {
+                androidx.compose.foundation.layout.Row {
+                    VideoBackground(file, androidx.compose.ui.Modifier.weight(2f), maxFps = 30)
+                    VideoBackground(file, androidx.compose.ui.Modifier.weight(1f), maxFps = 10)
+                }
+            }
+        }
+        val start = System.currentTimeMillis()
+        var frames = 0
+        var lastSeq = -1L
+        var distinct = 0
+        while (System.currentTimeMillis() - start < seconds * 1000) {
+            javax.swing.SwingUtilities.invokeAndWait {
+                scene.render((System.currentTimeMillis() - start) * 1_000_000)
+            }
+            frames++
+            Thread.sleep(16)
+        }
+        javax.swing.SwingUtilities.invokeAndWait { scene.close() }
+        val rt = Runtime.getRuntime()
+        println("ESTRES OK: $frames dibujos en $seconds s, memoria Java usada ${(rt.totalMemory() - rt.freeMemory()) / 1_048_576} MB")
+    }
 }

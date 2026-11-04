@@ -2,6 +2,11 @@ package app.proyecta.desktop
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.fillMaxSize
+import com.sun.jna.Pointer
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -96,23 +101,40 @@ object VideoBackgrounds {
     }
 }
 
-/** Un video reproduciéndose en bucle, sin sonido; cada cuadro nuevo se publica en [frame]. */
+/** Un cuadro listo para dibujar. [seq] cambia en cada cuadro para que la pantalla se redibuje. */
+class VideoFrame(val image: ImageBitmap, val width: Int, val height: Int, val seq: Long)
+
 /**
  * Separación mínima entre cuadros: 24 ms. Un video de 24/25/30 cuadros (33-41 ms entre cuadros) pasa
  * completo aunque un cuadro llegue un poco antes; uno de 60 queda en 30 parejos (se toma uno sí, uno no).
  */
 private const val MIN_FRAME_NANOS = 24_000_000L
 
+/** Imágenes que se reutilizan en ronda. Ninguna se libera mientras el video suena. */
+private const val POOL_SIZE = 6
+
+/**
+ * Un video reproduciéndose en bucle, sin sonido; cada cuadro nuevo se publica en [frame].
+ *
+ * Memoria: hay un grupo fijo de [POOL_SIZE] imágenes que se reutilizan en ronda y que solo se
+ * liberan al cerrar el video. Así nunca se dibuja una imagen ya liberada (eso hacía caer la app)
+ * y no se crea ni destruye memoria en cada cuadro. Los píxeles se copian en el hilo de la interfaz,
+ * el mismo que dibuja, así nunca se lee una imagen a medio escribir.
+ */
 class VideoLoop(file: File, factory: MediaPlayerFactory, maxWidth: Int) : AutoCloseable {
-    val frame: MutableState<ImageBitmap?> = mutableStateOf(null)
+    val frame: MutableState<VideoFrame?> = mutableStateOf(null)
 
     private val player: EmbeddedMediaPlayer = factory.mediaPlayers().newEmbeddedMediaPlayer()
     @Volatile private var info: ImageInfo? = null
     @Volatile private var bytes = ByteArray(0)
     private val pending = AtomicBoolean(false)
     @Volatile private var lastFrameNanos = 0L
-    /** Cuadros ya reemplazados, que se liberan un par de cuadros después (por si aún se están dibujando). */
-    private val retired = ArrayDeque<Bitmap>()
+    @Volatile private var closed = false
+
+    // Solo se tocan en el hilo de la interfaz (EDT).
+    private var pool: List<Pair<Bitmap, ImageBitmap>> = emptyList()
+    private var next = 0
+    private var seq = 0L
 
     init {
         val format = object : BufferFormatCallbackAdapter() {
@@ -130,27 +152,19 @@ class VideoLoop(file: File, factory: MediaPlayerFactory, maxWidth: Int) : AutoCl
             // Videos de 60 cuadros se reducen a 30 parejos; los de hasta 30 pasan completos.
             val now = System.nanoTime()
             if (now - lastFrameNanos < MIN_FRAME_NANOS) return@RenderCallback
-            lastFrameNanos = now
-            // Si la pantalla todavía no dibujó el cuadro anterior, se descarta este (no se acumula trabajo).
+            // Si la pantalla todavía no tomó el cuadro anterior, se descarta este (no se acumula trabajo).
             if (!pending.compareAndSet(false, true)) return@RenderCallback
+            lastFrameNanos = now
             val buf = buffers[0]
             buf.rewind()
             val dst = bytes
             buf.get(dst, 0, min(dst.size, buf.remaining()))
-            // Un solo mapa de bits por cuadro (sin copias intermedias), que se libera a mano después.
-            val bitmap = Bitmap()
-            if (!bitmap.installPixels(i, dst, i.width * 4)) {
-                bitmap.close(); pending.set(false); return@RenderCallback
-            }
-            bitmap.setImmutable()
-            val image = bitmap.asComposeImageBitmap()
             SwingUtilities.invokeLater {
-                if (closed) { bitmap.close(); return@invokeLater }
-                frame.value = image
-                retired.addLast(bitmap)
-                // Liberar de inmediato la memoria de los cuadros viejos en vez de esperar al recolector de Java.
-                while (retired.size > 3) retired.removeFirst().close()
-                pending.set(false)
+                try {
+                    if (!closed) publish(i, dst)
+                } finally {
+                    pending.set(false)
+                }
             }
         }
         player.videoSurface().set(factory.videoSurfaces().newVideoSurface(format, render, true))
@@ -158,7 +172,30 @@ class VideoLoop(file: File, factory: MediaPlayerFactory, maxWidth: Int) : AutoCl
         player.media().play(file.absolutePath, ":no-audio", ":input-repeat=65535")
     }
 
-    @Volatile private var closed = false
+    /** En el EDT: copia el cuadro a la siguiente imagen del grupo y lo publica. */
+    private fun publish(i: ImageInfo, pixels: ByteArray) {
+        if (pool.isEmpty() || pool[0].first.width != i.width || pool[0].first.height != i.height) {
+            // Primer cuadro (o cambió el tamaño): se crea el grupo. El anterior se libera más tarde.
+            val old = pool
+            pool = List(POOL_SIZE) {
+                val b = Bitmap()
+                check(b.allocPixels(i)) { "No pude reservar memoria para el video" }
+                b to b.asComposeImageBitmap()
+            }
+            releaseLater(old.map { it.first })
+        }
+        val (bitmap, image) = pool[next]
+        next = (next + 1) % pool.size
+        val pixmap = bitmap.peekPixels() ?: return
+        val rowBytes = i.width * 4
+        if (pixmap.rowBytes == rowBytes) {
+            Pointer(pixmap.addr).write(0L, pixels, 0, min(pixels.size, rowBytes * i.height))
+        } else {
+            for (y in 0 until i.height) Pointer(pixmap.addr).write(y.toLong() * pixmap.rowBytes, pixels, y * rowBytes, rowBytes)
+        }
+        bitmap.notifyPixelsChanged()
+        frame.value = VideoFrame(image, i.width, i.height, ++seq)
+    }
 
     override fun close() {
         closed = true
@@ -166,8 +203,15 @@ class VideoLoop(file: File, factory: MediaPlayerFactory, maxWidth: Int) : AutoCl
         runCatching { player.release() }
         SwingUtilities.invokeLater {
             frame.value = null
-            while (retired.isNotEmpty()) retired.removeFirst().close()
+            releaseLater(pool.map { it.first })
+            pool = emptyList()
         }
+    }
+
+    /** Libera imágenes un par de segundos después, cuando ya nadie puede estar dibujándolas. */
+    private fun releaseLater(bitmaps: List<Bitmap>) {
+        if (bitmaps.isEmpty()) return
+        javax.swing.Timer(3_000) { bitmaps.forEach { it.close() } }.apply { isRepeats = false; start() }
     }
 }
 
@@ -189,6 +233,18 @@ fun VideoBackground(file: File, modifier: Modifier = Modifier, maxFps: Int = 30)
             if (now - last >= minGap || shown.value == null) { shown.value = f; last = now }
         }
     }
-    val img = shown.value ?: return
-    Image(img, contentDescription = null, modifier = modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+    Canvas(modifier.fillMaxSize()) {
+        val f = shown.value ?: return@Canvas
+        // Recortar para llenar (como ContentScale.Crop), centrado.
+        val scale = maxOf(size.width / f.width, size.height / f.height)
+        val srcW = (size.width / scale).roundToInt().coerceIn(1, f.width)
+        val srcH = (size.height / scale).roundToInt().coerceIn(1, f.height)
+        drawImage(
+            f.image,
+            srcOffset = IntOffset((f.width - srcW) / 2, (f.height - srcH) / 2),
+            srcSize = IntSize(srcW, srcH),
+            dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt()),
+            filterQuality = FilterQuality.Medium,
+        )
+    }
 }
