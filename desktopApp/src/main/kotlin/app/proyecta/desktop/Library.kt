@@ -296,6 +296,9 @@ class Library(val baseDir: File) {
         return n
     }
 
+    /** Lo que ocupa la carpeta de anuncios. */
+    fun announcementsBytes(): Long = announcementsDir.listFiles().orEmpty().sumOf { it.length() }
+
     @Synchronized
     fun refreshAnnouncements() {
         _catalog.value = _catalog.value.copy(announcements = scanAnnouncements())

@@ -77,7 +77,7 @@ fun ConnectWindow(
     onAllowFirewall: () -> Unit,
     /** Clave para controlar (null = sin clave). */
     pin: String?,
-    onNewPin: () -> Unit,
+    onNewPin: (digits: Int) -> Unit,
     onPinOff: (Boolean) -> Unit,
     onClose: () -> Unit,
 ) {
@@ -168,7 +168,7 @@ fun ConnectWindow(
 fun controlUrl(host: String, port: Int, pin: String?): String = "http://$host:$port" + if (pin != null) "/#pin=$pin" else ""
 
 @Composable
-private fun PinSection(pin: String?, onNewPin: () -> Unit, onPinOff: (Boolean) -> Unit) {
+private fun PinSection(pin: String?, onNewPin: (Int) -> Unit, onPinOff: (Boolean) -> Unit) {
     Section("Clave para controlar") {
         if (pin != null) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -182,7 +182,9 @@ private fun PinSection(pin: String?, onNewPin: () -> Unit, onPinOff: (Boolean) -
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onNewPin) { Text("Cambiar clave") }
+                OutlinedButton({ onNewPin(pin.length) }) { Text("Cambiar clave") }
+                if (pin.length < 6) OutlinedButton({ onNewPin(6) }) { Text("Clave más segura (6 números)") }
+                else TextButton({ onNewPin(4) }) { Text("Volver a 4 números") }
                 TextButton({ onPinOff(true) }) { Text("Quitar la clave") }
             }
             Text(

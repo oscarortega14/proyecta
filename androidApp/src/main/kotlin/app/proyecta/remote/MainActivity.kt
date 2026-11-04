@@ -79,10 +79,12 @@ class MainActivity : ComponentActivity() {
         if (uri.scheme != "proyecta" || uri.host != "connect") return
         val host = uri.getQueryParameter("host")?.trim().orEmpty()
         // El control web pasa también la clave que ya tiene, así la app no la pide otra vez.
-        uri.getQueryParameter("pin")?.trim()?.takeIf { it.matches(Regex("""\d{4}""")) }?.let { pin ->
-            getSharedPreferences("proyecta", Context.MODE_PRIVATE).edit().putString("pin", pin).apply()
+        if (!host.matches(Regex("""^[0-9A-Za-z.\-:]{1,64}$"""))) return
+        uri.getQueryParameter("pin")?.trim()?.takeIf { it.matches(Regex("""\d{4,6}""")) }?.let { pin ->
+            // La clave del enlace vale solo para ese mismo computador.
+            getSharedPreferences("proyecta", Context.MODE_PRIVATE).edit().putString("pin", pin).putString("pinHost", host).apply()
         }
-        if (host.matches(Regex("""^[0-9A-Za-z.\-:]{1,64}$"""))) linkHost.value = host
+        linkHost.value = host
     }
 
     override fun onNewIntent(intent: android.content.Intent) {
@@ -97,8 +99,13 @@ class MainActivity : ComponentActivity() {
 
         val prefs = getSharedPreferences("proyecta", Context.MODE_PRIVATE)
         client = RemoteClient(lifecycleScope)
-        client.savedPin = { prefs.getString("pin", null) }
-        client.onPinAccepted = { pin -> prefs.edit().putString("pin", pin).apply() }
+        // La clave se manda sola solo al computador donde se aceptó.
+        // (Las versiones anteriores no guardaban de qué computador era: vale para el que ya estaba guardado.)
+        client.savedPin = { host ->
+            val pinHost = prefs.getString("pinHost", null) ?: prefs.getString("host", null)
+            prefs.getString("pin", null)?.takeIf { pinHost == host }
+        }
+        client.onPinAccepted = { host, pin -> prefs.edit().putString("pin", pin).putString("pinHost", host).apply() }
         readLink(intent)
         prefs.getString("host", null)?.let { client.connect(it) }
         client.onHostChanged = { host -> prefs.edit().putString("host", host).apply() }

@@ -29,6 +29,7 @@ import io.ktor.server.websocket.timeout
 import io.ktor.server.websocket.webSocket
 import io.ktor.websocket.Frame
 import io.ktor.websocket.readText
+import io.ktor.websocket.close
 import kotlinx.coroutines.launch
 import java.net.Inet4Address
 import java.net.NetworkInterface
@@ -59,6 +60,8 @@ class RemoteServer(
     private fun Application.module() {
         install(WebSockets) {
             pingPeriod = 15.seconds
+            // Nadie manda mensajes grandes: uno gigante solo serviría para llenar la memoria.
+            maxFrameSize = NetGuard.MAX_FRAME_BYTES
             timeout = 30.seconds
         }
         routing {
@@ -72,6 +75,10 @@ class RemoteServer(
             // Subir un anuncio (foto o video) desde el celular: POST /anuncios?nombre=foto.jpg con la clave en X-Proyecta-Pin.
             post("/anuncios") {
                 val address = call.request.local.remoteAddress
+                if (!NetGuard.trusted(call.request.headers["Host"], call.request.headers["Origin"], pcName)) {
+                    call.respondText("No permitido", status = HttpStatusCode.Forbidden)
+                    return@post
+                }
                 if (guard.required) {
                     val attempt = call.request.headers["X-Proyecta-Pin"].orEmpty()
                     if (guard.check(address, attempt) != PinGuard.Result.Ok) {
@@ -108,6 +115,10 @@ class RemoteServer(
                         }
                     }
                     if (total == 0L) { call.respondText("Llegó vacío", status = HttpStatusCode.BadRequest); return@post }
+                    if (library.announcementsBytes() + total > MAX_ANNOUNCEMENTS_BYTES) {
+                        call.respondText("La carpeta de anuncios está llena (máximo ${MAX_ANNOUNCEMENTS_BYTES / 1_000_000_000} GB). Borra algunos en el computador.", status = HttpStatusCode.InsufficientStorage)
+                        return@post
+                    }
                     library.addAnnouncements(listOf(tmp))
                     call.respondText(ProtocolJson.encodeToString(kotlinx.serialization.json.JsonObject.serializer(),
                         kotlinx.serialization.json.buildJsonObject { put("ok", kotlinx.serialization.json.JsonPrimitive(true)); put("nombre", kotlinx.serialization.json.JsonPrimitive(name)) }),
@@ -121,6 +132,16 @@ class RemoteServer(
 
             webSocket(WS_PATH) {
                 val address = call.request.local.remoteAddress
+                // Solo nuestras páginas y la app (no sitios ajenos ni DNS rebinding), y pocas conexiones por dispositivo.
+                if (!NetGuard.trusted(call.request.headers["Host"], call.request.headers["Origin"], pcName)) {
+                    close(io.ktor.websocket.CloseReason(io.ktor.websocket.CloseReason.Codes.VIOLATED_POLICY, "Origen no permitido"))
+                    return@webSocket
+                }
+                if (!NetGuard.acquire(address)) {
+                    close(io.ktor.websocket.CloseReason(io.ktor.websocket.CloseReason.Codes.TRY_AGAIN_LATER, "Demasiadas conexiones"))
+                    return@webSocket
+                }
+                val limiter = NetGuard.RateLimiter()
                 // Clave con la que esta conexión se autorizó (si la clave cambia, deja de valer).
                 var granted: String? = null
                 // ¿Este remoto entiende State.keepSlides? (lo dice en Hello). Y qué diapositivas tiene ya.
@@ -151,7 +172,9 @@ class RemoteServer(
                 try {
                     for (frame in incoming) {
                         if (frame !is Frame.Text) continue
-                        val msg = runCatching { decodeClientMessage(frame.readText()) }.getOrNull() ?: continue
+                        val msg = runCatching { decodeClientMessage(frame.readText()) }.getOrNull()?.let(NetGuard::clamp) ?: continue
+                        // Demasiadas órdenes seguidas: se ignoran (nadie toca 20 veces por segundo).
+                        if (!limiter.allow(msg)) continue
                         if (msg is ClientMessage.BibleSearch) {
                             // La respuesta va solo a quien buscó.
                             send(Frame.Text(bibleSearch(library, msg.query).encode()))
@@ -182,6 +205,7 @@ class RemoteServer(
                     }
                 } finally {
                     pushJob.cancel()
+                    NetGuard.release(address)
                 }
             }
         }
@@ -191,6 +215,12 @@ class RemoteServer(
         /** Tope de lo que se puede subir desde un celular (un video corto). */
         const val MAX_UPLOAD = 300_000_000L
 
+        /** Tope de toda la carpeta de anuncios al subir desde la red (para que nadie llene el disco). */
+        const val MAX_ANNOUNCEMENTS_BYTES = 5_000_000_000L
+
+        /** Desde el celular solo formatos comunes (los raros tienen más historial de fallas en los decodificadores). */
+        val UPLOAD_EXTENSIONS = setOf("jpg", "jpeg", "png", "webp", "mp4", "mov", "m4v")
+
         /**
          * Nombre seguro para un anuncio subido. Los nombres genéricos de las cámaras
          * ("image.jpg", "IMG_1234.HEIC", "VID_…") pasan a "Anuncio 2026-11-08 10-30.jpg".
@@ -199,7 +229,7 @@ class RemoteServer(
         fun uploadName(requested: String, now: Long): String? {
             val base = File(requested.replace('\\', '/').substringAfterLast('/')).name
             val ext = base.substringAfterLast('.', "").lowercase()
-            if (!Library.isMediaFile("x.$ext")) return null
+            if (ext !in UPLOAD_EXTENSIONS) return null
             val stem = cleanListName(base.substringBeforeLast('.')) ?: ""
             val generic = stem.isEmpty() || Regex("""^(image|img|photo|foto|video|vid|pxl|screenshot|captura)[ _-]?\d*.*$""", RegexOption.IGNORE_CASE).matches(stem)
             val finalStem = if (generic) "Anuncio " + java.text.SimpleDateFormat("yyyy-MM-dd HH-mm-ss", java.util.Locale.ROOT).format(java.util.Date(now)) else stem

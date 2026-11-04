@@ -28,7 +28,7 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun PinDialog(pcName: String, message: String?, onDismiss: () -> Unit, onPin: (String) -> Unit) {
     var pin by rememberSaveable { mutableStateOf("") }
-    val ok = pin.length == 4
+    val ok = pin.length in 4..6
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Clave para controlar") },
@@ -36,7 +36,7 @@ fun PinDialog(pcName: String, message: String?, onDismiss: () -> Unit, onPin: (S
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Está en el computador${if (pcName.isNotEmpty()) " ($pcName)" else ""}, en \"Conectar dispositivos\". Se pide una sola vez.")
                 OutlinedTextField(
-                    pin, { v -> pin = v.filter(Char::isDigit).take(4) },
+                    pin, { v -> pin = v.filter(Char::isDigit).take(6) },
                     singleLine = true,
                     textStyle = TextStyle(fontSize = 32.sp, textAlign = TextAlign.Center, letterSpacing = 12.sp),
                     modifier = Modifier.fillMaxWidth(),

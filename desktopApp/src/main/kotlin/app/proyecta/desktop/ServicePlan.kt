@@ -76,6 +76,8 @@ class ServicePlan(
     /** Reemplaza la lista actual por una guardada. */
     @Synchronized
     fun open(name: String): String? {
+        // Solo una de las listas guardadas (nada de "../" para leer otros archivos).
+        if (name !in scanSaved()) return "No encontré la lista \"$name\""
         val loaded = load(File(listsDir, "$name.json")) ?: return "No encontré la lista \"$name\""
         update { loaded.copy(current = -1, name = name) }
         return null

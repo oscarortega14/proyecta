@@ -233,7 +233,7 @@ fun main() {
                 firewallOk = firewallOk,
                 onAllowFirewall = allowFirewall,
                 pin = settings.activePin,
-                onNewPin = { settingsStore.update { it.copy(pin = Settings.randomPin(), pinOff = false) } },
+                onNewPin = { digits -> settingsStore.update { it.copy(pin = Settings.randomPin(digits), pinOff = false) } },
                 onPinOff = { off -> settingsStore.update { it.copy(pinOff = off) } },
                 onClose = { connectOpen = false },
             )

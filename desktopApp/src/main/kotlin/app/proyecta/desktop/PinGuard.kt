@@ -5,8 +5,12 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Clave para controlar desde la red. Sin la clave un dispositivo puede mirar (vista de escenario,
- * OBS, buscar en la Biblia) pero no cambiar lo que se proyecta. Tras [MAX_TRIES] intentos fallidos
- * desde una misma dirección, esa dirección queda bloqueada [LOCK_MILLIS].
+ * OBS, buscar en la Biblia) pero no cambiar lo que se proyecta.
+ *
+ * Contra quien prueba claves:
+ * - Por dirección: tras [MAX_TRIES] fallos queda bloqueada 1 minuto; cada nuevo bloqueo dura el doble (hasta 30 min).
+ * - En total: si en un minuto hay [MAX_GLOBAL_FAILURES] fallos (aunque vengan de muchas direcciones,
+ *   alguien cambiándose de IP), nadie más puede probar hasta que pase ese minuto. Los que ya entraron siguen.
  */
 class PinGuard(
     private val pin: StateFlow<String?>,
@@ -18,8 +22,9 @@ class PinGuard(
         data class Locked(val seconds: Long) : Result
     }
 
-    private class Failures(var count: Int, var lockedUntil: Long)
+    private class Failures(var count: Int, var lockedUntil: Long, var lockouts: Int)
     private val failures = HashMap<String, Failures>()
+    private val recent = ArrayDeque<Long>() // fallos de todos en el último minuto
 
     val required: Boolean get() = !pin.value.isNullOrEmpty()
 
@@ -29,17 +34,22 @@ class PinGuard(
     @Synchronized
     fun check(address: String, attempt: String): Result {
         val now = clock()
-        val f = failures.getOrPut(address) { Failures(0, 0) }
+        while (recent.isNotEmpty() && recent.first() <= now - WINDOW_MILLIS) recent.removeFirst()
+        val f = failures.getOrPut(address) { Failures(0, 0, 0) }
         if (f.lockedUntil > now) return Result.Locked((f.lockedUntil - now + 999) / 1000)
+        if (recent.size >= MAX_GLOBAL_FAILURES) return Result.Locked((recent.first() + WINDOW_MILLIS - now + 999) / 1000)
         if (!required || attempt.trim() == pin.value) {
-            failures.remove(address)
+            f.count = 0
             return Result.Ok
         }
+        recent.addLast(now)
         f.count++
         if (f.count >= MAX_TRIES) {
             f.count = 0
-            f.lockedUntil = now + LOCK_MILLIS
-            return Result.Locked(LOCK_MILLIS / 1000)
+            f.lockouts++
+            val lock = (LOCK_MILLIS shl (f.lockouts - 1).coerceAtMost(5)).coerceAtMost(MAX_LOCK_MILLIS)
+            f.lockedUntil = now + lock
+            return Result.Locked(lock / 1000)
         }
         return Result.Wrong(MAX_TRIES - f.count)
     }
@@ -47,6 +57,9 @@ class PinGuard(
     companion object {
         const val MAX_TRIES = 5
         const val LOCK_MILLIS = 60_000L
+        const val MAX_LOCK_MILLIS = 30 * 60_000L
+        const val MAX_GLOBAL_FAILURES = 20
+        const val WINDOW_MILLIS = 60_000L
 
         /** Lo que se puede pedir sin clave: solo mirar o consultar. */
         fun isReadOnly(msg: ClientMessage) =

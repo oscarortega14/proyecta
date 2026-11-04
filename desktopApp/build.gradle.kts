@@ -11,10 +11,10 @@ plugins {
 
 kotlin { jvmToolchain(17) }
 
-val ktor = "3.0.1"
+val ktor = "3.1.3"
 
 /** Versión de Proyecta: va al instalador y a la app (para avisar cuando hay una más nueva). */
-val appVersion = "2.2.1"
+val appVersion = "2.2.2"
 
 dependencies {
     implementation(project(":shared"))
@@ -56,8 +56,8 @@ sourceSets.main { resources.srcDir(writeBuildConfig) }
 // --- VLC incluido (solo Windows): reproduce los fondos de video sin instalar nada aparte ---
 // Se descarga el VLC portable oficial una vez, se verifica su SHA-256 y se extrae solo lo
 // necesario para reproducir video (sin interfaz, idiomas, red ni codificadores).
-val vlcVersion = "3.0.21"
-val vlcSha256 = "a0b7ec02b50adf6417eed014fb8df50af39690505a4225b85b3dc2ed17d14843"
+val vlcVersion = "3.0.24"
+val vlcSha256 = "fcf30850371ad10c9373cc4f0f4501e7dee49e3e9ae9f20c72fb2661a1ca6323"
 val vlcZip = layout.buildDirectory.file("vlc-download/vlc-$vlcVersion-win64.zip")
 val appResources = layout.buildDirectory.dir("appResources")
 

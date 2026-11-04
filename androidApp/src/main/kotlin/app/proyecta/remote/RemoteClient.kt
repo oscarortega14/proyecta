@@ -115,10 +115,14 @@ class RemoteClient(private val scope: CoroutineScope) {
     private val _auth = MutableStateFlow<ServerMessage.Auth?>(null)
     val auth: StateFlow<ServerMessage.Auth?> = _auth.asStateFlow()
 
-    /** La clave guardada en este dispositivo (se manda sola al conectarse). */
-    var savedPin: () -> String? = { null }
-    /** Se llama cuando el PC aceptó una clave, para guardarla. */
-    var onPinAccepted: (String) -> Unit = {}
+    /**
+     * La clave guardada para ese computador (se manda sola al conectarse). Queda atada a la dirección
+     * donde se aceptó: un enlace malicioso que nos haga conectar a otro equipo no se la lleva.
+     */
+    var savedPin: (host: String) -> String? = { null }
+    /** Se llama cuando el PC aceptó una clave, para guardarla junto con su dirección. */
+    var onPinAccepted: (host: String, pin: String) -> Unit = { _, _ -> }
+    @Volatile private var currentHost: String? = null
     @Volatile private var triedSavedPin = false
     @Volatile private var pendingPin: String? = null
 
@@ -150,6 +154,7 @@ class RemoteClient(private val scope: CoroutineScope) {
                         failures = 0
                         triedSavedPin = false
                         _auth.value = null
+                        currentHost = host
                         // descartar órdenes que se acumularon mientras no había conexión
                         while (queue.tryReceive().isSuccess) Unit
                         // Que el PC no repita el texto de todas las diapositivas en cada "Siguiente".
@@ -228,7 +233,7 @@ class RemoteClient(private val scope: CoroutineScope) {
         runCatching {
             val response = http.post("http://$host:$DEFAULT_PORT/anuncios") {
                 url { parameters.append("nombre", name) }
-                header("X-Proyecta-Pin", savedPin().orEmpty())
+                header("X-Proyecta-Pin", savedPin(host).orEmpty())
                 setBody(object : io.ktor.http.content.OutgoingContent.ReadChannelContent() {
                     override val contentLength: Long? = size
                     override fun readFrom(): io.ktor.utils.io.ByteReadChannel =
@@ -270,12 +275,13 @@ class RemoteClient(private val scope: CoroutineScope) {
             is ServerMessage.Error -> _errors.tryEmit(m.message)
             is ServerMessage.Auth -> {
                 if (m.ok) {
-                    pendingPin?.let(onPinAccepted)
+                    val host = currentHost
+                    if (host != null) pendingPin?.let { onPinAccepted(host, it) }
                     pendingPin = null
                 } else if (m.required && !triedSavedPin) {
                     // Primero se prueba la clave guardada, sin molestar al usuario.
                     triedSavedPin = true
-                    val saved = savedPin()
+                    val saved = currentHost?.let(savedPin)
                     if (saved != null) { pendingPin = saved; queue.trySend(ClientMessage.Login(saved)); return }
                 }
                 _auth.value = m

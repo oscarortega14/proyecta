@@ -94,7 +94,7 @@
   <div class="card">
     <h2>Clave para controlar</h2>
     <p class="muted">Está en el computador, en «Conectar dispositivos». Se pide una sola vez.</p>
-    <input id="pinInput" type="tel" inputmode="numeric" maxlength="4" autocomplete="off" enterkeyhint="done">
+    <input id="pinInput" type="tel" inputmode="numeric" maxlength="6" autocomplete="off" enterkeyhint="done">
     <p id="pinErr"></p>
     <div class="row three"><button class="btn" id="pinOk">Entrar</button><button class="btn outline" id="pinLater">Solo mirar</button></div>
   </div>
@@ -530,7 +530,7 @@ $("clearMsg").onclick = () => { $("msg").value = ""; P.send("stage_message", { t
 // El QR trae la clave después del "#": se guarda y se borra de la dirección.
 const pinStore = { get: () => { try { return localStorage.getItem("pin"); } catch (e) { return null; } },
                    set: (v) => { try { localStorage.setItem("pin", v); } catch (e) {} } };
-const hashPin = (location.hash.match(/pin=(\d{4})/) || [])[1];
+const hashPin = (location.hash.match(/pin=(\d{4,6})/) || [])[1];
 if (hashPin) { pinStore.set(hashPin); history.replaceState(null, "", location.pathname + location.search); }
 let triedSavedPin = false, pendingPin = null;
 P.on("status", () => { if (S.connected) triedSavedPin = false; });
@@ -541,7 +541,7 @@ function askPin(message) {
 }
 function sendPin() {
   const v = $("pinInput").value.replace(/\D/g, "");
-  if (v.length !== 4) { $("pinErr").textContent = "Son 4 números"; return; }
+  if (v.length < 4 || v.length > 6) { $("pinErr").textContent = "Son 4 o 6 números"; return; }
   pendingPin = v; P.send("login", { pin: v });
 }
 $("pinOk").onclick = sendPin;

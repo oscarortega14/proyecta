@@ -38,7 +38,7 @@ android {
     }
 }
 
-val ktor = "3.0.1"
+val ktor = "3.1.3"
 
 dependencies {
     implementation(project(":shared"))

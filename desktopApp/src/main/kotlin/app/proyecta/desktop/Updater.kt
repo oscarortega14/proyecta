@@ -58,7 +58,8 @@ object Updater {
     fun parseRelease(json: String): Release? {
         val o = runCatching { Json.parseToJsonElement(json) as? JsonObject }.getOrNull() ?: return null
         if ((o["draft"] as? JsonPrimitive)?.contentOrNull == "true" || (o["prerelease"] as? JsonPrimitive)?.contentOrNull == "true") return null
-        val version = o.str("tag_name")?.trim()?.removePrefix("v")?.ifEmpty { null } ?: return null
+        // Solo números y puntos: la versión termina en un nombre de archivo y en el script de instalación.
+        val version = o.str("tag_name")?.trim()?.removePrefix("v")?.takeIf { Regex("""\d{1,4}(\.\d{1,4}){1,3}""").matches(it) } ?: return null
         val msi = (o["assets"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
             .firstOrNull { it.str("name").orEmpty().endsWith(".msi", ignoreCase = true) } ?: return null
         val url = msi.str("browser_download_url")?.takeIf { it.startsWith("https://") } ?: return null

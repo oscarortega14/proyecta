@@ -35,7 +35,11 @@ data class Settings(
     companion object {
         const val WINDOWED = "ventana"
 
-        fun randomPin(): String = (java.security.SecureRandom().nextInt(9000) + 1000).toString()
+        /** Clave al azar de [digits] números (4 o 6), sin cero al inicio. */
+        fun randomPin(digits: Int = 4): String {
+            val low = if (digits >= 6) 100_000 else 1_000
+            return (java.security.SecureRandom().nextInt(low * 9) + low).toString()
+        }
     }
 }
 
