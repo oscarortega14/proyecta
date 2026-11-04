@@ -22,12 +22,18 @@ const Proyecta = (() => {
   function connect() {
     const proto = location.protocol === "https:" ? "wss://" : "ws://";
     ws = new WebSocket(proto + location.host + "/ws");
-    ws.onopen = () => { S.connected = true; emit("status"); };
+    ws.onopen = () => {
+      S.connected = true;
+      // Decirle al PC que entendemos "keepSlides": así no repite el texto en cada "Siguiente".
+      ws.send(JSON.stringify({ type: "hello", features: ["keepSlides"] }));
+      emit("status");
+    };
     ws.onclose = () => { S.connected = false; emit("status"); setTimeout(connect, 2000); };
     ws.onerror = () => ws.close();
     ws.onmessage = (e) => {
       const m = JSON.parse(e.data);
       if (m.type === "state") {
+        if (m.keepSlides) m.state.slides = S.state.slides; // solo cambió la posición: el texto ya lo tenemos
         S.state = m.state;
         if (m.serverNow) S.serverOffset = m.serverNow - Date.now();
         emit("state");

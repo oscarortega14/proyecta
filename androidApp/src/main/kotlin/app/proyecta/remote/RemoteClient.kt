@@ -152,6 +152,8 @@ class RemoteClient(private val scope: CoroutineScope) {
                         _auth.value = null
                         // descartar órdenes que se acumularon mientras no había conexión
                         while (queue.tryReceive().isSuccess) Unit
+                        // Que el PC no repita el texto de todas las diapositivas en cada "Siguiente".
+                        send(Frame.Text(ClientMessage.Hello(listOf(app.proyecta.shared.FEATURE_KEEP_SLIDES)).encode()))
                         val sender = launch { for (m in queue) send(Frame.Text(m.encode())) }
                         try {
                             for (frame in incoming) {
@@ -261,7 +263,7 @@ class RemoteClient(private val scope: CoroutineScope) {
             is ServerMessage.BibleChapter -> _bibleChapter.value = m
             is ServerMessage.State -> {
                 if (m.serverNow > 0) serverOffset = m.serverNow - System.currentTimeMillis()
-                _state.value = m.state
+                _state.value = app.proyecta.shared.mergeState(_state.value, m)
             }
             is ServerMessage.BibleResults -> _bibleResults.value = m
             is ServerMessage.Plan -> { _plan.value = m.plan; _savedLists.value = m.saved }

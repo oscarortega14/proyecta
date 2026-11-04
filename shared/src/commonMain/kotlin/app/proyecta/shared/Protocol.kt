@@ -101,6 +101,13 @@ sealed interface ClientMessage {
     @Serializable @SerialName("bible_second")
     data class SetSecondBible(val name: String?) : ClientMessage
 
+    /**
+     * Lo primero que manda un remoto al conectarse: qué entiende. Con [FEATURE_KEEP_SLIDES] el PC
+     * deja de repetir el texto de todas las diapositivas en cada "Siguiente" (ver State.keepSlides).
+     */
+    @Serializable @SerialName("hello")
+    data class Hello(val features: List<String> = emptyList()) : ClientMessage
+
     /** Clave de 4 números para poder controlar (si el PC la pide). Responde con ServerMessage.Auth. */
     @Serializable @SerialName("login")
     data class Login(val pin: String) : ClientMessage
@@ -169,6 +176,11 @@ sealed interface ServerMessage {
         val state: PresentationState,
         /** Hora del PC al enviar, para que los remotos corrijan la diferencia de reloj en la cuenta regresiva. */
         val serverNow: Long = 0,
+        /**
+         * Las diapositivas no cambiaron (solo la posición, negro, avisos…): llegan vacías y el remoto
+         * conserva las que ya tiene. Solo se manda a quien dijo [FEATURE_KEEP_SLIDES] en Hello.
+         */
+        val keepSlides: Boolean = false,
     ) : ServerMessage
 
     @Serializable @SerialName("bible_results")
@@ -195,6 +207,13 @@ sealed interface ServerMessage {
     @Serializable @SerialName("auth")
     data class Auth(val required: Boolean, val ok: Boolean, val message: String? = null) : ServerMessage
 }
+
+/** Capacidad de Hello: entiende State.keepSlides. */
+const val FEATURE_KEEP_SLIDES = "keepSlides"
+
+/** El remoto arma el estado completo: si [m] trae keepSlides, conserva las diapositivas que ya tenía. */
+fun mergeState(previous: PresentationState, m: ServerMessage.State): PresentationState =
+    if (m.keepSlides) m.state.copy(slides = previous.slides) else m.state
 
 val ProtocolJson = Json {
     ignoreUnknownKeys = true

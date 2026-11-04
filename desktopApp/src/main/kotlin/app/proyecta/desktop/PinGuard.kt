@@ -50,6 +50,6 @@ class PinGuard(
 
         /** Lo que se puede pedir sin clave: solo mirar o consultar. */
         fun isReadOnly(msg: ClientMessage) =
-            msg is ClientMessage.BibleSearch || msg is ClientMessage.BibleChapter || msg is ClientMessage.Login
+            msg is ClientMessage.BibleSearch || msg is ClientMessage.BibleChapter || msg is ClientMessage.Login || msg is ClientMessage.Hello
     }
 }

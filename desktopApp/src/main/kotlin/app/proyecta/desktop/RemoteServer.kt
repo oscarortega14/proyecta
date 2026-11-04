@@ -123,6 +123,9 @@ class RemoteServer(
                 val address = call.request.local.remoteAddress
                 // Clave con la que esta conexión se autorizó (si la clave cambia, deja de valer).
                 var granted: String? = null
+                // ¿Este remoto entiende State.keepSlides? (lo dice en Hello). Y qué diapositivas tiene ya.
+                val lean = java.util.concurrent.atomic.AtomicBoolean(false)
+                var sentSlides: List<app.proyecta.shared.Slide>? = null
                 fun auth(message: String? = null) = ServerMessage.Auth(guard.required, guard.allows(granted), message)
                 // Envía biblioteca y estado al conectarse, y luego cada vez que cambien.
                 val pushJob = launch {
@@ -136,7 +139,14 @@ class RemoteServer(
                         kotlinx.coroutines.flow.combine(commands.plan.state, commands.plan.saved) { p, saved -> ServerMessage.Plan(p, saved) }
                             .collect { m -> send(Frame.Text(m.encode())) }
                     }
-                    presenter.state.collect { s -> send(Frame.Text(ServerMessage.State(s, System.currentTimeMillis()).encode())) }
+                    presenter.state.collect { s ->
+                        val now = System.currentTimeMillis()
+                        // Si solo cambió la posición (u otro detalle), no se repite el texto de todas las diapositivas.
+                        val same = sentSlides.let { it != null && (it === s.slides || it == s.slides) }
+                        val msg = if (lean.get() && same) ServerMessage.State(s.copy(slides = emptyList()), now, keepSlides = true)
+                        else ServerMessage.State(s, now).also { sentSlides = s.slides }
+                        send(Frame.Text(msg.encode()))
+                    }
                 }
                 try {
                     for (frame in incoming) {
@@ -149,6 +159,10 @@ class RemoteServer(
                         }
                         if (msg is ClientMessage.BibleChapter) {
                             send(Frame.Text(bibleChapter(library, msg.book, msg.chapter).encode()))
+                            continue
+                        }
+                        if (msg is ClientMessage.Hello) {
+                            lean.set(app.proyecta.shared.FEATURE_KEEP_SLIDES in msg.features)
                             continue
                         }
                         if (msg is ClientMessage.Login) {

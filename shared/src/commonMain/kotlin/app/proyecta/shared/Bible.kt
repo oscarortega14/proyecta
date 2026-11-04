@@ -169,6 +169,9 @@ class Bible(val name: String, val books: List<Book>) {
         }
     }
 
+    /** Arma el índice de búsqueda ya (en segundo plano), para que la primera búsqueda no espere. */
+    fun warmUp(): Int = searchIndex.size
+
     /**
      * Busca versículos que contengan todas las palabras (sin importar tildes ni mayúsculas).
      * Primero los que tienen la frase exacta, luego el resto en orden bíblico.
