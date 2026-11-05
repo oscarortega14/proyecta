@@ -20,15 +20,40 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import java.util.Calendar
 
 private val MONTHS = listOf("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")
 
-/** "Culto domingo 8 nov 2026": el próximo domingo (o hoy). Igual que en el PC; sin java.time (Android 7). */
-fun suggestedListName(now: Calendar = Calendar.getInstance()): String {
-    val c = now.clone() as Calendar
-    while (c.get(Calendar.DAY_OF_WEEK) != Calendar.SUNDAY) c.add(Calendar.DAY_OF_MONTH, 1)
-    return "Culto domingo ${c.get(Calendar.DAY_OF_MONTH)} ${MONTHS[c.get(Calendar.MONTH)]} ${c.get(Calendar.YEAR)}"
+/** "Culto domingo 8 nov 2026": el próximo domingo (o hoy). Igual que en el PC. */
+fun suggestedListName(date: Triple<Int, Int, Int> = today()): String {
+    var days = daysFromCivil(date.first, date.second, date.third)
+    // 1970-01-01 fue jueves: (días + 4) % 7 da 0 = domingo.
+    while (((days + 4) % 7 + 7) % 7 != 0L) days++
+    val (y, m, d) = civilFromDays(days)
+    return "Culto domingo $d ${MONTHS[m - 1]} $y"
+}
+
+/** Días desde 1970-01-01 (algoritmo de Howard Hinnant, sin depender de java.time). */
+internal fun daysFromCivil(year: Int, month: Int, day: Int): Long {
+    val y = (if (month <= 2) year - 1 else year).toLong()
+    val era = (if (y >= 0) y else y - 399) / 400
+    val yoe = y - era * 400
+    val mp = (month + 9) % 12
+    val doy = (153 * mp + 2) / 5 + day - 1
+    val doe = yoe * 365 + yoe / 4 - yoe / 100 + doy
+    return era * 146097 + doe - 719468
+}
+
+internal fun civilFromDays(days: Long): Triple<Int, Int, Int> {
+    val z = days + 719468
+    val era = (if (z >= 0) z else z - 146096) / 146097
+    val doe = z - era * 146097
+    val yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365
+    val doy = doe - (365 * yoe + yoe / 4 - yoe / 100)
+    val mp = (5 * doy + 2) / 153
+    val d = (doy - (153 * mp + 2) / 5 + 1).toInt()
+    val m = (if (mp < 10) mp + 3 else mp - 9).toInt()
+    val y = (yoe + era * 400 + if (m <= 2) 1 else 0).toInt()
+    return Triple(y, m, d)
 }
 
 @Composable

@@ -27,8 +27,8 @@ import app.proyecta.shared.formatClock
 @Composable
 fun PreacherTimer(state: PresentationState, serverOffset: Long, send: (ClientMessage) -> Unit) {
     var minutes by rememberSaveable { mutableStateOf("30") }
-    val now by produceState(System.currentTimeMillis() + serverOffset, state.timerStart) {
-        while (state.timerStart != null) { value = System.currentTimeMillis() + serverOffset; kotlinx.coroutines.delay(500) }
+    val now by produceState(nowMillis() + serverOffset, state.timerStart) {
+        while (state.timerStart != null) { value = nowMillis() + serverOffset; kotlinx.coroutines.delay(500) }
     }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Tiempo del predicador", style = MaterialTheme.typography.titleMedium)

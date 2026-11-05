@@ -4,9 +4,11 @@ Programa para proyectar letras de canciones y la Biblia en la iglesia, con contr
 
 | Módulo | Qué es | Tecnología |
 |---|---|---|
-| `shared/` | Modelos, protocolo, lector de canciones, búsqueda en la Biblia | Kotlin Multiplatform (JVM + Android) |
+| `shared/` | Modelos, protocolo, lector de canciones, búsqueda en la Biblia | Kotlin Multiplatform (JVM + Android + iOS) |
 | `desktopApp/` | Ventana del operador + ventana de proyección + servidor para los remotos | Compose Desktop + Ktor (WebSocket) |
-| `androidApp/` | Control remoto (Android 7 o superior) | Jetpack Compose + Ktor client |
+| `remoteUi/` | Pantallas del control remoto, compartidas entre Android e iPhone | Compose Multiplatform + Ktor client |
+| `androidApp/` | Control remoto para Android 7 o superior (solo la ventana; usa `remoteUi`) | Android |
+| `iosApp/` | Control remoto para iPhone/iPad (en construcción: ver [docs/IOS.md](docs/IOS.md)) | SwiftUI + `remoteUi` |
 
 ## Cómo funciona
 
@@ -128,8 +130,9 @@ Requisitos: JDK 17. Para Android, además el SDK de Android (`scripts/setup-wsl.
 PROYECTA_VPL=/ruta/spaRV1909_vpl.txt ./gradlew :desktopApp:test   # incluye la Biblia real
 PROYECTA_RENDER_DIR=/tmp/out PROYECTA_BG=/ruta/fondo.png ./gradlew :desktopApp:test --tests '*RenderPreviewTest*'  # PNGs de la proyección
 ./gradlew :desktopApp:run                       # abrir el programa de escritorio
-./gradlew :androidApp:assembleRelease           # APK del control remoto
-adb install -r androidApp/build/outputs/apk/release/androidApp-release.apk
+./gradlew :androidApp:assembleGithubRelease     # APK del control remoto
+adb install -r androidApp/build/outputs/apk/github/release/androidApp-github-release.apk
+./gradlew :androidApp:bundlePlayRelease         # paquete para Google Play
 ./gradlew :desktopApp:packageMsi                # instalador para Windows (ejecutar en Windows; descarga WiX solo)
 # -> desktopApp/build/compose/binaries/main/msi/Proyecta-<versión>.msi (incluye Java: no hace falta instalarlo)
 ```

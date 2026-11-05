@@ -1,0 +1,6 @@
+# Se genera con xcodegen a partir de project.yml
+*.xcodeproj/
+ProyectaRemoto/Info.plist
+xcuserdata/
+DerivedData/
+build/

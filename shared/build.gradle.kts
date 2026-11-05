@@ -12,6 +12,8 @@ kotlin {
     jvmToolchain(17)
     jvm()
     if (withAndroid) androidTarget()
+    // iPhone (solo se compilan en una Mac; en Linux/Windows Gradle los salta)
+    iosArm64(); iosSimulatorArm64(); iosX64()
 
     sourceSets {
         commonMain.dependencies {
@@ -26,7 +28,7 @@ kotlin {
 if (withAndroid) {
     extensions.configure<LibraryExtension> {
         namespace = "app.proyecta.shared"
-        compileSdk = 34
+        compileSdk = 36
         defaultConfig { minSdk = 24 }
         compileOptions {
             sourceCompatibility = JavaVersion.VERSION_17

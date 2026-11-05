@@ -2,16 +2,8 @@ package app.proyecta.remote
 
 import app.proyecta.shared.BibleBookInfo
 import app.proyecta.shared.ClientMessage
-import java.net.SocketTimeoutException
-import java.net.InetAddress
-import java.net.DatagramSocket
-import java.net.DatagramPacket
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.Dispatchers
 import app.proyecta.shared.ProtocolJson
 import app.proyecta.shared.DiscoveryReply
-import app.proyecta.shared.DISCOVERY_REQUEST
-import app.proyecta.shared.DISCOVERY_PORT
 import app.proyecta.shared.DEFAULT_PORT
 import app.proyecta.shared.PresentationState
 import app.proyecta.shared.ServerMessage
@@ -23,17 +15,16 @@ import app.proyecta.shared.encode
 import io.ktor.client.HttpClient
 import io.ktor.client.statement.bodyAsText
 import io.ktor.client.request.get
-import io.ktor.utils.io.jvm.javaio.toByteReadChannel
 import io.ktor.client.request.setBody
 import io.ktor.client.request.header
 import io.ktor.client.request.post
-import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.client.plugins.websocket.pingInterval
 import io.ktor.client.plugins.websocket.webSocket
 import io.ktor.websocket.Frame
 import io.ktor.websocket.readText
 import kotlinx.coroutines.CancellationException
+import kotlin.concurrent.Volatile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -59,7 +50,7 @@ sealed interface ConnectionStatus {
 
 /** Conexión WebSocket con el escritorio. Se reconecta sola si se cae el Wi-Fi. */
 class RemoteClient(private val scope: CoroutineScope) {
-    private val http = HttpClient(OkHttp) {
+    private val http = platformHttpClient {
         install(WebSockets) { pingInterval = 10.seconds }
     }
 
@@ -196,33 +187,11 @@ class RemoteClient(private val scope: CoroutineScope) {
      * Busca a Proyecta en la red local: envía un mensaje a todos (broadcast) y espera respuestas.
      * Devuelve los PCs encontrados (normalmente uno).
      */
-    suspend fun discover(timeoutMs: Long = 1_500): List<FoundServer> = withContext(Dispatchers.IO) {
-        runCatching {
-            DatagramSocket().use { socket ->
-                socket.broadcast = true
-                socket.soTimeout = 300
-                val request = DISCOVERY_REQUEST.toByteArray()
-                socket.send(DatagramPacket(request, request.size, InetAddress.getByName("255.255.255.255"), DISCOVERY_PORT))
-                val found = LinkedHashMap<String, FoundServer>()
-                val buf = ByteArray(512)
-                val end = System.currentTimeMillis() + timeoutMs
-                while (System.currentTimeMillis() < end) {
-                    val packet = DatagramPacket(buf, buf.size)
-                    try { socket.receive(packet) } catch (_: SocketTimeoutException) { continue }
-                    val reply = runCatching {
-                        ProtocolJson.decodeFromString(DiscoveryReply.serializer(), String(packet.data, 0, packet.length))
-                    }.getOrNull() ?: continue
-                    val host = packet.address.hostAddress ?: continue
-                    found[host] = FoundServer(reply.name, host)
-                }
-                found.values.toList()
-            }
-        }.getOrDefault(emptyList())
-    }
+    suspend fun discover(timeoutMs: Long = 1_500): List<FoundServer> = discoverServers(timeoutMs)
 
     /** Nombre del PC (consulta /info), o null si no responde. */
-    suspend fun pcName(host: String): String? = withContext(Dispatchers.IO) {
-        runCatching {
+    suspend fun pcName(host: String): String? {
+        return runCatching {
             val text = http.get("http://$host:$DEFAULT_PORT/info").bodyAsText()
             ProtocolJson.decodeFromString(DiscoveryReply.serializer(), text).name.ifBlank { null }
         }.getOrNull()
@@ -232,16 +201,15 @@ class RemoteClient(private val scope: CoroutineScope) {
      * Sube una foto o video a los anuncios del PC (con la clave guardada).
      * Devuelve un mensaje para mostrar. Se envía por partes, sin cargar todo el video en memoria.
      */
-    suspend fun uploadAnnouncement(name: String, size: Long?, open: () -> java.io.InputStream): String = withContext(Dispatchers.IO) {
-        val host = (_status.value as? ConnectionStatus.Connected)?.host ?: return@withContext "No hay conexión con el computador"
-        runCatching {
+    suspend fun uploadAnnouncement(file: PickedFile): String {
+        val host = (_status.value as? ConnectionStatus.Connected)?.host ?: return "No hay conexión con el computador"
+        return runCatching {
             val response = http.post("http://$host:$DEFAULT_PORT/anuncios") {
-                url { parameters.append("nombre", name) }
+                url { parameters.append("nombre", file.name) }
                 header("X-Proyecta-Pin", savedPin(host).orEmpty())
                 setBody(object : io.ktor.http.content.OutgoingContent.ReadChannelContent() {
-                    override val contentLength: Long? = size
-                    override fun readFrom(): io.ktor.utils.io.ByteReadChannel =
-                        open().toByteReadChannel()
+                    override val contentLength: Long? = file.size
+                    override fun readFrom(): io.ktor.utils.io.ByteReadChannel = file.open()
                 })
             }
             when (response.status.value) {
@@ -271,7 +239,7 @@ class RemoteClient(private val scope: CoroutineScope) {
             }
             is ServerMessage.BibleChapter -> _bibleChapter.value = m
             is ServerMessage.State -> {
-                if (m.serverNow > 0) serverOffset = m.serverNow - System.currentTimeMillis()
+                if (m.serverNow > 0) serverOffset = m.serverNow - nowMillis()
                 _state.value = app.proyecta.shared.mergeState(_state.value, m)
             }
             is ServerMessage.BibleResults -> _bibleResults.value = m

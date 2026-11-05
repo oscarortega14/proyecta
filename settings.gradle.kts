@@ -21,5 +21,11 @@ val hasAndroidSdk = System.getenv("ANDROID_HOME") != null ||
     file("local.properties").takeIf { it.exists() }?.readText()?.contains("sdk.dir") == true
 gradle.extra["withAndroid"] = hasAndroidSdk
 
+// La interfaz de la app de celulares (Android e iPhone) se comparte en :remoteUi.
+// Se arma donde hay SDK de Android o en una Mac (iPhone necesita Xcode).
+val isMac = System.getProperty("os.name").startsWith("Mac")
+gradle.extra["isMac"] = isMac
+
 include(":shared", ":desktopApp")
+if (hasAndroidSdk || isMac) include(":remoteUi")
 if (hasAndroidSdk) include(":androidApp")
