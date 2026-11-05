@@ -35,7 +35,7 @@ class FadeTest {
             val frames = (1..40).map { i -> brightness(scene.render(i * 20_000_000L)) }
             val end = frames.last()
             val dip = frames.min()
-            assertTrue(dip < minOf(start, end) - 2, "debería haber un fundido: inicio=$start mínimo=$dip final=$end")
+            assertTrue(dip < minOf(start, end) * 0.97, "debería haber un fundido: inicio=$start mínimo=$dip final=$end")
             // y termina en no más de medio segundo
             assertTrue(frames.drop(25).all { kotlin.math.abs(it - end) < 0.5 })
         }
