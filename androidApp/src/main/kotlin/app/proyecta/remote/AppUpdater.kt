@@ -31,7 +31,13 @@ data class AppUpdate(val version: String, val apk: ReleaseAsset)
  * Android solo lo acepta si está firmado con la MISMA clave que la app instalada.
  */
 class AppUpdater(private val context: Context) {
-    private val http = HttpClient(OkHttp)
+    private val http = HttpClient(OkHttp) {
+        // Tiempos de espera generosos para un Wi-Fi malo (la descarga en sí no tiene tope total).
+        install(io.ktor.client.plugins.HttpTimeout) {
+            connectTimeoutMillis = Downloader.CONNECT_TIMEOUT_MS
+            socketTimeoutMillis = Downloader.SOCKET_TIMEOUT_MS
+        }
+    }
 
     val currentVersion: String = runCatching {
         context.packageManager.getPackageInfo(context.packageName, 0).versionName
@@ -49,32 +55,17 @@ class AppUpdater(private val context: Context) {
         }.getOrNull()
     }
 
-    /** Descarga el APK (con progreso) y lo verifica. Lanza un error con un mensaje claro si falla. */
+    /**
+     * Descarga el APK (con progreso), reintentando y siguiendo desde donde quedó si el Wi-Fi se corta,
+     * y lo verifica. Si ya estaba bajado y entero, no lo vuelve a bajar. Lanza [DownloadException]
+     * con un mensaje corto para el usuario si no se pudo.
+     */
     suspend fun download(update: AppUpdate, onProgress: (Float) -> Unit): File = withContext(Dispatchers.IO) {
-        val dir = File(context.cacheDir, "actualizacion").apply { mkdirs(); listFiles()?.forEach { it.delete() } }
+        val dir = File(context.cacheDir, "actualizacion").apply { mkdirs() }
         val target = File(dir, "ProyectaRemoto-${update.version}.apk")
-        val digest = MessageDigest.getInstance("SHA-256")
-        http.prepareGet(update.apk.url) { header("User-Agent", "ProyectaRemoto/$currentVersion") }.execute { response ->
-            check(response.status.value == 200) { "GitHub respondió ${response.status.value}" }
-            val channel = response.bodyAsChannel()
-            val total = update.apk.size.takeIf { it > 0 }
-            var done = 0L
-            target.outputStream().use { out ->
-                val buf = ByteArray(1 shl 16)
-                while (true) {
-                    val n = channel.readAvailable(buf, 0, buf.size)
-                    if (n < 0) break
-                    out.write(buf, 0, n); digest.update(buf, 0, n); done += n
-                    if (total != null) onProgress((done.toFloat() / total).coerceIn(0f, 1f))
-                }
-            }
-        }
-        val sha = digest.digest().joinToString("") { "%02x".format(it) }
-        if (update.apk.sha256 != null && sha != update.apk.sha256) {
-            target.delete()
-            error("La descarga llegó dañada. Intenta de nuevo.")
-        }
-        target
+        // Se borran solo las de otras versiones: la parcial de esta se continúa.
+        dir.listFiles()?.filter { it != target }?.forEach { it.delete() }
+        Downloader(http, "ProyectaRemoto/$currentVersion").download(update.apk.url, target, update.apk.size.takeIf { it > 0 }, update.apk.sha256, onProgress)
     }
 
     /**
@@ -91,10 +82,12 @@ class AppUpdater(private val context: Context) {
             return false
         }
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.archivos", apk)
+        // CLEAR_TASK: el instalador se abre limpio, sin pantallas viejas encima (ej. los ajustes de
+        // "Fuentes desconocidas" de la primera vez, que si no aparecían antes que el instalador).
         context.startActivity(
             Intent(Intent.ACTION_VIEW)
                 .setDataAndType(uri, "application/vnd.android.package-archive")
-                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK),
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK),
         )
         return true
     }

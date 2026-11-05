@@ -69,7 +69,7 @@ fun UpdateDialog(
                                     .onSuccess { onExitForInstall() }
                                     .onFailure { error = "No pude abrir el instalador: ${it.message}" }
                             }
-                            .onFailure { error = "No pude descargar: ${it.message}"; progress = null }
+                            .onFailure { error = it.message ?: "No se pudo descargar"; progress = null }
                     }
                 },
                 enabled = !busy && Updater.canInstall,

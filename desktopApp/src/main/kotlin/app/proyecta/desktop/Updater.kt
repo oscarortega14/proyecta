@@ -93,29 +93,7 @@ object Updater {
     /** Descarga el instalador a la carpeta temporal, verificando el SHA-256 si GitHub lo publica. */
     suspend fun download(release: Release, onProgress: (Float) -> Unit): File = withContext(Dispatchers.IO) {
         val target = File(System.getProperty("java.io.tmpdir"), "Proyecta-${release.version}.msi")
-        val c = URI(release.msiUrl).toURL().openConnection() as HttpURLConnection
-        c.connectTimeout = 15000; c.readTimeout = 30000
-        c.setRequestProperty("User-Agent", "Proyecta/$currentVersion")
-        check(c.responseCode == 200) { "GitHub respondió ${c.responseCode}" }
-        val total = c.contentLengthLong.takeIf { it > 0 } ?: release.size
-        val digest = MessageDigest.getInstance("SHA-256")
-        c.inputStream.use { input ->
-            target.outputStream().use { out ->
-                val buf = ByteArray(1 shl 16)
-                var done = 0L
-                while (true) {
-                    val n = input.read(buf)
-                    if (n < 0) break
-                    out.write(buf, 0, n); digest.update(buf, 0, n); done += n
-                    if (total > 0) onProgress((done.toFloat() / total).coerceIn(0f, 1f))
-                }
-            }
-        }
-        val sha = digest.digest().joinToString("") { "%02x".format(it) }
-        if (release.sha256 != null && sha != release.sha256) {
-            target.delete()
-            error("La descarga llegó dañada. Intenta de nuevo.")
-        }
+        val sha = resumableDownload(release.msiUrl, target, release.size.takeIf { it > 0 }, release.sha256, onProgress)
         // Firma oficial: sin ella (o si no corresponde) no se instala, venga de donde venga.
         val signature = release.sigUrl?.let { url ->
             runCatching {
@@ -132,6 +110,58 @@ object Updater {
         }
         Log.info("Actualización ${release.version} descargada y con firma válida")
         target
+    }
+
+    /**
+     * Descarga resistente a un internet malo: espera hasta 30 s sin datos, reintenta hasta 6 veces
+     * siguiendo desde donde quedó (Range) y, si el archivo ya estaba entero (mismo SHA-256), no lo
+     * vuelve a bajar. Devuelve el SHA-256 del archivo. Los errores llegan con un mensaje corto.
+     */
+    internal fun resumableDownload(url: String, target: File, expectedSize: Long?, sha256: String?, onProgress: (Float) -> Unit, pauseMs: Long = 2_000): String {
+        if (sha256 != null && target.isFile && sha256Of(target) == sha256) { onProgress(1f); return sha256 }
+        var last: Exception? = null
+        for (attempt in 1..6) {
+            try {
+                val have = if (target.isFile) target.length() else 0L
+                val c = URI(url).toURL().openConnection() as HttpURLConnection
+                c.connectTimeout = 15_000; c.readTimeout = 30_000
+                c.setRequestProperty("User-Agent", "Proyecta/$currentVersion")
+                if (have > 0) c.setRequestProperty("Range", "bytes=$have-")
+                val code = c.responseCode
+                val resuming = code == 206
+                if (code != 200 && !resuming) throw java.io.IOException("HTTP $code")
+                var done = if (resuming) have else 0L
+                c.inputStream.use { input ->
+                    java.io.FileOutputStream(target, resuming).use { out ->
+                        val buf = ByteArray(1 shl 16)
+                        while (true) {
+                            val n = input.read(buf)
+                            if (n < 0) break
+                            out.write(buf, 0, n); done += n
+                            if (expectedSize != null) onProgress((done.toFloat() / expectedSize).coerceIn(0f, 1f))
+                        }
+                    }
+                }
+                if (expectedSize != null && target.length() < expectedSize) throw java.io.IOException("incompleto")
+                val sha = sha256Of(target)
+                if (sha256 != null && sha != sha256) { target.delete(); throw java.io.IOException("no coincide") }
+                return sha
+            } catch (e: Exception) {
+                last = e
+                Log.warn("Descarga de la actualización, intento $attempt: ${e.message}")
+                if (attempt < 6) Thread.sleep(pauseMs * attempt)
+            }
+        }
+        error(
+            if (last is java.net.UnknownHostException) "No hay internet en este computador. Revisa la conexión y vuelve a intentar."
+            else "La conexión a internet está muy lenta o se cortó. Vuelve a intentar: sigue desde donde quedó.",
+        )
+    }
+
+    internal fun sha256Of(f: File): String {
+        val md = MessageDigest.getInstance("SHA-256")
+        f.inputStream().use { input -> val b = ByteArray(1 shl 16); while (true) { val n = input.read(b); if (n < 0) break; md.update(b, 0, n) } }
+        return md.digest().joinToString("") { "%02x".format(it) }
     }
 
     /** Ruta del Proyecta.exe instalado (solo existe en la versión instalada, no al probar con Gradle). */

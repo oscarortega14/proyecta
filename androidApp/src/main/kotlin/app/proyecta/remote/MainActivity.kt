@@ -611,7 +611,8 @@ private fun UpdateBanner() {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Hay una versión nueva de la app: ${u.version}", fontWeight = FontWeight.Medium)
             progress?.let { androidx.compose.material3.LinearProgressIndicator(progress = { it }, modifier = Modifier.fillMaxWidth()) }
-            message?.let { Text(it, color = MaterialTheme.colorScheme.onPrimaryContainer) }
+            // Mensaje corto (como mucho 3 líneas): que nunca tape el botón Actualizar.
+            message?.let { Text(it, color = MaterialTheme.colorScheme.onPrimaryContainer, maxLines = 3, overflow = TextOverflow.Ellipsis) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button({
                     message = null
@@ -623,7 +624,7 @@ private fun UpdateBanner() {
                                 message = if (updater.install(apk)) "Confirma la instalación en la ventana de Android."
                                 else "Permite instalar apps de Proyecta Remoto y vuelve a tocar Actualizar."
                             }
-                            .onFailure { progress = null; message = it.message ?: "No se pudo descargar" }
+                            .onFailure { progress = null; message = (it as? DownloadException)?.message ?: Downloader.friendly(it as? Exception) }
                     }
                 }, enabled = progress == null) { Text("Actualizar") }
                 TextButton({ hidden = true }) { Text("Más tarde") }
