@@ -29,8 +29,14 @@ módulo compartido `remoteUi/` (Compose Multiplatform). Ya está hecho y probado
 
 **Pendiente en la Mac** (en este orden):
 
-1. Compilar por primera vez y corregir lo que falle en `iosMain` (se escribió sin poder compilarlo).
-2. Probar en el simulador y en un iPhone real contra el PC con Selah.
+1. ~~Compilar por primera vez `iosMain`~~ **Hecho (5 nov 2026, Xcode 27.2):** compiló sin cambios; las 39
+   pruebas comunes pasan en el simulador (`:remoteUi:iosSimulatorArm64Test`, `:shared:iosSimulatorArm64Test`).
+2. Probar contra el PC con Selah: **simulador hecho** (iPhone 17 Pro, iOS 26): el enlace `selah://connect`
+   conecta con la clave, se eligió una canción, se pasaron diapositivas y Negro. **Falta un iPhone real.**
+   - En Xcode 27 la ventana del simulador se llama **DeviceHub** (`Xcode.app/Contents/Applications/DeviceHub.app`).
+   - En el simulador usar la IP de la Mac en el Wi-Fi, no `127.0.0.1` (otro programa puede tener el puerto 8765 local).
+   - Aviso del enlazador: `libicu.icudtl_dat.o` (de Compose) está hecho para iOS 17.2 y la app pide 15.0.
+     Es solo datos; revisar en un iPhone con iOS 15–17 antes de publicar, o subir el mínimo a 17.
 3. Búsqueda automática del PC en iPhone (ver §5: dos caminos).
 4. Subir fotos/videos a Anuncios desde el iPhone (ver §6). Mientras no esté, el botón no aparece.
 5. Capturas, ficha y envío a App Store Connect / TestFlight (§8).
