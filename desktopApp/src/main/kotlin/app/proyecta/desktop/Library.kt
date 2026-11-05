@@ -237,7 +237,7 @@ class Library(val baseDir: File) {
                     if (f.extension.equals("json", true)) Bible.fromJson(text, f.nameWithoutExtension)
                     else Bible.fromVpl(text, f.nameWithoutExtension)
                 }
-                    .onFailure { errors += "No pude leer ${f.name}: ${it.message}" }
+                    .onFailure { errors += "No pude leer ${f.name}: ${it.message}"; Log.error("No pude leer la Biblia ${f.name}", it) }
                     .getOrNull()
             }
             .associateBy { it.name }

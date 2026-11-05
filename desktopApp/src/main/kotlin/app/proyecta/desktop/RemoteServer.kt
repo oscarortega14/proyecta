@@ -120,6 +120,7 @@ class RemoteServer(
                         return@post
                     }
                     library.addAnnouncements(listOf(tmp))
+                    Log.info("Anuncio subido desde $address: $name (${total / 1000} KB)")
                     call.respondText(ProtocolJson.encodeToString(kotlinx.serialization.json.JsonObject.serializer(),
                         kotlinx.serialization.json.buildJsonObject { put("ok", kotlinx.serialization.json.JsonPrimitive(true)); put("nombre", kotlinx.serialization.json.JsonPrimitive(name)) }),
                         ContentType.Application.Json)
@@ -134,6 +135,7 @@ class RemoteServer(
                 val address = call.request.local.remoteAddress
                 // Solo nuestras páginas y la app (no sitios ajenos ni DNS rebinding), y pocas conexiones por dispositivo.
                 if (!NetGuard.trusted(call.request.headers["Host"], call.request.headers["Origin"], pcName)) {
+                    Log.warn("Conexión rechazada (origen ajeno) desde $address: Host=${call.request.headers["Host"]} Origin=${call.request.headers["Origin"]}")
                     close(io.ktor.websocket.CloseReason(io.ktor.websocket.CloseReason.Codes.VIOLATED_POLICY, "Origen no permitido"))
                     return@webSocket
                 }
@@ -142,6 +144,7 @@ class RemoteServer(
                     return@webSocket
                 }
                 val limiter = NetGuard.RateLimiter()
+                Log.info("Remoto conectado desde $address")
                 // Clave con la que esta conexión se autorizó (si la clave cambia, deja de valer).
                 var granted: String? = null
                 // ¿Este remoto entiende State.keepSlides? (lo dice en Hello). Y qué diapositivas tiene ya.
@@ -191,8 +194,8 @@ class RemoteServer(
                         if (msg is ClientMessage.Login) {
                             val reply = when (val r = guard.check(address, msg.pin)) {
                                 PinGuard.Result.Ok -> { granted = pin.value; auth() }
-                                is PinGuard.Result.Wrong -> auth("Clave incorrecta (te quedan ${r.triesLeft} intentos)")
-                                is PinGuard.Result.Locked -> auth("Demasiados intentos. Espera ${r.seconds} segundos.")
+                                is PinGuard.Result.Wrong -> { Log.warn("Clave incorrecta desde $address"); auth("Clave incorrecta (te quedan ${r.triesLeft} intentos)") }
+                                is PinGuard.Result.Locked -> { Log.warn("Bloqueado por intentos: $address (${r.seconds} s)"); auth("Demasiados intentos. Espera ${r.seconds} segundos.") }
                             }
                             send(Frame.Text(reply.encode()))
                             continue
@@ -206,6 +209,7 @@ class RemoteServer(
                 } finally {
                     pushJob.cancel()
                     NetGuard.release(address)
+                    Log.info("Remoto desconectado: $address")
                 }
             }
         }

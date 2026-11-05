@@ -23,7 +23,9 @@ class Presenter(
     val state: StateFlow<PresentationState> = _state.asStateFlow()
 
     /** Aplica una orden. Devuelve un mensaje de error para mostrar, o null si salió bien. */
-    fun handle(msg: ClientMessage): String? = when (msg) {
+    fun handle(msg: ClientMessage): String? = handleInner(msg).also { err -> if (err != null) Log.warn("Orden ${msg::class.simpleName}: $err") }
+
+    private fun handleInner(msg: ClientMessage): String? = when (msg) {
         is ClientMessage.SelectSong -> selectSong(msg.id)
         is ClientMessage.GoTo -> { _state.update { s -> if (msg.index in s.slides.indices) s.copy(index = msg.index) else s }; null }
         ClientMessage.Next -> { _state.update { s -> s.copy(index = (s.index + 1).coerceAtMost(s.slides.lastIndex)) }; null }

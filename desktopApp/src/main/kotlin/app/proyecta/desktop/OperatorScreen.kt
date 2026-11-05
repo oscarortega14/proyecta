@@ -804,6 +804,11 @@ private fun HelpMenu(onShortcuts: () -> Unit, onWelcome: () -> Unit, onBackups: 
             DropdownMenuItem({ Text("Atajos de teclado") }, { open = false; onShortcuts() }, Modifier.hand())
             DropdownMenuItem({ Text("Guía de inicio") }, { open = false; onWelcome() }, Modifier.hand())
             DropdownMenuItem({ Text("Respaldos…") }, { open = false; onBackups() }, Modifier.hand())
+            DropdownMenuItem(
+                { Text("Ver el registro (si algo falló)") },
+                { open = false; Log.current?.takeIf { it.isFile }?.let { f -> runCatching { java.awt.Desktop.getDesktop().open(f) } } },
+                Modifier.hand(),
+            )
             HorizontalDivider()
             Text("Proyecta ${Updater.currentVersion}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
         }

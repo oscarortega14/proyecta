@@ -35,6 +35,11 @@ import java.io.File
 
 fun main() {
     val baseDir = File(System.getProperty("user.home"), "Proyecta")
+    Log.start(baseDir)
+    Log.info(
+        "Proyecta ${Updater.currentVersion} iniciando · ${System.getProperty("os.name")} ${System.getProperty("os.version")} · " +
+            "Java ${System.getProperty("java.version")} · memoria máx ${Runtime.getRuntime().maxMemory() / 1_000_000} MB",
+    )
     val settingsStore = SettingsStore(File(baseDir, "ajustes.json"))
     val library = Library(baseDir).also {
         it.preferredBible = settingsStore.value.bible
@@ -52,8 +57,10 @@ fun main() {
     val server = RemoteServer(commands, library, pin = settingsStore.pin)
     val backups = Backups(baseDir, settingsStore)
     val serverError = runCatching { server.start() }.exceptionOrNull()?.let {
+        Log.error("No pude abrir el puerto ${server.port}", it)
         "No pude abrir el puerto ${server.port} para el control remoto: ${it.message}"
     }
+    Log.info("Pantallas: " + Screens.list().joinToString { it.label } + " · VLC: " + if (VideoBackgrounds.available) "sí" else "no")
     val discovery = DiscoveryResponder().also { runCatching { it.start() } }
     val themes = ThemeStore(File(library.baseDir, "tema.json"))
 
@@ -91,7 +98,11 @@ fun main() {
         // Respaldo semanal automático, un rato después de abrir.
         LaunchedEffect(Unit) {
             kotlinx.coroutines.delay(30_000)
-            if (backups.isDue()) withContext(Dispatchers.IO) { runCatching { backups.create() } }
+            if (backups.isDue()) withContext(Dispatchers.IO) {
+                runCatching { backups.create() }
+                    .onSuccess { Log.info("Respaldo automático: ${it.name}") }
+                    .onFailure { Log.error("Falló el respaldo automático", it) }
+            }
         }
         // Actualizaciones: se pregunta a GitHub un rato después de abrir (sin estorbar el arranque).
         var release by remember { mutableStateOf<Release?>(null) }
@@ -99,6 +110,7 @@ fun main() {
         LaunchedEffect(Unit) {
             kotlinx.coroutines.delay(15_000)
             release = Updater.latest()
+            Log.info("Actualizaciones: última publicada ${release?.version ?: "(no se pudo consultar)"}")
         }
         val offerUpdate = Updater.shouldOffer(release, Updater.currentVersion, settings.skippedUpdate)
         val historyEntries by commands.history!!.entries.collectAsState()
@@ -202,7 +214,7 @@ fun main() {
                         title = { Text("¿Cerrar Proyecta?") },
                         text = { Text("Se apaga la proyección y se desconectan las tablets y celulares.") },
                         confirmButton = {
-                            TextButton({ server.stop(); discovery.stop(); exitApplication() }) { Text("Cerrar Proyecta") }
+                            TextButton({ Log.info("Cerrado por el operador"); server.stop(); discovery.stop(); exitApplication() }) { Text("Cerrar Proyecta") }
                         },
                         dismissButton = { Button({ confirmExit = false }) { Text("Seguir usando") } },
                     )

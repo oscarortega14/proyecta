@@ -97,7 +97,7 @@ object VideoBackgrounds {
         val q = videoQuality(announcement, light)
         val loop = runCatching {
             VideoLoop(file, f, q.maxWidth, repeat = !announcement, audio = announcement, minFrameNanos = q.minFrameNanos)
-        }.getOrNull() ?: return null
+        }.onFailure { Log.error("No pude abrir el video ${file.name}", it) }.getOrNull() ?: return null
         loops[key] = Entry(loop, 1)
         return loop
     }
