@@ -79,7 +79,9 @@ object Updater {
     /** Pregunta a GitHub. null si no hay internet, no hay versiones publicadas o algo falla. */
     suspend fun latest(): Release? = withContext(Dispatchers.IO) {
         runCatching {
-            val c = URI(LATEST_URL).toURL().openConnection() as HttpURLConnection
+            // PROYECTA_UPDATE_URL: solo para probar actualizaciones con un servidor local (la firma se exige igual).
+            val url = System.getenv("PROYECTA_UPDATE_URL")?.takeIf { it.startsWith("http://127.0.0.1") || it.startsWith("http://localhost") } ?: LATEST_URL
+            val c = URI(url).toURL().openConnection() as HttpURLConnection
             c.connectTimeout = 8000; c.readTimeout = 8000
             c.setRequestProperty("Accept", "application/vnd.github+json")
             c.setRequestProperty("User-Agent", "Proyecta/$currentVersion")

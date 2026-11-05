@@ -82,6 +82,14 @@ class SignatureTest {
         kotlin.test.assertFalse(Updater.verifySignature(sha, sig)) // la llave oficial no firmó esto
     }
 
+    @Test
+    fun plainHttpOnlyFromThisSameComputer() {
+        val local = """{"tag_name":"2.3.1","assets":[{"name":"P.msi","browser_download_url":"http://127.0.0.1:8899/P.msi"}]}"""
+        kotlin.test.assertNotNull(Updater.parseRelease(local))
+        val lan = """{"tag_name":"2.3.1","assets":[{"name":"P.msi","browser_download_url":"http://192.168.1.5/P.msi"}]}"""
+        kotlin.test.assertNull(Updater.parseRelease(lan))
+    }
+
     /** Con un instalador firmado de verdad por tools/Firma.java:  PROYECTA_SIGNED=/ruta/Proyecta-x.msi */
     @Test
     fun realSignedInstaller() {

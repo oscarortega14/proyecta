@@ -39,7 +39,8 @@ object Releases {
         if (o.str("draft") == "true" || o.str("prerelease") == "true") return null
         val version = o.str("tag_name")?.trim()?.removePrefix("v")?.takeIf { Regex("""\d{1,4}(\.\d{1,4}){1,3}""").matches(it) } ?: return null
         val assets = (o["assets"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }.mapNotNull { a ->
-            val url = a.str("browser_download_url")?.takeIf { it.startsWith("https://") } ?: return@mapNotNull null
+            // https siempre; http solo dentro del mismo equipo (pruebas). La firma se exige igual.
+            val url = a.str("browser_download_url")?.takeIf { it.startsWith("https://") || LOCAL.matches(it) } ?: return@mapNotNull null
             ReleaseAsset(
                 name = a.str("name").orEmpty(),
                 url = url,
@@ -49,6 +50,8 @@ object Releases {
         }
         return ReleaseInfo(version, o.str("body").orEmpty().trim(), assets)
     }
+
+    private val LOCAL = Regex("""^http://(127\.0\.0\.1|localhost)(:\d+)?/.*""")
 
     private fun JsonObject.str(k: String) = (this[k] as? JsonPrimitive)?.contentOrNull
 }
