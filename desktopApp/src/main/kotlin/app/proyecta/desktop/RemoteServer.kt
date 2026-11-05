@@ -183,6 +183,10 @@ class RemoteServer(
                             send(Frame.Text(bibleSearch(library, msg.query).encode()))
                             continue
                         }
+                        if (msg is ClientMessage.SongSearch) {
+                            send(Frame.Text(ServerMessage.SongResults(msg.query, library.searchSongs(msg.query)).encode()))
+                            continue
+                        }
                         if (msg is ClientMessage.BibleChapter) {
                             send(Frame.Text(bibleChapter(library, msg.book, msg.chapter).encode()))
                             continue

@@ -168,6 +168,7 @@ private fun RemoteApp(client: RemoteClient, savedHost: String, pcName: String, l
     val bibleName by client.bibleName.collectAsState()
     val plan by client.plan.collectAsState()
     val savedLists by client.savedLists.collectAsState()
+    val songResults by client.songResults.collectAsState()
     val announcements by client.announcements.collectAsState()
     val sermons by client.sermons.collectAsState()
     val bibleNames by client.bibleNames.collectAsState()
@@ -207,7 +208,7 @@ private fun RemoteApp(client: RemoteClient, savedHost: String, pcName: String, l
             Column(Modifier.weight(1f).fillMaxWidth().padding(12.dp)) {
                 when (tab) {
                     0 -> LiveTab(state, client::send)
-                    1 -> SongsTab(songs, onAdd = { id -> client.send(ClientMessage.PlanAddSong(id)) }) { id ->
+                    1 -> SongsTab(songs, songResults, onSearch = { q -> client.send(ClientMessage.SongSearch(q)) }, onAdd = { id -> client.send(ClientMessage.PlanAddSong(id)) }) { id ->
                         client.send(ClientMessage.SelectSong(id)); tab = 0
                     }
                     2 -> BibleTab(
@@ -346,17 +347,33 @@ private fun LiveTab(state: PresentationState, send: (ClientMessage) -> Unit) {
 }
 
 @Composable
-private fun SongsTab(songs: List<SongSummary>, onAdd: (String) -> Unit, onSelect: (String) -> Unit) {
+private fun SongsTab(
+    songs: List<SongSummary>,
+    serverResults: ServerMessage.SongResults?,
+    onSearch: (String) -> Unit,
+    onAdd: (String) -> Unit,
+    onSelect: (String) -> Unit,
+) {
     val context = LocalContext.current
     var query by rememberSaveable { mutableStateOf("") }
-    val results = remember(query, songs) { songs.search(query) }
-    OutlinedTextField(query, { query = it }, label = { Text("Buscar canción") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+    // Al instante por título; un momento después el computador busca también en la letra.
+    LaunchedEffect(query) {
+        if (query.trim().length >= 2) { kotlinx.coroutines.delay(250); onSearch(query.trim()) }
+    }
+    val results = remember(query, songs, serverResults) {
+        serverResults?.takeIf { it.query == query.trim() }?.hits
+            ?: songs.search(query).map { app.proyecta.shared.SongHit(it.id, it.title, it.firstLine) }
+    }
+    OutlinedTextField(query, { query = it }, label = { Text("Buscar por título o por la letra") }, singleLine = true, modifier = Modifier.fillMaxWidth())
     LazyColumn(Modifier.padding(top = 8.dp)) {
         items(results, key = { it.id }) { song ->
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f).clickable { onSelect(song.id) }.padding(vertical = 10.dp)) {
                     Text(song.title, fontWeight = FontWeight.Medium, fontSize = 18.sp)
-                    Text(song.firstLine, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        if (song.snippet.isNotEmpty()) "…${song.snippet}…" else song.firstLine,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    )
                 }
                 OutlinedButton({
                     onAdd(song.id)

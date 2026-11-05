@@ -114,7 +114,7 @@
     <div id="slides"></div>
   </section>
   <section id="songs" class="tab">
-    <input id="q" type="search" placeholder="Buscar canción">
+    <input id="q" type="search" placeholder="Buscar por título o por la letra">
     <div id="songList"></div>
   </section>
   <section id="bible" class="tab">
@@ -434,13 +434,24 @@ function renderBrowser() {
   });
 }
 
+// Buscar por título al instante; por la letra, el computador responde (song_results) un momento después.
+let songHits = null, songTimer = null;
+function onSongQuery() {
+  const q = $("q").value.trim();
+  songHits = null;
+  renderSongs();
+  clearTimeout(songTimer);
+  if (q.length >= 2) songTimer = setTimeout(() => P.send("song_search", { query: q }), 250);
+}
+P.on("songResults", (m) => { if (m.query === $("q").value.trim()) { songHits = m.hits; renderSongs(); } });
+
 function renderSongs() {
   const list = $("songList"); list.replaceChildren();
-  P.searchSongs($("q").value).forEach((song) => {
+  (songHits || P.searchSongs($("q").value)).forEach((song) => {
     const row = P.el("div", "item");
     const t = P.el("div", "t");
     t.appendChild(P.el("b", null, song.title));
-    t.appendChild(P.el("small", null, song.firstLine));
+    t.appendChild(P.el("small", null, song.snippet ? "…" + song.snippet + "…" : song.firstLine));
     t.onclick = () => { P.send("select_song", { id: song.id }); showTab("live"); };
     const add = P.el("button", "icon", "+");
     add.title = "Agregar a la lista";
@@ -490,7 +501,7 @@ function renderPlan() {
 $("prev").onclick = () => P.send("prev");
 $("next").onclick = () => P.send("next");
 $("blank").onclick = () => P.send("blank", { blank: !S.state.blank });
-$("q").oninput = renderSongs;
+$("q").oninput = onSongQuery;
 const showRef = () => { if ($("ref").value.trim()) { $("ref").blur(); showBible($("ref").value.trim(), 0); } };
 $("showRef").onclick = showRef;
 $("ref").onkeydown = (e) => { if (e.key === "Enter") showRef(); };

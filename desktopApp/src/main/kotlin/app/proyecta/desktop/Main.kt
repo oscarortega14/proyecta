@@ -170,6 +170,7 @@ fun main() {
                     onOpenBackups = { backupsOpen = true },
                     lastSung = lastSung,
                     searchBible = { q -> library.bible?.search(q) },
+                    searchSongs = { q -> library.searchSongs(q) },
                     bible = remember(catalog) { library.bible },
                     onSelectBible = { name -> scope.launch(Dispatchers.IO) { commands.onSelectBible(name) } },
                     onSelectSecondBible = { name -> scope.launch(Dispatchers.IO) { commands.onSelectSecondBible(name) } },

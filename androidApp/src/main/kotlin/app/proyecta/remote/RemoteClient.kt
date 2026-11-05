@@ -96,6 +96,10 @@ class RemoteClient(private val scope: CoroutineScope) {
     private val _secondBible = MutableStateFlow<String?>(null)
     val secondBible: StateFlow<String?> = _secondBible.asStateFlow()
 
+    /** Última respuesta a una búsqueda de canciones (título o letra). */
+    private val _songResults = MutableStateFlow<ServerMessage.SongResults?>(null)
+    val songResults: StateFlow<ServerMessage.SongResults?> = _songResults.asStateFlow()
+
     /** Predicaciones del PC. */
     private val _sermons = MutableStateFlow<List<SongSummary>>(emptyList())
     val sermons: StateFlow<List<SongSummary>> = _sermons.asStateFlow()
@@ -271,6 +275,7 @@ class RemoteClient(private val scope: CoroutineScope) {
                 _state.value = app.proyecta.shared.mergeState(_state.value, m)
             }
             is ServerMessage.BibleResults -> _bibleResults.value = m
+            is ServerMessage.SongResults -> _songResults.value = m
             is ServerMessage.Plan -> { _plan.value = m.plan; _savedLists.value = m.saved }
             is ServerMessage.Error -> _errors.tryEmit(m.message)
             is ServerMessage.Auth -> {

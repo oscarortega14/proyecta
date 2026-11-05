@@ -93,6 +93,8 @@ fun OperatorScreen(
     /** Última vez que se cantó cada canción (id → fecha). */
     lastSung: Map<String, java.time.LocalDate> = emptyMap(),
     searchBible: (String) -> Pair<List<BibleHit>, Int>?,
+    /** Buscar canciones por título o letra. */
+    searchSongs: (String) -> List<app.proyecta.shared.SongHit> = { emptyList() },
     bible: Bible? = null,
     onSelectBible: (String) -> Unit = {},
     onSelectSecondBible: (String?) -> Unit = {},
@@ -140,6 +142,7 @@ fun OperatorScreen(
                     onAddAnnouncements = { onAddAnnouncements()?.let { message = it } },
                     onOpenAnnouncements = onOpenAnnouncements,
                     onEditSermon = onEditSermon,
+                    searchSongs = searchSongs,
                 )
                 SlidesPanel(state, Modifier.weight(1f).fillMaxHeight(), send) { id -> if (state.sermon) onEditSermon(id) else onEdit(id) }
                 LivePanel(state, Modifier.width(320.dp).fillMaxHeight(), send)
@@ -230,6 +233,7 @@ private fun LeftPanel(
     onAddAnnouncements: () -> Unit,
     onOpenAnnouncements: () -> Unit,
     onEditSermon: (String?) -> Unit,
+    searchSongs: (String) -> List<app.proyecta.shared.SongHit>,
 ) {
     var tab by remember { mutableIntStateOf(0) }
     val focusManager = LocalFocusManager.current
@@ -251,7 +255,7 @@ private fun LeftPanel(
             }
         }
         when (tab) {
-            0 -> SongsTab(catalog, lastSung, Modifier.weight(1f), send, present, onReload, onOpenFolder, onEdit, onImport, onExport, onEditSermon)
+            0 -> SongsTab(catalog, lastSung, Modifier.weight(1f), send, present, onReload, onOpenFolder, onEdit, onImport, onExport, onEditSermon, searchSongs)
             1 -> BibleTab(catalog, bible, onSelectBible, onSelectSecondBible, Modifier.weight(1f), send, present, searchBible)
             2 -> AnnouncementsTab(catalog.announcements, currentMedia, Modifier.weight(1f), send, present, onAddAnnouncements, onOpenAnnouncements)
             else -> PlanPanel(plan, savedLists, onDeleteSavedList, Modifier.weight(1f).fillMaxWidth(), send)
@@ -272,11 +276,16 @@ private fun SongsTab(
     onImport: () -> Unit,
     onExport: () -> Unit,
     onEditSermon: (String?) -> Unit,
+    searchSongs: (String) -> List<app.proyecta.shared.SongHit>,
 ) {
     var query by remember { mutableStateOf("") }
     var sermons by remember { mutableStateOf(false) }
-    val list = if (sermons) catalog.sermons else catalog.songs
-    val results = remember(query, catalog, sermons) { list.search(query) }
+    // Canciones: por título o por cualquier frase de la letra. Predicaciones: por título.
+    val results = remember(query, catalog, sermons) {
+        if (sermons) catalog.sermons.search(query).map { app.proyecta.shared.SongHit(it.id, it.title, it.firstLine) }
+        else if (query.isBlank()) catalog.songs.map { app.proyecta.shared.SongHit(it.id, it.title, it.firstLine) }
+        else searchSongs(query)
+    }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             FilterChip(!sermons, { sermons = false }, { Text("Canciones (${catalog.songs.size})") })
@@ -284,7 +293,7 @@ private fun SongsTab(
         }
         OutlinedTextField(
             query, { query = it },
-            label = { Text(if (sermons) "Buscar predicación" else "Buscar entre ${catalog.songs.size} canciones") },
+            label = { Text(if (sermons) "Buscar predicación" else "Buscar por título o letra (${catalog.songs.size} canciones)") },
             singleLine = true, modifier = Modifier.fillMaxWidth().marksTyping(),
         )
         LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
@@ -299,7 +308,8 @@ private fun SongsTab(
                         Text(song.title, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         // "Cantada: hace 3 días" ayuda a no repetir
                         Text(
-                            (if (sermons) "" else lastSung[song.id]?.let { "Cantada: ${formatAgo(it)} · " }.orEmpty()) + song.firstLine, style = MaterialTheme.typography.bodySmall, maxLines = 1,
+                            if (song.snippet.isNotEmpty()) "…${song.snippet}…"
+                            else (if (sermons) "" else lastSung[song.id]?.let { "Cantada: ${formatAgo(it)} · " }.orEmpty()) + song.firstLine, style = MaterialTheme.typography.bodySmall, maxLines = 1,
                             overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }

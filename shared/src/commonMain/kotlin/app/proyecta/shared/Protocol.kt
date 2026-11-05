@@ -130,6 +130,10 @@ sealed interface ClientMessage {
     @Serializable @SerialName("bible_search")
     data class BibleSearch(val query: String) : ClientMessage
 
+    /** Buscar canciones por título o por cualquier frase de la letra; responde con ServerMessage.SongResults. */
+    @Serializable @SerialName("song_search")
+    data class SongSearch(val query: String) : ClientMessage
+
     /** Pedir el texto de un capítulo (para el explorador); responde con ServerMessage.BibleChapter. */
     @Serializable @SerialName("bible_chapter")
     data class BibleChapter(val book: String, val chapter: Int) : ClientMessage
@@ -182,6 +186,9 @@ sealed interface ServerMessage {
          */
         val keepSlides: Boolean = false,
     ) : ServerMessage
+
+    @Serializable @SerialName("song_results")
+    data class SongResults(val query: String, val hits: List<SongHit>) : ServerMessage
 
     @Serializable @SerialName("bible_results")
     data class BibleResults(val query: String, val hits: List<BibleHit>, val total: Int = hits.size) : ServerMessage

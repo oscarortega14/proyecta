@@ -71,6 +71,9 @@ class Library(val baseDir: File) {
 
     fun song(id: String): Song? = songs[id]
 
+    /** Canciones por título o por cualquier frase de la letra. */
+    fun searchSongs(query: String): List<app.proyecta.shared.SongHit> = app.proyecta.shared.searchSongsFull(songs.values, query)
+
     private fun songFile(id: String, sermon: Boolean = false) = File(if (sermon) sermonsDir else songsDir, "$id.txt")
 
     /** Texto tal como está en el archivo, para el editor. */

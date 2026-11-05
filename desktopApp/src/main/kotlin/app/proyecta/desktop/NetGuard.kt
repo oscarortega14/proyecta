@@ -55,6 +55,7 @@ object NetGuard {
         is ClientMessage.SetAlert -> msg.copy(text = msg.text.take(MAX_TEXT))
         is ClientMessage.StartCountdown -> msg.copy(text = msg.text.take(MAX_TEXT))
         is ClientMessage.BibleSearch -> msg.copy(query = msg.query.take(MAX_TEXT))
+        is ClientMessage.SongSearch -> msg.copy(query = msg.query.take(MAX_TEXT))
         is ClientMessage.ShowBible -> msg.copy(reference = msg.reference.take(MAX_TEXT))
         is ClientMessage.PlanAddBible -> msg.copy(reference = msg.reference.take(MAX_TEXT))
         else -> msg
@@ -72,7 +73,7 @@ object NetGuard {
             val now = clock()
             tokens = minOf(BURST.toDouble(), tokens + (now - last) / 1e9 * PER_SECOND)
             last = now
-            val cost = if (msg is ClientMessage.BibleSearch) 5.0 else 1.0
+            val cost = if (msg is ClientMessage.BibleSearch || msg is ClientMessage.SongSearch) 5.0 else 1.0
             if (tokens < cost) return false
             tokens -= cost
             return true

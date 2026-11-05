@@ -28,3 +28,33 @@ fun List<SongSummary>.search(query: String): List<SongSummary> {
         words.all { it in hay }
     }
 }
+
+/** Una canción encontrada; [snippet] es la línea de la letra donde apareció (vacío si fue por el título). */
+@kotlinx.serialization.Serializable
+data class SongHit(val id: String, val title: String, val firstLine: String = "", val snippet: String = "")
+
+/**
+ * Busca en el título y en toda la letra (sin tildes ni mayúsculas; todas las palabras deben aparecer).
+ * Primero las que coinciden por título o primera línea, después las que coinciden por la letra,
+ * con la línea donde aparece ("…me gozaré en tu presencia…") para reconocerla.
+ */
+fun searchSongsFull(songs: Collection<Song>, query: String, limit: Int = 100): List<SongHit> {
+    val words = normalizeText(query).split(' ').filter { it.isNotBlank() }
+    val sorted = songs.sortedBy { normalizeText(it.title) }
+    if (words.isEmpty()) return sorted.take(limit).map { it.hit("") }
+    val byTitle = mutableListOf<SongHit>()
+    val byLyrics = mutableListOf<SongHit>()
+    for (song in sorted) {
+        val s = song.summary()
+        if (words.all { it in normalizeText(s.title + " " + s.firstLine) }) { byTitle += song.hit(""); continue }
+        val lines = song.slides.asSequence().flatMap { it.text.lineSequence() }.distinct().toList()
+        if (!words.all { w -> lines.any { w in normalizeText(it) } }) continue
+        // La línea con más palabras buscadas (y, si se puede, con la frase seguida)
+        val phrase = words.joinToString(" ")
+        val best = lines.maxByOrNull { l -> val n = normalizeText(l); (if (phrase in n) 100 else 0) + words.count { it in n } }.orEmpty()
+        byLyrics += song.hit(best.trim())
+    }
+    return (byTitle + byLyrics).take(limit)
+}
+
+private fun Song.hit(snippet: String) = summary().let { SongHit(it.id, it.title, it.firstLine, snippet) }
