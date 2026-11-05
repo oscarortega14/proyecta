@@ -57,4 +57,4 @@ cuota de 5 GB, `SELAH_UPDATE_URL` solo para localhost.
 
 ## Tiendas (estado)
 Ver §9 de `docs/IOS.md`: Google Play (falta crear la app, 12 probadores × 14 días), Microsoft Store
-(falta la cuenta de Partner Center y la identidad del paquete), App Store (en curso desde la Mac).
+(identidad lista: OscarOrtega.SelahRemote, nombre "Selah Remote"; falta enviar el MSIX), App Store (en curso desde la Mac).

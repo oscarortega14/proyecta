@@ -226,7 +226,7 @@ val packageMsix by tasks.registering {
 
         // makeappx.exe: del SDK de Windows, o del paquete NuGet Microsoft.Windows.SDK.BuildTools
         val makeappx = (listOfNotNull(System.getenv("MAKEAPPX")?.let(::File)) +
-            listOfNotNull(System.getenv("LOCALAPPDATA")?.let { File(it, "selah-herramientas") }, File("C:/Program Files (x86)/Windows Kits/10/bin"))
+            listOfNotNull(System.getenv("LOCALAPPDATA")?.let { File(it, "selah-herramientas") }, System.getenv("LOCALAPPDATA")?.let { File(it, "proyecta-herramientas") } /* antes del cambio de nombre */, File("C:/Program Files (x86)/Windows Kits/10/bin"))
                 .flatMap { d -> d.walkTopDown().filter { it.name.equals("makeappx.exe", true) && it.path.contains("x64") }.toList() })
             .firstOrNull { it.isFile } ?: error("No encontré makeappx.exe (SDK de Windows). Define MAKEAPPX con su ruta.")
         val msix = File(root, "Selah-$appVersion.msix")
