@@ -1,7 +1,7 @@
-# Proyecta — contexto para Claude Code
+# Selah — contexto para Claude Code
 
 Programa libre (MIT) para proyectar letras de canciones y la Biblia en iglesias, con control remoto
-desde celulares. Repositorio público: github.com/oscarortega14/proyecta. El dueño habla español;
+desde celulares. Repositorio público: github.com/oscarortega14/selah. El dueño habla español;
 **la interfaz, los comentarios y los mensajes de commit van en español**, en lenguaje sencillo
 (lo usan voluntarios de la iglesia, no técnicos).
 
@@ -20,7 +20,7 @@ desde celulares. Repositorio público: github.com/oscarortega14/proyecta. El due
 
 ## Versiones y herramientas
 Kotlin 2.3.21, Compose MP 1.10.3, AGP 8.13.2, Gradle 8.14.6, JDK 17. Ktor **cliente** 3.1.3 en el celular
-(3.6 trae OkHttp 5 → compileSdk 37). La versión de todo está en `gradle.properties` (`proyecta.version`);
+(3.6 trae OkHttp 5 → compileSdk 37). La versión de todo está en `gradle.properties` (`selah.version`);
 Android: versionCode = a*10000+b*100+c. iOS: `iosApp/project.yml` (mantener igual a mano).
 
 ## Comandos
@@ -36,7 +36,7 @@ cd iosApp && xcodegen                            # proyecto de Xcode
 ```
 
 ## Reglas importantes
-- **Nunca** subir al repositorio claves ni contraseñas: `~/.config/proyecta/` (clave Ed25519 de firma
+- **Nunca** subir al repositorio claves ni contraseñas: `~/.config/selah/` (clave Ed25519 de firma
   de actualizaciones, keystore de Android y sus contraseñas), `desktopApp/pixabay.key`, Team ID privado.
 - Las actualizaciones del PC se verifican con firma Ed25519 (`tools/Firma.java`, clave pública en
   `desktopApp/.../Updater.kt`). La clave privada vive solo en el PC con Windows/WSL del dueño.
@@ -52,7 +52,7 @@ cd iosApp && xcodegen                            # proyecto de Xcode
 ## Seguridad (no romper)
 Clave (PIN) con bloqueo por IP + límite global (`PinGuard`), comprobación de Origin/Host, marcos de 64 KB,
 10 conexiones por IP, 20 mensajes/s, textos recortados (`NetGuard`), subidas solo jpg/png/webp/mp4/mov con
-cuota de 5 GB, `PROYECTA_UPDATE_URL` solo para localhost.
+cuota de 5 GB, `SELAH_UPDATE_URL` solo para localhost.
 
 ## Tiendas (estado)
 Ver §9 de `docs/IOS.md`: Google Play (falta crear la app, 12 probadores × 14 días), Microsoft Store

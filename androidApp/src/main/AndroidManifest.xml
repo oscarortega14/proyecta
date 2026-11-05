@@ -19,11 +19,13 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- proyecta://connect?host=… : el botón "Abrir en la app" del control web -->
+            <!-- selah://connect?host=… : el botón "Abrir en la app" del control web -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="selah" android:host="connect" />
+                <!-- Enlace de un PC que aún tiene la versión 2.4 (cuando se llamaba Proyecta) -->
                 <data android:scheme="proyecta" android:host="connect" />
             </intent-filter>
         </activity>

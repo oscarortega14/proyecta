@@ -1,6 +1,6 @@
 # Se genera con xcodegen a partir de project.yml
 *.xcodeproj/
-ProyectaRemoto/Info.plist
+SelahRemoto/Info.plist
 xcuserdata/
 DerivedData/
 build/

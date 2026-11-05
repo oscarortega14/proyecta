@@ -1,12 +1,12 @@
-# Google Play — textos de la ficha de Proyecta Remoto
+# Google Play — textos de la ficha de Selah Remoto
 
-**Nombre (máx. 30):** Proyecta Remoto
+**Nombre (máx. 30):** Selah Remoto
 
 **Descripción breve (máx. 80):**
 Controla desde tu celular las letras y la Biblia que proyecta tu iglesia
 
 **Descripción completa:**
-Proyecta Remoto es el control remoto de Proyecta, el programa gratuito y de código abierto para proyectar letras de canciones y la Biblia en el videobeam de tu iglesia.
+Selah Remoto es el control remoto de Selah, el programa gratuito y de código abierto para proyectar letras de canciones y la Biblia en el videobeam de tu iglesia.
 
 Con el celular o la tablet en el mismo Wi-Fi que el computador:
 • Pasa las estrofas, salta al coro o pon la pantalla en negro.
@@ -18,14 +18,14 @@ Con el celular o la tablet en el mismo Wi-Fi que el computador:
 
 Encuentra el computador sola, sin escribir direcciones. Para que nadie más en el Wi-Fi mueva la letra, pide una clave de 4 números que aparece en el computador (se pide una sola vez).
 
-Necesitas Proyecta instalado en el computador de la iglesia (Windows). Es libre y gratuito: https://github.com/oscarortega14/proyecta
+Necesitas Selah instalado en el computador de la iglesia (Windows). Es libre y gratuito: https://github.com/oscarortega14/selah
 
 Sin publicidad, sin cuentas y sin recopilar datos: la app solo habla con el computador de tu iglesia.
 
 **Categoría:** Productividad (o Estilo de vida)
 **Etiquetas sugeridas:** iglesia, proyección, letras, Biblia, control remoto
 **Correo de contacto:** (el que uses para Play; obligatorio en la ficha)
-**Política de privacidad:** https://github.com/oscarortega14/proyecta/blob/main/docs/privacidad.md
+**Política de privacidad:** https://github.com/oscarortega14/selah/blob/main/docs/privacidad.md
 
 ---
 
@@ -41,4 +41,4 @@ Sin publicidad, sin cuentas y sin recopilar datos: la app solo habla con el comp
 - **Clasificación de contenido:** sin violencia, sexo, lenguaje ni apuestas; no comparte ubicación; sin interacción entre usuarios (no hay chat) → «Para todos».
 - **Público objetivo:** mayores de 18 (es una herramienta para operadores de proyección); no dirigida a niños.
 - **Anuncios:** la app no contiene anuncios.
-- **Acceso a la app:** no requiere inicio de sesión. Para probarla hace falta Proyecta en un PC con Windows; indicar al revisor: «La app controla el programa Proyecta (gratuito, github.com/oscarortega14/proyecta) en la misma red Wi-Fi. Sin ese programa muestra la pantalla de búsqueda del computador.»
+- **Acceso a la app:** no requiere inicio de sesión. Para probarla hace falta Selah en un PC con Windows; indicar al revisor: «La app controla el programa Selah (gratuito, github.com/oscarortega14/selah) en la misma red Wi-Fi. Sin ese programa muestra la pantalla de búsqueda del computador.»

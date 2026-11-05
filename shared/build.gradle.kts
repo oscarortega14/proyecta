@@ -27,7 +27,7 @@ kotlin {
 
 if (withAndroid) {
     extensions.configure<LibraryExtension> {
-        namespace = "app.proyecta.shared"
+        namespace = "app.selah.shared"
         compileSdk = 36
         defaultConfig { minSdk = 24 }
         compileOptions {

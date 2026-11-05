@@ -5,7 +5,7 @@
     <application>
         <provider
             android:name="androidx.core.content.FileProvider"
-            android:authorities="app.proyecta.remote.archivos"
+            android:authorities="app.selah.remote.archivos"
             android:exported="false"
             android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/archivos" />

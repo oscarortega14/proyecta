@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2B1A63"/>
+      <stop offset="1" stop-color="#5A3BC8"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="512" cy="250" r="640" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#B9A2FF" stop-opacity="0.55"/>
+      <stop offset="0.55" stop-color="#7A5CE0" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#7A5CE0" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="512" cy="598" r="150" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFE3A0" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#FFE3A0" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFE7A3"/>
+      <stop offset="1" stop-color="#F6B53D"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="230" fill="url(#bg)"/>
+  <rect width="1024" height="1024" rx="230" fill="url(#halo)"/>
+  <circle cx="512" cy="598" r="150" fill="url(#glow)"/>
+  <path d="M226,656 A286,300 0 0 1 798,656 A16,16 0 0 1 766,662 A254,226 0 0 0 258,662 A16,16 0 0 1 226,656 Z" fill="url(#gold)"/>
+  <circle cx="512" cy="598" r="66" fill="url(#gold)"/>
+</svg>

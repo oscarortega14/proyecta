@@ -7,15 +7,15 @@ import java.util.Base64;
 import java.util.HexFormat;
 
 /**
- * Firma de los instaladores de Proyecta (Ed25519).
+ * Firma de los instaladores de Selah (Ed25519).
  *
- *   java tools/Firma.java generar ~/.config/proyecta          crea la llave privada y muestra la pública
- *   java tools/Firma.java firmar Proyecta-2.3.0.msi LLAVE     crea Proyecta-2.3.0.msi.sig
- *   java tools/Firma.java verificar Proyecta-2.3.0.msi PUBLICA
+ *   java tools/Firma.java generar ~/.config/selah          crea la llave privada y muestra la pública
+ *   java tools/Firma.java firmar Selah-2.3.0.msi LLAVE     crea Selah-2.3.0.msi.sig
+ *   java tools/Firma.java verificar Selah-2.3.0.msi PUBLICA
  *
  * Se firma "proyecta-msi-v1:" + SHA-256 del archivo (en hexadecimal). La app hace lo mismo al
  * descargar una actualización y la rechaza si la firma no corresponde a la llave pública incluida.
- * La llave privada NUNCA va al repositorio: queda en ~/.config/proyecta y hay que respaldarla.
+ * La llave privada NUNCA va al repositorio: queda en ~/.config/selah y hay que respaldarla.
  */
 public class Firma {
     static final String PREFIX = "proyecta-msi-v1:";

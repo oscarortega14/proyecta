@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<title>Proyecta · OBS</title>
+<title>Selah · OBS</title>
 <!--
   Fuente de navegador para OBS (fondo transparente).
   Parámetros opcionales en la URL:
@@ -34,10 +34,10 @@
 <body>
 <div id="wrap" class="hidden"><div id="box"></div></div>
 <div id="lt" class="off"><div id="ltTitle"></div><div id="ltSub"></div></div>
-<script src="proyecta.js"></script>
+<script src="selah.js"></script>
 <script>
 "use strict";
-const P = Proyecta, S = P.S;
+const P = Selah, S = P.S;
 const params = new URLSearchParams(location.search);
 const wrap = document.getElementById("wrap"), box = document.getElementById("box");
 wrap.classList.add(["top", "center"].includes(params.get("pos")) ? params.get("pos") : "bottom");

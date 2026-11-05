@@ -1,4 +1,4 @@
-rootProject.name = "proyecta"
+rootProject.name = "selah"
 
 pluginManagement {
     repositories {

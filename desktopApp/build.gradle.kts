@@ -16,8 +16,8 @@ kotlin { jvmToolchain(17) }
 
 val ktor = "3.6.1"
 
-/** Versión de Proyecta: va al instalador y a la app (para avisar cuando hay una más nueva). */
-val appVersion = providers.gradleProperty("proyecta.version").get() // un solo número para PC y app: gradle.properties
+/** Versión de Selah: va al instalador y a la app (para avisar cuando hay una más nueva). */
+val appVersion = providers.gradleProperty("selah.version").get() // un solo número para PC y app: gradle.properties
 
 dependencies {
     implementation(project(":shared"))
@@ -41,7 +41,7 @@ dependencies {
 // --- Clave de la API de Pixabay (buscador de fondos) ---
 // No se sube al repositorio: se lee de desktopApp/pixabay.key o de la variable PIXABAY_KEY
 // y se escribe en un recurso generado al compilar.
-val generatedResources = layout.buildDirectory.dir("generated/proyecta-resources")
+val generatedResources = layout.buildDirectory.dir("generated/selah-resources")
 val writeBuildConfig by tasks.registering {
     val keyFile = layout.projectDirectory.file("pixabay.key").asFile
     val key = (System.getenv("PIXABAY_KEY") ?: keyFile.takeIf { it.exists() }?.readText())?.trim().orEmpty()
@@ -49,7 +49,7 @@ val writeBuildConfig by tasks.registering {
     inputs.property("appVersion", appVersion)
     outputs.dir(generatedResources)
     doLast {
-        val f = generatedResources.get().file("proyecta-build.properties").asFile
+        val f = generatedResources.get().file("selah-build.properties").asFile
         f.parentFile.mkdirs()
         f.writeText("pixabay.key=$key\nversion=$appVersion\n")
     }
@@ -96,22 +96,24 @@ val prepareVlc by tasks.registering(Sync::class) {
 
 compose.desktop {
     application {
-        mainClass = "app.proyecta.desktop.MainKt"
+        mainClass = "app.selah.desktop.MainKt"
         // Tope de memoria: sin él Java puede crecer hasta 1/4 de la RAM antes de limpiar.
         // Con 512 MB sobra para proyectar con video y la app nunca se infla en un PC modesto.
         jvmArgs += listOf("-Xmx512m", "-XX:MaxMetaspaceSize=192m")
         nativeDistributions {
             appResourcesRootDir.set(appResources)
             targetFormats(TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "Proyecta"
+            packageName = "Selah"
             packageVersion = appVersion
             description = "Proyección de canciones y Biblia con control remoto"
-            vendor = "Proyecta"
+            vendor = "Selah"
             copyright = "MIT License"
             // Se incluye el entorno Java completo: el PC de la iglesia no necesita instalar nada más.
             includeAllModules = true
+            linux { iconFile.set(project.file("src/main/resources/web/icons/icon-512.png")) }
             windows {
-                menuGroup = "Proyecta"
+                iconFile.set(project.file("icons/selah.ico"))
+                menuGroup = "Selah"
                 dirChooser = true
                 shortcut = true
                 perUserInstall = false
@@ -130,19 +132,19 @@ if (System.getProperty("os.name").startsWith("Windows")) {
     tasks.withType<Test>().configureEach {
         dependsOn(prepareVlc)
         systemProperty("compose.application.resources.dir", appResources.get().dir("windows").asFile.absolutePath)
-        System.getenv("PROYECTA_VIDEO")?.let { environment("PROYECTA_VIDEO", it) }
+        System.getenv("SELAH_VIDEO")?.let { environment("SELAH_VIDEO", it) }
     }
 }
 
 // --- Microsoft Store (MSIX) -------------------------------------------------------------------
 // La tienda vuelve a firmar el MSIX con un certificado de Microsoft: así Windows (incluido el
-// Control inteligente de aplicaciones) confía en Proyecta sin comprar un certificado propio.
+// Control inteligente de aplicaciones) confía en Selah sin comprar un certificado propio.
 //   gradlew.bat :desktopApp:packageMsix     (solo en Windows; necesita makeappx.exe del SDK de Windows)
 val packageMsix by tasks.registering {
     group = "distribution"
-    description = "Arma Proyecta-x.y.z.msix para subir a Microsoft Store"
+    description = "Arma Selah-x.y.z.msix para subir a Microsoft Store"
     dependsOn("createDistributable")
-    val appImage = layout.buildDirectory.dir("compose/binaries/main/app/Proyecta")
+    val appImage = layout.buildDirectory.dir("compose/binaries/main/app/Selah")
     val out = layout.buildDirectory.dir("msix")
     val icon = layout.projectDirectory.file("src/main/resources/web/icons/icon-512.png")
     val props = listOf("msix.identityName", "msix.publisher", "msix.publisherDisplayName", "msix.displayName")
@@ -197,7 +199,7 @@ val packageMsix by tasks.registering {
                 <Resource Language="es-ES" />
               </Resources>
               <Applications>
-                <Application Id="Proyecta" Executable="Proyecta.exe" EntryPoint="Windows.FullTrustApplication">
+                <Application Id="Selah" Executable="Selah.exe" EntryPoint="Windows.FullTrustApplication">
                   <uap:VisualElements DisplayName="${esc(props.getValue("msix.displayName"))}" Description="$desc" BackgroundColor="transparent"
                                       Square150x150Logo="Assets\Square150x150Logo.png" Square44x44Logo="Assets\Square44x44Logo.png">
                     <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
@@ -215,10 +217,10 @@ val packageMsix by tasks.registering {
 
         // makeappx.exe: del SDK de Windows, o del paquete NuGet Microsoft.Windows.SDK.BuildTools
         val makeappx = (listOfNotNull(System.getenv("MAKEAPPX")?.let(::File)) +
-            listOfNotNull(System.getenv("LOCALAPPDATA")?.let { File(it, "proyecta-herramientas") }, File("C:/Program Files (x86)/Windows Kits/10/bin"))
+            listOfNotNull(System.getenv("LOCALAPPDATA")?.let { File(it, "selah-herramientas") }, File("C:/Program Files (x86)/Windows Kits/10/bin"))
                 .flatMap { d -> d.walkTopDown().filter { it.name.equals("makeappx.exe", true) && it.path.contains("x64") }.toList() })
             .firstOrNull { it.isFile } ?: error("No encontré makeappx.exe (SDK de Windows). Define MAKEAPPX con su ruta.")
-        val msix = File(root, "Proyecta-$appVersion.msix")
+        val msix = File(root, "Selah-$appVersion.msix")
         val p = ProcessBuilder(makeappx.absolutePath, "pack", "/d", layoutDir.absolutePath, "/p", msix.absolutePath, "/o")
             .redirectErrorStream(true).start()
         val log = p.inputStream.bufferedReader().readText()

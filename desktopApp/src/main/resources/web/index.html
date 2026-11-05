@@ -5,13 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <meta name="theme-color" content="#16141a">
 <link rel="manifest" href="manifest.json">
-<meta name="apple-mobile-web-app-title" content="Proyecta">
+<meta name="apple-mobile-web-app-title" content="Selah">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" href="icons/favicon.png">
-<title>Proyecta · Control remoto</title>
+<title>Selah · Control remoto</title>
 <style>
   :root { --bg:#16141a; --card:#2a2730; --text:#ece6f0; --muted:#a59fb0; --accent:#cdbdff; --accent-bg:#4f378b; --danger:#f2b8b5; }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -82,7 +82,7 @@
 <body>
 <header id="status"><span class="dot"></span><span id="statusText">Conectando…</span></header>
 <div class="banner" id="appBanner">
-  <span style="flex:1">¿Tienes la app Proyecta Remoto?</span>
+  <span style="flex:1">¿Tienes la app Selah Remoto?</span>
   <a id="openApp" href="#">Abrir en la app</a>
   <button id="closeBanner" aria-label="Cerrar">✕</button>
 </div>
@@ -221,10 +221,10 @@
 </footer>
 <div id="toast"></div>
 
-<script src="proyecta.js"></script>
+<script src="selah.js"></script>
 <script>
 "use strict";
-const P = Proyecta, S = P.S, $ = (id) => document.getElementById(id);
+const P = Selah, S = P.S, $ = (id) => document.getElementById(id);
 
 function showTab(name) {
   document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("on", b.dataset.tab === name));
@@ -371,7 +371,7 @@ function renderBrowser() {
   view.replaceChildren(); crumbs.replaceChildren();
   if (!books.length) {
     view.appendChild(P.el("p", "muted", S.bibleName
-      ? "Para ver los libros, actualiza Proyecta en el computador. Mientras tanto puedes escribir la cita arriba."
+      ? "Para ver los libros, actualiza Selah en el computador. Mientras tanto puedes escribir la cita arriba."
       : "El computador no tiene Biblia cargada."));
     return;
   }
@@ -597,9 +597,9 @@ if (isAndroid && !standalone && store.get("noAppBanner") !== "1") {
   $("openApp").onpointerdown = () => {
     // La app recibe también la clave, así no la vuelve a pedir.
     const pin = pinStore.get();
-    $("openApp").href = "proyecta://connect?host=" + encodeURIComponent(location.hostname) + (pin ? "&pin=" + pin : "");
+    $("openApp").href = "selah://connect?host=" + encodeURIComponent(location.hostname) + (pin ? "&pin=" + pin : "");
   };
-  $("openApp").href = "proyecta://connect?host=" + encodeURIComponent(location.hostname);
+  $("openApp").href = "selah://connect?host=" + encodeURIComponent(location.hostname);
   $("openApp").onclick = () => {
     // Si a los 2 s seguimos aquí, el celular no tiene la app: avisar y seguir en la web.
     let left = false;
@@ -607,7 +607,7 @@ if (isAndroid && !standalone && store.get("noAppBanner") !== "1") {
     document.addEventListener("visibilitychange", gone, { once: true });
     window.addEventListener("blur", gone, { once: true });
     setTimeout(() => {
-      if (!left && document.visibilityState === "visible") toast("Este celular no tiene la app Proyecta Remoto. Puedes seguir usando esta página.");
+      if (!left && document.visibilityState === "visible") toast("Este celular no tiene la app Selah Remoto. Puedes seguir usando esta página.");
     }, 2000);
   };
   $("appBanner").style.display = "flex";

@@ -1,41 +1,41 @@
-# Proyecto de Xcode para Proyecta Remoto en iPhone/iPad.
+# Proyecto de Xcode para Selah Remoto en iPhone/iPad.
 # Se genera con XcodeGen (brew install xcodegen):   cd iosApp && xcodegen
-# Luego abrir ProyectaRemoto.xcodeproj. Ver docs/IOS.md.
-name: ProyectaRemoto
+# Luego abrir SelahRemoto.xcodeproj. Ver docs/IOS.md.
+name: SelahRemoto
 options:
-  bundleIdPrefix: app.proyecta
+  bundleIdPrefix: app.selah
   deploymentTarget:
     iOS: "15.0"
   developmentLanguage: es
 settings:
   base:
-    # Misma versión que el PC y Android (gradle.properties → proyecta.version)
+    # Misma versión que el PC y Android (gradle.properties → selah.version)
     MARKETING_VERSION: "2.4.0"
     CURRENT_PROJECT_VERSION: "20400"
     # Escribe aquí tu Team ID de Apple (developer.apple.com → Membership), o elígelo en Xcode
     DEVELOPMENT_TEAM: ""
     CODE_SIGN_STYLE: Automatic
 targets:
-  ProyectaRemoto:
+  SelahRemoto:
     type: application
     platform: iOS
     sources:
-      - ProyectaRemoto
+      - SelahRemoto
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: app.proyecta.remote
-        PRODUCT_NAME: ProyectaRemoto
+        PRODUCT_BUNDLE_IDENTIFIER: app.selah.remote
+        PRODUCT_NAME: SelahRemoto
         TARGETED_DEVICE_FAMILY: "1,2" # iPhone y iPad
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # El framework de Kotlin lo deja aquí la tarea embedAndSignAppleFrameworkForXcode
         FRAMEWORK_SEARCH_PATHS: ["$(inherited)", "$(SRCROOT)/../remoteUi/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)"]
-        OTHER_LDFLAGS: ["$(inherited)", "-framework", "ProyectaRemotoUI"]
+        OTHER_LDFLAGS: ["$(inherited)", "-framework", "SelahRemotoUI"]
         ENABLE_USER_SCRIPT_SANDBOXING: NO
         ENABLE_BITCODE: NO
     info:
-      path: ProyectaRemoto/Info.plist
+      path: SelahRemoto/Info.plist
       properties:
-        CFBundleDisplayName: Proyecta Remoto
+        CFBundleDisplayName: Selah Remoto
         CFBundleDevelopmentRegion: es
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
@@ -50,17 +50,17 @@ targets:
         UIUserInterfaceStyle: Dark
         # Compose Multiplatform: animaciones a 120 Hz en iPhone Pro
         CADisableMinimumFrameDurationOnPhone: true
-        # iOS pide permiso para hablar con equipos de la red local (el PC con Proyecta)
-        NSLocalNetworkUsageDescription: "Proyecta Remoto se conecta al computador de la iglesia que proyecta las canciones y la Biblia, dentro de la misma red Wi-Fi."
+        # iOS pide permiso para hablar con equipos de la red local (el PC con Selah)
+        NSLocalNetworkUsageDescription: "Selah Remoto se conecta al computador de la iglesia que proyecta las canciones y la Biblia, dentro de la misma red Wi-Fi."
         # La conexión con el PC es ws:// / http:// dentro de la red local (no sale a internet)
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
         # Sin cifrado propio (solo HTTPS del sistema): evita la pregunta de exportación en cada envío
         ITSAppUsesNonExemptEncryption: false
-        # proyecta://connect?host=…
+        # selah://connect?host=…
         CFBundleURLTypes:
-          - CFBundleURLName: app.proyecta.remote
-            CFBundleURLSchemes: [proyecta]
+          - CFBundleURLName: app.selah.remote
+            CFBundleURLSchemes: [selah, proyecta]   # proyecta: PCs con la versión 2.4
     preBuildScripts:
       - name: Compilar Kotlin (remoteUi)
         basedOnDependencyAnalysis: false

@@ -7,14 +7,14 @@ plugins {
 
 kotlin { jvmToolchain(17) }
 
-val appVersion = providers.gradleProperty("proyecta.version").get()
+val appVersion = providers.gradleProperty("selah.version").get()
 
 android {
-    namespace = "app.proyecta.remote"
+    namespace = "app.selah.remote"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "app.proyecta.remote"
+        applicationId = "app.selah.remote"
         minSdk = 24 // Android 7: la tablet de la iglesia
         targetSdk = 36 // Google Play exige apuntar a una versión reciente de Android
         // Mismo número que el programa del PC (gradle.properties); 2.3.0 → 20300
@@ -22,11 +22,13 @@ android {
         versionCode = appVersion.split('.').map { it.toInt() }.let { (a, b, c) -> a * 10000 + b * 100 + c }
     }
 
-    // Clave propia de Proyecta (fuera del repositorio, en ~/.config/proyecta). Android solo acepta
+    // Clave propia de Selah (fuera del repositorio, en ~/.config/selah). Android solo acepta
     // una actualización firmada con la MISMA clave: hay que respaldarla. Sin ella se usa la de depuración.
-    val releaseKey = File(System.getProperty("user.home"), ".config/proyecta/firma-android.properties")
+    val releaseKey = listOf(".config/selah", ".config/proyecta") // la segunda: antes del cambio de nombre
+        .map { File(System.getProperty("user.home"), "$it/firma-android.properties") }
+        .firstOrNull { it.isFile } ?: File(System.getProperty("user.home"), ".config/selah/firma-android.properties")
     signingConfigs {
-        if (releaseKey.isFile) create("proyecta") {
+        if (releaseKey.isFile) create("selah") {
             val p = Properties().apply { releaseKey.inputStream().use { load(it) } }
             storeFile = File(p.getProperty("storeFile"))
             storePassword = p.getProperty("storePassword")
@@ -38,7 +40,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.findByName("proyecta") ?: signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("selah") ?: signingConfigs.getByName("debug")
         }
     }
 

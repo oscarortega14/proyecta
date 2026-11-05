@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" href="icons/favicon.png">
-<title>Proyecta · Escenario</title>
+<title>Selah · Escenario</title>
 <style>
   * { box-sizing:border-box; }
   html, body { margin:0; height:100%; background:#000; color:#fff; font-family:system-ui, -apple-system, Roboto, sans-serif; overflow:hidden; }
@@ -53,10 +53,10 @@
 <div id="nextLbl">Sigue</div>
 <div id="next"></div>
 <div id="status"></div>
-<script src="proyecta.js"></script>
+<script src="selah.js"></script>
 <script>
 "use strict";
-const P = Proyecta, S = P.S, $ = (id) => document.getElementById(id);
+const P = Selah, S = P.S, $ = (id) => document.getElementById(id);
 
 // Ajusta el tamaño de letra para que el texto quepa en su caja.
 function fit(box, maxVh) {
@@ -168,7 +168,7 @@ setInterval(tick, 1000); tick();
 window.addEventListener("resize", render);
 
 P.on("state", render);
-P.on("status", () => { $("status").textContent = S.connected ? "" : "Sin conexión con Proyecta…"; });
+P.on("status", () => { $("status").textContent = S.connected ? "" : "Sin conexión con Selah…"; });
 P.connect();
 </script>
 </body>

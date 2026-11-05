@@ -1,0 +1,417 @@
+package app.selah.desktop
+
+import app.selah.shared.Bible
+import app.selah.shared.Song
+import app.selah.shared.SongParser
+import app.selah.shared.SongSummary
+import app.selah.shared.normalizeText
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import java.io.File
+import java.nio.ByteBuffer
+import java.nio.charset.CharacterCodingException
+import java.nio.charset.Charset
+import java.nio.charset.CodingErrorAction
+
+/** Lo que el remoto necesita saber de la biblioteca. */
+data class ImportResult(val added: Int, val skipped: Int, val renamed: Int)
+
+data class Catalog(
+    val songs: List<SongSummary> = emptyList(),
+    val bibleName: String? = null,
+    val bibleError: String? = null,
+    /** Traducciones para elegir (las de la carpeta biblia/ y las que vienen con el programa). */
+    val bibleNames: List<String> = emptyList(),
+    /** Créditos que exige la licencia de la traducción en uso. */
+    val bibleNotice: String? = null,
+    /** Archivos de la carpeta anuncios (imágenes y videos). */
+    val announcements: List<String> = emptyList(),
+    /** Predicaciones (carpeta predicaciones), con el mismo formato que las canciones. */
+    val sermons: List<SongSummary> = emptyList(),
+    /** Segunda traducción que sale debajo de la primera, o null. */
+    val secondBibleName: String? = null,
+)
+
+/**
+ * Biblioteca en disco:
+ *   <base>/canciones/  un archivo .txt por canción
+ *   <base>/biblia/     Biblias propias (.json o .txt VPL), además de las que vienen con el programa
+ */
+class Library(val baseDir: File) {
+    val songsDir = File(baseDir, "canciones")
+    val bibleDir = File(baseDir, "biblia")
+    val backgroundsDir = File(baseDir, "fondos")
+    val announcementsDir = File(baseDir, "anuncios")
+    val sermonsDir = File(baseDir, "predicaciones")
+    @Volatile private var sermons: Map<String, Song> = emptyMap()
+
+    fun sermon(id: String): Song? = sermons[id]
+
+    @Volatile private var songs: Map<String, Song> = emptyMap()
+    @Volatile var bible: Bible? = null
+        private set
+
+    /** Traducción elegida por el operador (null = la primera de la carpeta, o la Reina-Valera 1909). */
+    @Volatile var preferredBible: String? = null
+
+    /** Segunda traducción elegida (null = ninguna). */
+    @Volatile var preferredSecondBible: String? = null
+
+    /** Segunda traducción en uso (nunca la misma que la primera). */
+    @Volatile var secondBible: Bible? = null
+        private set
+
+    /** Biblias de la carpeta biblia/, ya leídas. */
+    @Volatile private var userBibles: Map<String, Bible> = emptyMap()
+    @Volatile private var bibleErrors: String? = null
+
+    private val _catalog = MutableStateFlow(Catalog())
+    val catalog: StateFlow<Catalog> = _catalog.asStateFlow()
+
+    fun song(id: String): Song? = songs[id]
+
+    /** Canciones por título o por cualquier frase de la letra. */
+    fun searchSongs(query: String): List<app.selah.shared.SongHit> = app.selah.shared.searchSongsFull(songs.values, query)
+
+    private fun songFile(id: String, sermon: Boolean = false) = File(if (sermon) sermonsDir else songsDir, "$id.txt")
+
+    /** Texto tal como está en el archivo, para el editor. */
+    fun rawText(id: String, sermon: Boolean = false): String? = songFile(id, sermon).takeIf { it.isFile }?.let { readTextSmart(it) }
+
+    /**
+     * Guarda una canción y recarga la biblioteca. El nombre del archivo sale del título,
+     * así que si el título cambia el archivo se renombra. Devuelve el id (nombre) final.
+     * Lanza IllegalArgumentException con un mensaje para el usuario si algo no cuadra.
+     */
+    @Synchronized
+    fun save(oldId: String?, text: String, sermon: Boolean = false): String {
+        val dir = if (sermon) sermonsDir else songsDir
+        val what = if (sermon) "una predicación" else "una canción"
+        val normalized = text.replace("\r\n", "\n").replace('\r', '\n').trimEnd() + "\n"
+        if (!normalized.trimStart().startsWith("#")) {
+            throw IllegalArgumentException("La primera línea debe ser el título, por ejemplo: # " + if (sermon) "El buen pastor" else "Cuán grande es Él")
+        }
+        val title = SongParser.parse("", normalized).title.trim()
+        if (title.isEmpty()) throw IllegalArgumentException("Falta el título después de #")
+        val newId = fileNameFor(title)
+        if (newId.isEmpty()) throw IllegalArgumentException("El título no sirve como nombre de archivo")
+        val existing = songFile(newId, sermon)
+        val renaming = oldId != null && !newId.equals(oldId, ignoreCase = true)
+        if ((oldId == null || renaming) && existing.exists()) {
+            throw IllegalArgumentException("Ya existe $what llamada \"$title\"")
+        }
+
+        dir.mkdirs()
+        // Escribir primero a un temporal para no dejar el archivo a medias si algo falla.
+        val tmp = File(dir, ".$newId.tmp")
+        tmp.writeText(normalized, Charsets.UTF_8)
+        if (oldId != null) songFile(oldId, sermon).takeIf { it.exists() }?.delete()
+        if (!tmp.renameTo(existing)) {
+            existing.writeText(normalized, Charsets.UTF_8)
+            tmp.delete()
+        }
+        reload()
+        return newId
+    }
+
+    /** Imágenes disponibles en Selah/fondos (nombres de archivo, en orden alfabético). */
+    fun backgrounds(): List<String> {
+        backgroundsDir.mkdirs()
+        return backgroundsDir.listFiles { f -> f.isFile && f.extension.lowercase() in IMAGE_EXTENSIONS }
+            .orEmpty().map { it.name }.sortedBy { it.lowercase() }
+    }
+
+    /** Videos para fondo en Selah/fondos (se reproducen con VLC). */
+    fun videos(): List<String> {
+        backgroundsDir.mkdirs()
+        return backgroundsDir.listFiles { f -> f.isFile && isVideoFile(f.name) }
+            .orEmpty().map { it.name }.sortedBy { it.lowercase() }
+    }
+
+    fun backgroundFile(name: String): File? =
+        File(backgroundsDir, name).takeIf { it.isFile && it.parentFile == backgroundsDir }
+
+    /**
+     * Pone (o quita, con null) la línea "Fondo:" de una canción, justo debajo del título,
+     * conservando el resto del texto. Devuelve el id de la canción.
+     */
+    @Synchronized
+    fun setSongBackground(id: String, background: String?): String {
+        val text = rawText(id) ?: throw IllegalArgumentException("Canción no encontrada")
+        val lines = text.replace("\r\n", "\n").split('\n').filterNot { FONDO_LINE.matches(it.trim()) }.toMutableList()
+        if (background != null) {
+            val titleAt = lines.indexOfFirst { it.trimStart().startsWith("#") }
+            lines.add(titleAt + 1, "Fondo: $background")
+        }
+        return save(id, lines.joinToString("\n"))
+    }
+
+    /**
+     * Importa canciones: archivos .txt sueltos o dentro de .zip. Si ya existe una con el mismo
+     * nombre y el mismo texto se omite; si el texto es distinto se guarda como "Nombre (2)".
+     */
+    @Synchronized
+    fun importSongs(sources: List<File>): ImportResult {
+        songsDir.mkdirs()
+        var added = 0; var skipped = 0; var renamed = 0
+        fun take(name: String, text: String) {
+            val base = cleanListName(name) ?: return
+            var target = File(songsDir, "$base.txt")
+            if (target.exists()) {
+                if (readTextSmart(target).trim() == text.trim()) { skipped++; return }
+                var n = 2
+                while (File(songsDir, "$base ($n).txt").exists()) n++
+                target = File(songsDir, "$base ($n).txt")
+                renamed++
+            }
+            target.writeText(text, Charsets.UTF_8)
+            added++
+        }
+        // .txt de Selah, .xml OpenLyrics (OpenLP) y .json de Holyrics
+        fun takeFile(name: String, bytes: ByteArray) {
+            val ext = name.substringAfterLast('.', "").lowercase()
+            when (ext) {
+                "txt" -> take(File(name).nameWithoutExtension, decodeSmart(bytes))
+                "xml" -> SongImport.fromOpenLyrics(decodeSmart(bytes))?.let { take(it.title, it.text) }
+                "json" -> SongImport.fromHolyricsJson(decodeSmart(bytes)).forEach { take(it.title, it.text) }
+            }
+        }
+        fun isSongSource(name: String) = name.substringAfterLast('.', "").lowercase() in IMPORT_EXTENSIONS
+        for (src in sources) {
+            when {
+                src.isDirectory -> src.listFiles { f -> f.isFile && isSongSource(f.name) }.orEmpty().forEach { takeFile(it.name, it.readBytes()) }
+                src.extension.equals("zip", true) -> java.util.zip.ZipFile(src).use { zip ->
+                    zip.entries().asSequence()
+                        .filter { !it.isDirectory && isSongSource(it.name) && !it.name.contains("__MACOSX") }
+                        .forEach { e -> takeFile(e.name.substringAfterLast('/'), zip.getInputStream(e).readBytes()) }
+                }
+                isSongSource(src.name) -> takeFile(src.name, src.readBytes())
+            }
+        }
+        reload()
+        return ImportResult(added, skipped, renamed)
+    }
+
+    /** Guarda todas las canciones en un .zip (respaldo o para pasarlas a otro PC). Devuelve cuántas. */
+    fun exportSongs(target: File): Int {
+        val files = songsDir.listFiles { f -> f.isSongFile() }.orEmpty().sortedBy { it.name }
+        java.util.zip.ZipOutputStream(target.outputStream()).use { zip ->
+            for (f in files) {
+                zip.putNextEntry(java.util.zip.ZipEntry("canciones/${f.name}"))
+                f.inputStream().use { it.copyTo(zip) }
+                zip.closeEntry()
+            }
+        }
+        return files.size
+    }
+
+    @Synchronized
+    fun delete(id: String, sermon: Boolean = false) {
+        songFile(id, sermon).delete()
+        reload()
+    }
+
+    @Synchronized
+    fun reload() {
+        songsDir.mkdirs()
+        bibleDir.mkdirs()
+        backgroundsDir.mkdirs()
+        announcementsDir.mkdirs()
+        sermonsDir.mkdirs()
+        if (sermonsDir.listFiles { f -> f.isSongFile() }.isNullOrEmpty()) writeExampleSermon()
+        sermons = sermonsDir.listFiles { f -> f.isSongFile() }.orEmpty()
+            .map { f -> SongParser.parse(f.nameWithoutExtension, readTextSmart(f), f.nameWithoutExtension) }
+            .associateBy { it.id }
+        if (songsDir.listFiles { f -> f.isSongFile() }.isNullOrEmpty()) writeExampleSong()
+
+        val loaded = songsDir.listFiles { f -> f.isSongFile() }.orEmpty()
+            .map { f -> SongParser.parse(f.nameWithoutExtension, readTextSmart(f), f.nameWithoutExtension) }
+            .sortedBy { normalizeText(it.title) }
+        songs = loaded.associateBy { it.id }
+
+        val errors = mutableListOf<String>()
+        // .json (formato propio) o .txt (formato VPL de eBible.org)
+        userBibles = bibleDir.listFiles { f -> f.isFile && f.extension.lowercase() in setOf("json", "txt") }
+            .orEmpty().sortedBy { it.name.lowercase() }
+            .mapNotNull { f ->
+                runCatching {
+                    val text = readTextSmart(f)
+                    if (f.extension.equals("json", true)) Bible.fromJson(text, f.nameWithoutExtension)
+                    else Bible.fromVpl(text, f.nameWithoutExtension)
+                }
+                    .onFailure { errors += "No pude leer ${f.name}: ${it.message}"; Log.error("No pude leer la Biblia ${f.name}", it) }
+                    .getOrNull()
+            }
+            .associateBy { it.name }
+        bibleErrors = errors.joinToString(" · ").ifEmpty { null }
+        refreshBible(loaded.map { it.summary() })
+    }
+
+    /** Cambiar de traducción (se recuerda en [preferredBible]). */
+    @Synchronized
+    fun selectBible(name: String) {
+        preferredBible = name
+        refreshBible(_catalog.value.songs)
+    }
+
+    /** Elegir la segunda traducción (null = ninguna). */
+    @Synchronized
+    fun selectSecondBible(name: String?) {
+        preferredSecondBible = name
+        refreshBible(_catalog.value.songs)
+    }
+
+    private fun refreshBible(songs: List<SongSummary>) {
+        val names = (userBibles.keys + BUNDLED_BIBLES).distinct()
+        val active = preferredBible?.takeIf { it in names } ?: userBibles.keys.firstOrNull() ?: BUNDLED_BIBLES.first()
+        bible = userBibles[active] ?: bundled(active)
+        secondBible = preferredSecondBible?.takeIf { it in names && it != active }?.let { userBibles[it] ?: bundled(it) }
+        // El índice de búsqueda se arma en segundo plano: la primera búsqueda ya no espera (~350 ms → ~50 ms).
+        listOfNotNull(bible, secondBible).forEach { b -> Thread({ runCatching { b.warmUp() } }, "indice-biblia").apply { isDaemon = true; start() } }
+        val error = bibleErrors ?: if (bible == null) "No hay Biblia. Copia un archivo .json o .txt (VPL) en ${bibleDir.absolutePath}" else null
+        _catalog.value = Catalog(
+            songs, bible?.name, error, names, BIBLE_NOTICES[bible?.name], scanAnnouncements(),
+            sermons.values.sortedBy { normalizeText(it.title) }.map { it.summary() },
+            secondBible?.name,
+        )
+    }
+
+    private fun scanAnnouncements(): List<String> = announcementsDir.listFiles { f -> f.isFile && isMediaFile(f.name) }.orEmpty()
+        .sortedBy { normalizeText(it.name) }.map { it.name }
+
+    /** Archivo de un anuncio, solo si está dentro de la carpeta (nada de "../"). */
+    fun announcementFile(name: String): File? =
+        File(announcementsDir, name).takeIf { it.isFile && it.parentFile == announcementsDir && isMediaFile(name) }
+
+    /** Copia imágenes o videos a la carpeta de anuncios. Devuelve cuántos se agregaron. */
+    @Synchronized
+    fun addAnnouncements(files: List<File>): Int {
+        announcementsDir.mkdirs()
+        var n = 0
+        for (f in files.filter { it.isFile && isMediaFile(it.name) }) {
+            var target = File(announcementsDir, f.name)
+            var i = 2
+            while (target.exists() && target.length() != f.length()) target = File(announcementsDir, "${f.nameWithoutExtension} ($i).${f.extension}").also { i++ }
+            if (!target.exists()) { f.copyTo(target); n++ }
+        }
+        refreshAnnouncements()
+        return n
+    }
+
+    /** Lo que ocupa la carpeta de anuncios. */
+    fun announcementsBytes(): Long = announcementsDir.listFiles().orEmpty().sumOf { it.length() }
+
+    @Synchronized
+    fun refreshAnnouncements() {
+        _catalog.value = _catalog.value.copy(announcements = scanAnnouncements())
+    }
+
+    private fun File.isSongFile() = isFile && extension.equals("txt", true)
+
+    private fun writeExampleSermon() {
+        File(sermonsDir, "Ejemplo de predicación.txt").writeText(
+            """
+            # El buen pastor
+
+            Introducción:
+            Dios nos busca primero
+            aunque nos alejemos
+
+            Biblia: Juan 10:11
+
+            Punto 1:
+            Él conoce a sus ovejas
+
+            Punto 2:
+            Él da su vida por ellas
+
+            Biblia: Salmos 23:1-3
+
+            Conclusión:
+            Volvamos al buen pastor
+            """.trimIndent() + "\n",
+            Charsets.UTF_8,
+        )
+    }
+
+    private fun writeExampleSong() {
+        File(songsDir, "Canción de ejemplo.txt").writeText(
+            """
+            # Canción de ejemplo
+
+            Esta es la primera estrofa
+            Cada bloque separado por una línea en blanco
+            es una diapositiva
+
+            Coro:
+            Si la primera línea termina en dos puntos
+            se usa como etiqueta (Coro, Verso 2, Puente…)
+
+            Puedes borrar este archivo y crear
+            un .txt por cada canción en esta carpeta
+            """.trimIndent() + "\n",
+            Charsets.UTF_8,
+        )
+    }
+
+    companion object {
+        /** Biblias que vienen con el programa (archivos VPL en resources/biblia). */
+        val BUNDLED_BIBLES = listOf("Reina-Valera 1909", "Versión Biblia Libre")
+
+        /** Créditos que pide la licencia (CC BY-SA 4.0) de cada traducción incluida. */
+        val BIBLE_NOTICES = mapOf(
+            "Versión Biblia Libre" to "© 2018-2020 Jonathan Gallagher y Shelly Barrios de Avila · CC BY-SA 4.0 · eBible.org",
+        )
+
+        private val bundledCache = java.util.concurrent.ConcurrentHashMap<String, Bible>()
+
+        /** Una Biblia incluida, leída la primera vez que se usa. */
+        fun bundled(name: String): Bible? {
+            if (name !in BUNDLED_BIBLES) return null
+            bundledCache[name]?.let { return it }
+            val bible = Library::class.java.getResourceAsStream("/biblia/$name.txt")?.use { input ->
+                runCatching { Bible.fromVpl(decodeSmart(input.readBytes()), name) }.getOrNull()
+            } ?: return null
+            return bundledCache.putIfAbsent(name, bible) ?: bible
+        }
+
+        /** Reina-Valera 1909 (dominio público) incluida en el programa. */
+        val bundledBible: Bible? get() = bundled("Reina-Valera 1909")
+
+        fun decodeSmart(bytes: ByteArray): String = try {
+            Charsets.UTF_8.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .decode(ByteBuffer.wrap(bytes)).toString()
+        } catch (_: CharacterCodingException) {
+            String(bytes, Charset.forName("windows-1252"))
+        }.removePrefix("\uFEFF")
+
+        /** Lo que se puede importar: .txt (Selah), .xml (OpenLyrics/OpenLP), .json (Holyrics) y .zip con esos. */
+        val IMPORT_EXTENSIONS = setOf("txt", "xml", "json")
+
+        fun isMediaFile(name: String) = name.substringAfterLast('.', "").lowercase().let { it in IMAGE_EXTENSIONS || it in VIDEO_EXTENSIONS }
+
+        val IMAGE_EXTENSIONS = setOf("jpg", "jpeg", "png", "webp", "bmp")
+        private val FONDO_LINE = Regex("""^fondo\s*:.*$""", RegexOption.IGNORE_CASE)
+        private val FORBIDDEN = Regex("""[\\/:*?"<>|\u0000-\u001F]""")
+
+        /** "Salmo 2:7" -> "Salmo 2-7": caracteres que Windows no permite en nombres de archivo. */
+        fun fileNameFor(title: String): String =
+            title.replace(FORBIDDEN, "-").replace(Regex("\\s+"), " ").trim().trimEnd('.').take(100).trim()
+
+        /** Lee UTF-8; si el archivo fue guardado en ANSI (Bloc de notas viejo), usa Windows-1252. */
+        fun readTextSmart(f: File): String {
+            val bytes = f.readBytes()
+            return try {
+                Charsets.UTF_8.newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT)
+                    .decode(ByteBuffer.wrap(bytes)).toString()
+            } catch (_: CharacterCodingException) {
+                String(bytes, Charset.forName("windows-1252"))
+            }.removePrefix("﻿")
+        }
+    }
+}

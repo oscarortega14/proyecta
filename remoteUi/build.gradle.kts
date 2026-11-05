@@ -1,7 +1,7 @@
 import com.android.build.gradle.LibraryExtension
 
 /*
- * Interfaz de Proyecta Remoto compartida entre Android e iPhone (Compose Multiplatform).
+ * Interfaz de Selah Remoto compartida entre Android e iPhone (Compose Multiplatform).
  * commonMain: pantallas, conexión con el PC, clave, Biblia, lista… (todo lo que se ve)
  * androidMain / iosMain: lo propio de cada sistema (red, búsqueda del PC, preferencias, fotos).
  */
@@ -22,7 +22,7 @@ kotlin {
     // iPhone: el framework que usa el proyecto de Xcode (iosApp/). Solo se compila en una Mac.
     listOf(iosArm64(), iosSimulatorArm64(), iosX64()).forEach {
         it.binaries.framework {
-            baseName = "ProyectaRemotoUI"
+            baseName = "SelahRemotoUI"
             isStatic = true
         }
     }
@@ -53,7 +53,7 @@ kotlin {
 
 if (withAndroid) {
     extensions.configure<LibraryExtension> {
-        namespace = "app.proyecta.remote.ui"
+        namespace = "app.selah.remote.ui"
         compileSdk = 36
         defaultConfig { minSdk = 24 }
         compileOptions {
