@@ -25,6 +25,8 @@ data class Theme(
      * animados a 24 cuadros/s en baja resolución. Detrás de la letra casi no se nota.
      */
     val light: Boolean = false,
+    /** Fundido corto (unos 300 ms) al cambiar de diapositiva, en vez de un salto. */
+    val fade: Boolean = true,
     /** Cuánto oscurecer el fondo de imagen para que se lea la letra (0 = nada, 0.8 = casi negro). */
     val dim: Float = 0.3f,
     val textColor: String = "#FFFFFF",

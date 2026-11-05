@@ -238,6 +238,10 @@ fun BackgroundsWindow(
                             Switch(theme.light, { v -> themes.update { it.copy(light = v) } })
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Fundido suave al cambiar de diapositiva", modifier = Modifier.weight(1f))
+                            Switch(theme.fade, { v -> themes.update { it.copy(fade = v) } })
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("Sombra detrás de la letra", modifier = Modifier.weight(1f))
                             Switch(theme.shadow, { v -> themes.update { it.copy(shadow = v) } })
                         }

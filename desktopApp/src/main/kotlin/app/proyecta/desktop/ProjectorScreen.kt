@@ -93,8 +93,16 @@ fun ProjectorScreen(state: PresentationState, modifier: Modifier = Modifier, loo
                     val w = maxWidth
                     val h = maxHeight
                     val bottom = if (state.alert.isNotEmpty()) alertBarHeight(h) else 0.dp
-                    Box(Modifier.fillMaxSize().padding(bottom = bottom)) {
-                        SlideText(state, slide.text, slide.label, theme, w, h - bottom, slide.text2)
+                    // Fundido corto entre diapositivas (el fondo no se toca). En miniaturas y pruebas, sin animación.
+                    val fadeMillis = if (theme.fade && look.frozenTime == null) FADE_MILLIS else 0
+                    androidx.compose.animation.Crossfade(
+                        targetState = ShownSlide(slide.text, slide.label, slide.text2),
+                        animationSpec = androidx.compose.animation.core.tween(fadeMillis),
+                        label = "diapositiva",
+                    ) { shown ->
+                        Box(Modifier.fillMaxSize().padding(bottom = bottom)) {
+                            SlideText(state, shown.text, shown.label, theme, w, h - bottom, shown.text2)
+                        }
                     }
                 }
             }
@@ -102,6 +110,12 @@ fun ProjectorScreen(state: PresentationState, modifier: Modifier = Modifier, loo
         }
     }
 }
+
+/** Duración del fundido entre diapositivas. Corto: se nota suave pero no hace esperar. */
+internal const val FADE_MILLIS = 300
+
+/** Lo que identifica a una diapositiva en pantalla (si cambia, hay fundido). */
+private data class ShownSlide(val text: String, val label: String, val text2: String)
 
 /** Imagen entera (con franjas negras si no es 16:9) o video con sonido. */
 @Composable
