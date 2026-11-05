@@ -21,6 +21,8 @@ data class Release(
     /** SHA-256 que publica GitHub para el archivo (si lo trae), para verificar la descarga. */
     val sha256: String? = null,
     val size: Long = 0,
+    /** Firma Ed25519 del instalador (Proyecta-x.msi.sig). Sin firma válida no se instala. */
+    val sigUrl: String? = null,
 )
 
 /**
@@ -28,7 +30,28 @@ data class Release(
  * se descarga el .msi, se verifica y se instala (reemplaza la anterior gracias al upgradeUuid).
  */
 object Updater {
-    const val LATEST_URL = "https://api.github.com/repos/oscarortega14/proyecta/releases/latest"
+    const val LATEST_URL = app.proyecta.shared.RELEASES_LATEST_URL
+
+    /**
+     * Llave pública de las versiones oficiales (Ed25519). La privada solo la tiene quien publica
+     * (~/.config/proyecta/firma-ed25519.key, fuera del repositorio). Aunque alguien entrara a la cuenta
+     * de GitHub y publicara un instalador falso, Proyecta no lo instalaría.
+     */
+    const val PUBLIC_KEY = "MCowBQYDK2VwAyEABTkEXD35az+WB+TSi6dYSfcoYyUfQNcUb1ZBjJvIiUM="
+
+    /** Lo que se firma: "proyecta-msi-v1:" + SHA-256 del instalador (igual que tools/Firma.java). */
+    fun signedMessage(sha256Hex: String) = "proyecta-msi-v1:$sha256Hex".toByteArray()
+
+    /** ¿[signatureB64] es una firma válida de las versiones oficiales para un instalador con este SHA-256? */
+    fun verifySignature(sha256Hex: String, signatureB64: String, publicKey: String = PUBLIC_KEY): Boolean = runCatching {
+        val key = java.security.KeyFactory.getInstance("Ed25519")
+            .generatePublic(java.security.spec.X509EncodedKeySpec(java.util.Base64.getDecoder().decode(publicKey)))
+        java.security.Signature.getInstance("Ed25519").run {
+            initVerify(key)
+            update(signedMessage(sha256Hex))
+            verify(java.util.Base64.getDecoder().decode(signatureB64.trim()))
+        }
+    }.getOrDefault(false)
 
     /** Versión de este programa (la escribe el build en proyecta-build.properties). */
     val currentVersion: String by lazy {
@@ -40,15 +63,7 @@ object Updater {
     }
 
     /** "1.10.0" > "1.9.2"; ignora una "v" al inicio y sufijos como "-beta". */
-    fun isNewer(candidate: String, current: String): Boolean {
-        fun parts(v: String) = v.trim().removePrefix("v").substringBefore('-').split('.').map { it.toIntOrNull() ?: 0 }
-        val a = parts(candidate); val b = parts(current)
-        for (i in 0 until maxOf(a.size, b.size)) {
-            val x = a.getOrElse(i) { 0 }; val y = b.getOrElse(i) { 0 }
-            if (x != y) return x > y
-        }
-        return false
-    }
+    fun isNewer(candidate: String, current: String): Boolean = app.proyecta.shared.Releases.isNewer(candidate, current)
 
     /** ¿Avisar de esta versión? Solo si es más nueva y el operador no pidió saltarla. */
     fun shouldOffer(release: Release?, current: String, skipped: String?): Boolean =
@@ -56,16 +71,9 @@ object Updater {
 
     /** Lee la respuesta de GitHub (releases/latest). null si no hay .msi o no se entiende. */
     fun parseRelease(json: String): Release? {
-        val o = runCatching { Json.parseToJsonElement(json) as? JsonObject }.getOrNull() ?: return null
-        if ((o["draft"] as? JsonPrimitive)?.contentOrNull == "true" || (o["prerelease"] as? JsonPrimitive)?.contentOrNull == "true") return null
-        // Solo números y puntos: la versión termina en un nombre de archivo y en el script de instalación.
-        val version = o.str("tag_name")?.trim()?.removePrefix("v")?.takeIf { Regex("""\d{1,4}(\.\d{1,4}){1,3}""").matches(it) } ?: return null
-        val msi = (o["assets"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
-            .firstOrNull { it.str("name").orEmpty().endsWith(".msi", ignoreCase = true) } ?: return null
-        val url = msi.str("browser_download_url")?.takeIf { it.startsWith("https://") } ?: return null
-        val sha = msi.str("digest")?.takeIf { it.startsWith("sha256:") }?.removePrefix("sha256:")?.lowercase()
-        val size = msi.str("size")?.toLongOrNull() ?: 0
-        return Release(version, url, o.str("body").orEmpty().trim(), sha, size)
+        val r = app.proyecta.shared.Releases.parse(json) ?: return null
+        val msi = r.asset(".msi") ?: return null
+        return Release(r.version, msi.url, r.notes, msi.sha256, msi.size, r.asset(".msi.sig")?.url)
     }
 
     /** Pregunta a GitHub. null si no hay internet, no hay versiones publicadas o algo falla. */
@@ -104,8 +112,23 @@ object Updater {
         val sha = digest.digest().joinToString("") { "%02x".format(it) }
         if (release.sha256 != null && sha != release.sha256) {
             target.delete()
-            error("La descarga llegó dañada (la firma no coincide). Intenta de nuevo.")
+            error("La descarga llegó dañada. Intenta de nuevo.")
         }
+        // Firma oficial: sin ella (o si no corresponde) no se instala, venga de donde venga.
+        val signature = release.sigUrl?.let { url ->
+            runCatching {
+                val s = URI(url).toURL().openConnection() as HttpURLConnection
+                s.connectTimeout = 15000; s.readTimeout = 15000
+                s.setRequestProperty("User-Agent", "Proyecta/$currentVersion")
+                if (s.responseCode == 200) s.inputStream.use { it.readBytes().decodeToString() } else null
+            }.getOrNull()
+        }
+        if (signature == null || !verifySignature(sha, signature)) {
+            target.delete()
+            Log.error("Actualización ${release.version} RECHAZADA: falta la firma oficial o no corresponde")
+            error("Esta versión no tiene la firma oficial de Proyecta, así que no se instala por seguridad.")
+        }
+        Log.info("Actualización ${release.version} descargada y con firma válida")
         target
     }
 

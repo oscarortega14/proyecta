@@ -1,3 +1,4 @@
+import java.util.Properties
 plugins {
     id("com.android.application")
     kotlin("android")
@@ -5,6 +6,8 @@ plugins {
 }
 
 kotlin { jvmToolchain(17) }
+
+val appVersion = providers.gradleProperty("proyecta.version").get()
 
 android {
     namespace = "app.proyecta.remote"
@@ -14,15 +17,28 @@ android {
         applicationId = "app.proyecta.remote"
         minSdk = 24 // Android 7: la tablet de la iglesia
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        // Mismo número que el programa del PC (gradle.properties); 2.3.0 → 20300
+        versionName = appVersion
+        versionCode = appVersion.split('.').map { it.toInt() }.let { (a, b, c) -> a * 10000 + b * 100 + c }
+    }
+
+    // Clave propia de Proyecta (fuera del repositorio, en ~/.config/proyecta). Android solo acepta
+    // una actualización firmada con la MISMA clave: hay que respaldarla. Sin ella se usa la de depuración.
+    val releaseKey = File(System.getProperty("user.home"), ".config/proyecta/firma-android.properties")
+    signingConfigs {
+        if (releaseKey.isFile) create("proyecta") {
+            val p = Properties().apply { releaseKey.inputStream().use { load(it) } }
+            storeFile = File(p.getProperty("storeFile"))
+            storePassword = p.getProperty("storePassword")
+            keyAlias = p.getProperty("keyAlias")
+            keyPassword = p.getProperty("keyPassword")
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            // Firmado con la clave de depuración para poder instalarlo directo por adb.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("proyecta") ?: signingConfigs.getByName("debug")
         }
     }
 

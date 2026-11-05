@@ -14,7 +14,7 @@ kotlin { jvmToolchain(17) }
 val ktor = "3.1.3"
 
 /** Versión de Proyecta: va al instalador y a la app (para avisar cuando hay una más nueva). */
-val appVersion = "2.2.2"
+val appVersion = providers.gradleProperty("proyecta.version").get() // un solo número para PC y app: gradle.properties
 
 dependencies {
     implementation(project(":shared"))

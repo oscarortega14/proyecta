@@ -64,3 +64,42 @@ class UpdaterTest {
         assertTrue(Regex("""\d+\.\d+\.\d+""").matches(Updater.currentVersion))
     }
 }
+
+class SignatureTest {
+    private fun keyPair() = java.security.KeyPairGenerator.getInstance("Ed25519").generateKeyPair()
+    private fun b64(b: ByteArray) = java.util.Base64.getEncoder().encodeToString(b)
+
+    @Test
+    fun acceptsOnlyTheOfficialSignatureForThatExactInstaller() {
+        val kp = keyPair()
+        val pub = b64(kp.public.encoded)
+        val sha = "ab".repeat(32)
+        val sig = java.security.Signature.getInstance("Ed25519").run { initSign(kp.private); update(Updater.signedMessage(sha)); b64(sign()) }
+        kotlin.test.assertTrue(Updater.verifySignature(sha, sig, pub))
+        kotlin.test.assertFalse(Updater.verifySignature("cd".repeat(32), sig, pub)) // otro instalador
+        kotlin.test.assertFalse(Updater.verifySignature(sha, sig, b64(keyPair().public.encoded))) // otra llave
+        kotlin.test.assertFalse(Updater.verifySignature(sha, "basura", pub))
+        kotlin.test.assertFalse(Updater.verifySignature(sha, sig)) // la llave oficial no firmó esto
+    }
+
+    /** Con un instalador firmado de verdad por tools/Firma.java:  PROYECTA_SIGNED=/ruta/Proyecta-x.msi */
+    @Test
+    fun realSignedInstaller() {
+        val path = System.getenv("PROYECTA_SIGNED") ?: return
+        val f = java.io.File(path)
+        val sha = java.security.MessageDigest.getInstance("SHA-256").digest(f.readBytes()).joinToString("") { "%02x".format(it) }
+        kotlin.test.assertTrue(Updater.verifySignature(sha, java.io.File("$path.sig").readText()))
+    }
+
+    @Test
+    fun releaseWithSignatureAsset() {
+        val r = Updater.parseRelease(
+            """{"tag_name":"v2.3.0","assets":[
+              {"name":"Proyecta-2.3.0.msi","browser_download_url":"https://x/Proyecta-2.3.0.msi","size":5},
+              {"name":"Proyecta-2.3.0.msi.sig","browser_download_url":"https://x/Proyecta-2.3.0.msi.sig","size":1},
+              {"name":"ProyectaRemoto.apk","browser_download_url":"https://x/ProyectaRemoto.apk","size":2}]}""",
+        )!!
+        kotlin.test.assertEquals("https://x/Proyecta-2.3.0.msi", r.msiUrl)
+        kotlin.test.assertEquals("https://x/Proyecta-2.3.0.msi.sig", r.sigUrl)
+    }
+}
