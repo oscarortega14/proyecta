@@ -40,6 +40,7 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
         }
         if (withAndroid) androidMain.dependencies {
             implementation("io.ktor:ktor-client-okhttp:$ktor")

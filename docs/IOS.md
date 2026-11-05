@@ -32,12 +32,16 @@ módulo compartido `remoteUi/` (Compose Multiplatform). Ya está hecho y probado
 1. ~~Compilar por primera vez `iosMain`~~ **Hecho (5 nov 2026, Xcode 27.2):** compiló sin cambios; las 39
    pruebas comunes pasan en el simulador (`:remoteUi:iosSimulatorArm64Test`, `:shared:iosSimulatorArm64Test`).
 2. Probar contra el PC con Selah: **simulador hecho** (iPhone 17 Pro, iOS 26): el enlace `selah://connect`
-   conecta con la clave, se eligió una canción, se pasaron diapositivas y Negro. **Falta un iPhone real.**
+   conecta con la clave, se eligió una canción, se pasaron diapositivas y Negro.
+   **iPhone real hecho** (iPhone 17 Pro Max, firmado con la cuenta individual de pago; el Team ID no va al repo:
+   `xcodebuild … -allowProvisioningUpdates DEVELOPMENT_TEAM=<id>`): conecta y controla igual.
    - En Xcode 27 la ventana del simulador se llama **DeviceHub** (`Xcode.app/Contents/Applications/DeviceHub.app`).
    - En el simulador usar la IP de la Mac en el Wi-Fi, no `127.0.0.1` (otro programa puede tener el puerto 8765 local).
    - Aviso del enlazador: `libicu.icudtl_dat.o` (de Compose) está hecho para iOS 17.2 y la app pide 15.0.
      Es solo datos; revisar en un iPhone con iOS 15–17 antes de publicar, o subir el mínimo a 17.
-3. Búsqueda automática del PC en iPhone (ver §5: dos caminos).
+3. ~~Búsqueda automática del PC en iPhone~~ **Hecho con el camino A de §5** (`SubnetScan` en commonMain +
+   `discoverServers`/`wifiIpv4` en `Platform.ios.kt`): en un iPhone real encontró en pocos segundos la Mac
+   con Selah y el PC con Windows que aún tiene la 2.4 (Proyecta).
 4. Subir fotos/videos a Anuncios desde el iPhone (ver §6). Mientras no esté, el botón no aparece.
 5. Capturas, ficha y envío a App Store Connect / TestFlight (§8).
 
@@ -135,7 +139,7 @@ requiere el permiso especial de Apple** `com.apple.developer.networking.multicas
 
 Dos caminos (se pueden hacer los dos):
 
-**A. Sin pedir nada a Apple: recorrer la subred por HTTP** (recomendado primero)
+**A. Sin pedir nada a Apple: recorrer la subred por HTTP** — **hecho** (5 nov 2026)
 - Averiguar la IP propia del iPhone en Wi-Fi (interfaz `en0`) con `getifaddrs` (posix, cinterop).
 - Probar `GET http://<prefijo>.1…254:8765/info` en paralelo (≈ 32 a la vez, tiempo límite ≈ 700 ms,
   plugin `HttpTimeout` de Ktor). Los que respondan son PCs con Selah (`DiscoveryReply.name`).
