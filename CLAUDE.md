@@ -19,7 +19,8 @@ desde celulares. Repositorio público: github.com/oscarortega14/selah. El dueño
 - `iosApp/` — SwiftUI mínimo + `project.yml` (XcodeGen). El .xcodeproj no se versiona.
 
 ## Versiones y herramientas
-Kotlin 2.3.21, Compose MP 1.10.3, AGP 8.13.2, Gradle 8.14.6, JDK 17. Ktor **cliente** 3.1.3 en el celular
+Kotlin 2.3.21, Compose MP 1.10.3, AGP 8.13.2, Gradle 8.14.6. Java: **21 en `desktopApp`** (va dentro del instalador), **17 en `shared`/`remoteUi`/`androidApp`**
+(Android no usa ese Java; AGP 8.13 pide 17). Gradle descarga solo los que falten. Ktor **cliente** 3.1.3 en el celular
 (3.6 trae OkHttp 5 → compileSdk 37). La versión de todo está en `gradle.properties` (`selah.version`);
 Android: versionCode = a*10000+b*100+c. iOS: `iosApp/project.yml` (mantener igual a mano).
 

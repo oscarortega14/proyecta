@@ -75,13 +75,14 @@ selah/
 ```bash
 # Xcode desde la App Store (16 o más nuevo) y abrirlo una vez para aceptar la licencia
 xcode-select --install                 # herramientas de línea de comandos
-brew install --cask temurin@17         # JDK 17 (Gradle lo necesita)
+brew install --cask temurin@21         # Java para correr Gradle (descarga solo el 17 que usa el celular)
 brew install xcodegen                  # genera el .xcodeproj a partir de iosApp/project.yml
 git clone https://github.com/oscarortega14/selah.git && cd selah
 # (o, si ya estaba: git pull)
 ```
 
-Si Gradle no encuentra Java: `export JAVA_HOME=$(/usr/libexec/java_home -v 17)`.
+Si Gradle no encuentra Java: `export JAVA_HOME=$(/usr/libexec/java_home -v 21)`
+(o el de Android Studio: `/Applications/Android Studio.app/Contents/jbr/Contents/Home`).
 
 ## 4. Compilar y correr
 

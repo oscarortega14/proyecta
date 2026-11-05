@@ -138,7 +138,7 @@ En la tablet o el celular: abrir la app. Encuentra sola al PC en la red (si el r
 
 ## Compilar
 
-Requisitos: JDK 17. Para Android, además el SDK de Android (`scripts/setup-wsl.sh` lo instala en WSL/Ubuntu).
+Requisitos: JDK 17 o más nuevo (Gradle descarga solo el Java 21 del programa de escritorio y el 17 del celular). Para Android, además el SDK de Android (`scripts/setup-wsl.sh` lo instala en WSL/Ubuntu).
 
 ```bash
 ./gradlew test                                  # pruebas

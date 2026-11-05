@@ -8,6 +8,11 @@ pluginManagement {
     }
 }
 
+// Descarga sola el Java que pida cada módulo (21 para el PC, 17 para el celular) si no está instalado.
+plugins {
+    id("org.gradle.toolchains.foojay-resolver-convention") version "0.10.0"
+}
+
 dependencyResolutionManagement {
     repositories {
         google()

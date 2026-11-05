@@ -12,7 +12,9 @@ plugins {
     id("org.jetbrains.compose")
 }
 
-kotlin { jvmToolchain(17) }
+// Java 21 (soporte largo): es el que va dentro del instalador y corre en el PC de la iglesia.
+// El celular y lo compartido siguen en 17 (Android no usa este Java).
+kotlin { jvmToolchain(21) }
 
 val ktor = "3.6.1"
 
@@ -97,6 +99,13 @@ val prepareVlc by tasks.registering(Sync::class) {
 compose.desktop {
     application {
         mainClass = "app.selah.desktop.MainKt"
+        // El Java que va dentro del instalador: siempre un Temurin 21 completo (trae jpackage), no el que
+        // corre Gradle (si Gradle corre con 17, el programa compilado para 21 no arrancaría) ni el de
+        // Android Studio (no trae jpackage). Gradle lo descarga solo si no está.
+        javaHome = javaToolchains.launcherFor {
+            languageVersion.set(JavaLanguageVersion.of(21))
+            vendor.set(JvmVendorSpec.ADOPTIUM)
+        }.get().metadata.installationPath.asFile.absolutePath
         // Tope de memoria: sin él Java puede crecer hasta 1/4 de la RAM antes de limpiar.
         // Con 512 MB sobra para proyectar con video y la app nunca se infla en un PC modesto.
         jvmArgs += listOf("-Xmx512m", "-XX:MaxMetaspaceSize=192m")
