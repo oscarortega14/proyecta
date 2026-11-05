@@ -25,6 +25,7 @@ class UploadTest {
         assertEquals("Anuncio 2026-11-08 10-30-05.jpg", RemoteServer.uploadName("image.jpg", t))
         assertEquals("Anuncio 2026-11-08 10-30-05.jpg", RemoteServer.uploadName("IMG_4821.JPG".lowercase(), t))
         assertEquals("Anuncio 2026-11-08 10-30-05.mp4", RemoteServer.uploadName("VID_20261108_103000.mp4", t))
+        assertEquals("Anuncio 2026-11-08 10-30-05.mov", RemoteServer.uploadName("f2c3fab1-dd3a-4564-b1f2-124ab554ef62.mov", t)) // iPhone
         assertEquals("Retiro de jóvenes.png", RemoteServer.uploadName("Retiro de jóvenes.png", t))
         assertEquals("secreto.png", RemoteServer.uploadName("../../Windows/secreto.png", t)) // sin carpetas
         assertNull(RemoteServer.uploadName("virus.exe", t))

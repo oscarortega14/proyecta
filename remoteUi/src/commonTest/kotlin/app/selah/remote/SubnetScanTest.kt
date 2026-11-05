@@ -37,3 +37,17 @@ class SubnetScanTest {
         assertEquals(setOf(FoundServer("PC-IGLESIA", "192.168.40.9"), FoundServer("SONIDO", "192.168.40.77")), found.toSet())
     }
 }
+
+class UploadFileNameTest {
+    @Test
+    fun keepsTheNameAndUsesTheRealExtension() {
+        assertEquals("IMG_1234.jpg", uploadFileName("IMG_1234.HEIC", "jpg"))   // foto HEIC convertida
+        assertEquals("Retiro jóvenes.mov", uploadFileName("Retiro jóvenes.MOV", "MOV"))
+        assertEquals("anuncio.jpg", uploadFileName(null, "jpg"))
+        assertEquals("anuncio.mp4", uploadFileName("  ", ".mp4"))
+        assertEquals("foto.png", uploadFileName("../../carpeta/foto.png", "png"))
+        // El iPhone a veces solo da un código: se manda como genérico (el PC le pone "Anuncio <fecha>")
+        assertEquals("foto.jpg", uploadFileName("610B91B5-1580-4A1F-8DB9-530B76F78203", "jpg", "foto"))
+        assertEquals("video.mov", uploadFileName("f2c3fab1-dd3a-4564-b1f2-124ab554ef62.MOV", "mov", "video"))
+    }
+}

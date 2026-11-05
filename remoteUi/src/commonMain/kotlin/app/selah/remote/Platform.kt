@@ -40,3 +40,18 @@ interface KeyValueStore {
     fun get(key: String): String?
     fun put(vararg pairs: Pair<String, String>)
 }
+
+/**
+ * Nombre para subir un anuncio: el que sugiere el sistema (sin carpetas ni extensión) + [extension].
+ * "IMG_1234.HEIC" convertida a JPG → "IMG_1234.jpg". Si no hay nombre o es un código (el iPhone
+ * entrega "610B91B5-1580-…"), se usa [generic] ("foto", "video"): el PC lo cambia por "Anuncio <fecha>".
+ */
+fun uploadFileName(suggested: String?, extension: String, generic: String = "anuncio"): String {
+    val base = suggested.orEmpty().substringAfterLast('/').substringAfterLast('\\')
+        .let { if ('.' in it) it.substringBeforeLast('.') else it }
+        .trim()
+        .takeUnless { it.isBlank() || UUID_LIKE.matches(it) } ?: generic
+    return "$base.${extension.lowercase().removePrefix(".")}"
+}
+
+private val UUID_LIKE = Regex("""^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$""")

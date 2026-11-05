@@ -1,6 +1,5 @@
 package app.selah.remote
 
-import androidx.compose.runtime.Composable
 import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
 import app.selah.shared.DEFAULT_PORT
@@ -93,9 +92,6 @@ internal fun wifiIpv4(): String? = memScoped {
     }
 }
 
-/** TODO(iPhone): subir fotos con PHPickerViewController. Por ahora no se muestra el botón. */
-@Composable
-actual fun rememberMediaPicker(onPicked: (PickedFile) -> Unit): (() -> Unit)? = null
 
 /** Preferencias del iPhone (NSUserDefaults). */
 class IosStore : KeyValueStore {

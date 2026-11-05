@@ -42,7 +42,8 @@ módulo compartido `remoteUi/` (Compose Multiplatform). Ya está hecho y probado
 3. ~~Búsqueda automática del PC en iPhone~~ **Hecho con el camino A de §5** (`SubnetScan` en commonMain +
    `discoverServers`/`wifiIpv4` en `Platform.ios.kt`): en un iPhone real encontró en pocos segundos la Mac
    con Selah y el PC con Windows que aún tiene la 2.4 (Proyecta).
-4. Subir fotos/videos a Anuncios desde el iPhone (ver §6). Mientras no esté, el botón no aparece.
+4. ~~Subir fotos/videos a Anuncios desde el iPhone~~ **Hecho** (`MediaPicker.ios.kt`, PHPicker; fotos HEIC → JPG,
+   videos tal cual). Probado en iPhone real: llegaron un .jpg y un .mov al PC. Build 20401 en TestFlight.
 5. Capturas, ficha y envío a App Store Connect / TestFlight (§8).
    **Primer build en TestFlight (5 nov 2026):** app "Selah Remote" creada en App Store Connect (solo iOS);
    build 2.4.0 (20400), solo iPhone, mínimo iOS 17, con `PrivacyInfo.xcprivacy`. Se archivó y subió desde la

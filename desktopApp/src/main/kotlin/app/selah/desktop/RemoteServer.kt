@@ -239,7 +239,9 @@ class RemoteServer(
             val ext = base.substringAfterLast('.', "").lowercase()
             if (ext !in UPLOAD_EXTENSIONS) return null
             val stem = cleanListName(base.substringBeforeLast('.')) ?: ""
-            val generic = stem.isEmpty() || Regex("""^(image|img|photo|foto|video|vid|pxl|screenshot|captura)[ _-]?\d*.*$""", RegexOption.IGNORE_CASE).matches(stem)
+            val generic = stem.isEmpty() || Regex("""^(image|img|photo|foto|video|vid|pxl|screenshot|captura)[ _-]?\d*.*$""", RegexOption.IGNORE_CASE).matches(stem) ||
+                // iPhone: a veces el archivo solo trae un código ("610B91B5-1580-4A1F-8DB9-530B76F78203")
+                Regex("""^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$""", RegexOption.IGNORE_CASE).matches(stem)
             val finalStem = if (generic) "Anuncio " + java.text.SimpleDateFormat("yyyy-MM-dd HH-mm-ss", java.util.Locale.ROOT).format(java.util.Date(now)) else stem
             return "$finalStem.$ext"
         }
