@@ -52,6 +52,7 @@ private val SAMPLE = PresentationState(
     index = 0,
 )
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun BackgroundsWindow(
     library: Library,
@@ -215,6 +216,18 @@ fun BackgroundsWindow(
                                     onClick = { themes.update { it.copy(textColor = hex) } },
                                     label = { Text(name) },
                                     leadingIcon = { Box(Modifier.width(14.dp).aspectRatio(1f).clip(RoundedCornerShape(3.dp)).background(hexColor(hex))) },
+                                )
+                            }
+                        }
+                        Text("Tipografía", style = MaterialTheme.typography.titleSmall)
+                        androidx.compose.foundation.layout.FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            FilterChip(theme.font == null, { themes.update { it.copy(font = null) } }, { Text("Del sistema") })
+                            for ((name, what) in Fonts.CHOICES) {
+                                FilterChip(
+                                    theme.font == name, { themes.update { it.copy(font = name) } },
+                                    { Text("$name · $what", fontFamily = Fonts.family(name)) },
                                 )
                             }
                         }

@@ -236,8 +236,9 @@ private fun SlideText(state: PresentationState, text: String, label: String, the
     val availH = with(density) { (height - pad * 2).roundToPx() }.coerceAtLeast(1)
     // fontScale > 1 solo sube el tope (si el texto cabe); < 1 achica lo calculado.
     val maxSize = 110f * theme.fontScale.coerceAtLeast(1f)
-    val size = remember(text, label, showLabel, availW, availH, maxSize, density, text2) {
-        fitFontSizeMeasured(measurer, density, text, if (showLabel) label else null, availW, availH, maxSize, text2 = text2.ifEmpty { null })
+    val family = Fonts.family(theme.font)
+    val size = remember(text, label, showLabel, availW, availH, maxSize, density, text2, family) {
+        fitFontSizeMeasured(measurer, density, text, if (showLabel) label else null, availW, availH, maxSize, text2 = text2.ifEmpty { null }, family = family)
     } * theme.fontScale.coerceAtMost(1f)
     val shadow = if (theme.shadow) Shadow(Color.Black.copy(alpha = 0.9f), Offset(2f, 3f), blurRadius = size / 5) else null
 
@@ -247,25 +248,26 @@ private fun SlideText(state: PresentationState, text: String, label: String, the
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         if (showLabel && labelOnTop) {
-            Text(label, style = labelStyle(size).copy(color = color.copy(alpha = 0.8f), shadow = shadow, fontWeight = FontWeight.Bold))
+            Text(label, style = labelStyle(size, family).copy(color = color.copy(alpha = 0.8f), shadow = shadow, fontWeight = FontWeight.Bold))
             Spacer(Modifier.height(with(density) { (size * LABEL_GAP).sp.toDp() }))
         }
-        Text(text, style = slideStyle(size).copy(color = color, shadow = shadow))
+        Text(text, style = slideStyle(size, family).copy(color = color, shadow = shadow))
         if (text2.isNotEmpty()) {
             // Segunda traducción: debajo, un poco más chica y en cursiva.
             Spacer(Modifier.height(with(density) { (size * LABEL_GAP).sp.toDp() }))
-            Text(text2, style = secondStyle(size).copy(color = color.copy(alpha = 0.85f), shadow = shadow))
+            Text(text2, style = secondStyle(size, family).copy(color = color.copy(alpha = 0.85f), shadow = shadow))
         }
         if (showLabel && !labelOnTop) {
             Spacer(Modifier.height(with(density) { (size * LABEL_GAP).sp.toDp() }))
-            Text(label, style = labelStyle(size).copy(color = color.copy(alpha = 0.75f), shadow = shadow))
+            Text(label, style = labelStyle(size, family).copy(color = color.copy(alpha = 0.75f), shadow = shadow))
         }
     }
 }
 
 private const val LABEL_GAP = 0.4f
 
-internal fun slideStyle(size: Float) = TextStyle(
+internal fun slideStyle(size: Float, family: androidx.compose.ui.text.font.FontFamily? = null) = TextStyle(
+    fontFamily = family,
     fontSize = size.sp,
     lineHeight = (size * 1.2f).sp,
     fontWeight = FontWeight.SemiBold,
@@ -273,9 +275,10 @@ internal fun slideStyle(size: Float) = TextStyle(
 )
 
 /** Segunda traducción: 80 % del tamaño y en cursiva. */
-internal fun secondStyle(size: Float) = slideStyle(size * 0.8f).copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic, fontWeight = FontWeight.Normal)
+internal fun secondStyle(size: Float, family: androidx.compose.ui.text.font.FontFamily? = null) = slideStyle(size * 0.8f, family).copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic, fontWeight = FontWeight.Normal)
 
-internal fun labelStyle(size: Float) = TextStyle(fontSize = (size * 0.55f).sp, textAlign = TextAlign.Center)
+internal fun labelStyle(size: Float, family: androidx.compose.ui.text.font.FontFamily? = null) =
+    TextStyle(fontFamily = family, fontSize = (size * 0.55f).sp, textAlign = TextAlign.Center)
 
 /**
  * El tamaño de letra más grande (en sp) con el que el texto cabe de verdad en [widthPx]×[heightPx].
@@ -292,19 +295,20 @@ internal fun fitFontSizeMeasured(
     maxSize: Float = 110f,
     minSize: Float = 8f,
     text2: String? = null,
+    family: androidx.compose.ui.text.font.FontFamily? = null,
 ): Float {
     val longestWords = text.split(Regex("\\s+")).filter { it.isNotEmpty() }.sortedByDescending { it.length }.take(3)
     val unbounded = Constraints()
     fun fits(sp: Float): Boolean {
-        val style = slideStyle(sp)
+        val style = slideStyle(sp, family)
         if (longestWords.any { measurer.measure(it, style, constraints = unbounded, density = density).size.width > widthPx }) return false
         var h = measurer.measure(text, style, constraints = Constraints(maxWidth = widthPx), density = density).size.height
         if (label != null) {
-            h += measurer.measure(label, labelStyle(sp), constraints = Constraints(maxWidth = widthPx), density = density).size.height
+            h += measurer.measure(label, labelStyle(sp, family), constraints = Constraints(maxWidth = widthPx), density = density).size.height
             h += with(density) { (sp * LABEL_GAP).sp.roundToPx() }
         }
         if (text2 != null) {
-            h += measurer.measure(text2, secondStyle(sp), constraints = Constraints(maxWidth = widthPx), density = density).size.height
+            h += measurer.measure(text2, secondStyle(sp, family), constraints = Constraints(maxWidth = widthPx), density = density).size.height
             h += with(density) { (sp * LABEL_GAP).sp.roundToPx() }
         }
         return h <= heightPx

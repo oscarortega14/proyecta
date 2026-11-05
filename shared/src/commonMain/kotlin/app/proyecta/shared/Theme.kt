@@ -27,6 +27,8 @@ data class Theme(
     val light: Boolean = false,
     /** Fundido corto (unos 300 ms) al cambiar de diapositiva, en vez de un salto. */
     val fade: Boolean = true,
+    /** Tipografía de la letra ("Montserrat", "Nunito"…); null = la del sistema. */
+    val font: String? = null,
     /** Cuánto oscurecer el fondo de imagen para que se lea la letra (0 = nada, 0.8 = casi negro). */
     val dim: Float = 0.3f,
     val textColor: String = "#FFFFFF",
