@@ -187,6 +187,14 @@
     </div>
     <p class="muted" id="cdNow"></p>
     <hr>
+    <h2>Nombre en la transmisión (OBS)</h2>
+    <input id="ltTitle" type="text" placeholder="Nombre (ej. Pastor Juan Pérez)">
+    <input id="ltSub" type="text" placeholder="Debajo (ej. Predicación)" style="margin-top:8px">
+    <div class="row" style="margin-top:8px">
+      <button class="btn" id="ltShow" style="flex:1">Mostrar</button>
+      <button class="btn outline" id="ltHide">Quitar</button>
+    </div>
+    <hr>
     <h2>Tiempo del predicador</h2>
     <p class="muted">Se ve solo en la vista de escenario.</p>
     <div class="row">
@@ -525,6 +533,8 @@ $("cdStart").onclick = () => { const m = parseInt($("cdMin").value, 10); if (m >
 $("cdStop").onclick = () => P.send("countdown_stop");
 $("tmStart").onclick = () => P.send("timer_start", { minutes: parseInt($("tmMin").value, 10) || 0 });
 $("tmStop").onclick = () => P.send("timer_stop");
+$("ltShow").onclick = () => { if ($("ltTitle").value.trim()) P.send("lower_third", { title: $("ltTitle").value, subtitle: $("ltSub").value }); };
+$("ltHide").onclick = () => P.send("lower_third", { title: "", subtitle: "" });
 setInterval(() => {
   const st = S.state;
   if (st.timerStart == null) { $("tmNow").textContent = ""; return; }

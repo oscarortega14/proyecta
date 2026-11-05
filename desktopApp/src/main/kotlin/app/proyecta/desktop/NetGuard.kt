@@ -53,6 +53,7 @@ object NetGuard {
     fun clamp(msg: ClientMessage): ClientMessage = when (msg) {
         is ClientMessage.StageMessage -> msg.copy(text = msg.text.take(MAX_TEXT))
         is ClientMessage.SetAlert -> msg.copy(text = msg.text.take(MAX_TEXT))
+        is ClientMessage.SetLowerThird -> msg.copy(title = msg.title.take(MAX_TEXT), subtitle = msg.subtitle.take(MAX_TEXT))
         is ClientMessage.StartCountdown -> msg.copy(text = msg.text.take(MAX_TEXT))
         is ClientMessage.BibleSearch -> msg.copy(query = msg.query.take(MAX_TEXT))
         is ClientMessage.SongSearch -> msg.copy(query = msg.query.take(MAX_TEXT))

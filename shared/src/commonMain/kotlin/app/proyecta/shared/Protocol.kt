@@ -93,6 +93,10 @@ sealed interface ClientMessage {
     @Serializable @SerialName("timer_stop")
     data object StopTimer : ClientMessage
 
+    /** Nombre en la transmisión (OBS): título y subtítulo; ambos "" lo quitan. */
+    @Serializable @SerialName("lower_third")
+    data class SetLowerThird(val title: String, val subtitle: String = "") : ClientMessage
+
     /** Elegir la traducción de la Biblia. */
     @Serializable @SerialName("bible_select")
     data class SelectBible(val name: String) : ClientMessage

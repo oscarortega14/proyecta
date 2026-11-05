@@ -49,9 +49,11 @@ class FadeTest {
         ImageComposeScene(320, 180, Density(1f)) { ProjectorScreen(s, look = Look(plain.copy(fade = false))) }.use { scene ->
             scene.render(0)
             s = state.copy(index = 1)
-            val right = brightness(scene.render(1_000_000L))
+            // Ningún cuadro en negro ni a medias: cambia de una vez a la nueva
+            val frames = (1..10).map { i -> brightness(scene.render(i * 20_000_000L)) }
             val later = brightness(scene.render(1_000_000_000L))
-            assertTrue(kotlin.math.abs(right - later) < 0.5, "sin fundido, cambia de una vez ($right vs $later)")
+            assertTrue(frames.all { it > 1 }, "sin parpadeo en negro: $frames")
+            assertTrue(frames.drop(1).all { kotlin.math.abs(it - later) < 0.5 }, "sin fundido: $frames vs $later")
         }
     }
 }

@@ -7,6 +7,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
+import java.io.File
 
 class PreacherTimerTest {
     @Test
@@ -38,6 +40,28 @@ class PreacherTimerTest {
         assertNotNull(p.handle(ClientMessage.StartTimer(9999)))
         p.handle(ClientMessage.StopTimer)
         assertNull(p.state.value.timerStart)
+        dir.deleteRecursively()
+    }
+}
+
+class LowerThirdTest {
+    @Test
+    fun nameForTheStreamStaysWhileSlidesChangeAndNeverReachesTheProjector() {
+        val dir = kotlin.io.path.createTempDirectory("proyecta-nombre").toFile()
+        val p = Presenter(Library(dir).also { it.reload() })
+        assertNull(p.handle(ClientMessage.SetLowerThird(" Pastor Juan Pérez ", "Predicación")))
+        p.handle(ClientMessage.SelectSong("Canción de ejemplo"))
+        p.handle(ClientMessage.ShowBible("Juan 3:16"))
+        assertEquals("Pastor Juan Pérez", p.state.value.lowerThird)
+        assertEquals("Predicación", p.state.value.lowerThirdSub)
+        // Textos enormes desde la red se recortan
+        val clamped = NetGuard.clamp(ClientMessage.SetLowerThird("x".repeat(5000))) as ClientMessage.SetLowerThird
+        assertEquals(NetGuard.MAX_TEXT, clamped.title.length)
+        p.handle(ClientMessage.SetLowerThird("", ""))
+        assertEquals("", p.state.value.lowerThird)
+        // El videobeam no lo dibuja: ProjectorScreen no usa lowerThird
+        val src = File("src/main/kotlin/app/proyecta/desktop/ProjectorScreen.kt").readText()
+        assertTrue("lowerThird" !in src)
         dir.deleteRecursively()
     }
 }

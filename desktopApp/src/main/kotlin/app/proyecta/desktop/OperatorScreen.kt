@@ -458,6 +458,7 @@ private fun LivePanel(state: PresentationState, modifier: Modifier, send: (Clien
         "cuenta regresiva".takeIf { state.countdownEnd != null },
         "mensaje".takeIf { state.stageMessage.isNotEmpty() },
         "tiempo del predicador".takeIf { state.timerStart != null },
+        "nombre en OBS".takeIf { state.lowerThird.isNotEmpty() },
     )
     Column(modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("En pantalla", style = MaterialTheme.typography.titleMedium)
@@ -499,6 +500,8 @@ private fun LivePanel(state: PresentationState, modifier: Modifier, send: (Clien
             CountdownBox(state, send)
             HorizontalDivider()
             PreacherTimerBox(state, send)
+            HorizontalDivider()
+            LowerThirdBox(state, send)
             HorizontalDivider()
             StageMessageBox(state.stageMessage, send)
         }
@@ -854,5 +857,23 @@ private fun PreacherTimerBox(state: PresentationState, send: (ClientMessage) -> 
             },
             color = if (left != null && left < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
         )
+    }
+}
+
+/** Nombre en la transmisión (OBS): "Pastor Juan Pérez · Predicación". No sale en el videobeam. */
+@Composable
+private fun LowerThirdBox(state: PresentationState, send: (ClientMessage) -> Unit) {
+    var title by remember { mutableStateOf("") }
+    var subtitle by remember { mutableStateOf("") }
+    Text("Nombre en la transmisión (OBS)", style = MaterialTheme.typography.titleSmall)
+    Text("Sale solo en OBS, no en el videobeam.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    OutlinedTextField(title, { title = it }, label = { Text("Nombre (ej. Pastor Juan Pérez)") }, singleLine = true, modifier = Modifier.fillMaxWidth().marksTyping())
+    OutlinedTextField(subtitle, { subtitle = it }, label = { Text("Debajo (ej. Predicación)") }, singleLine = true, modifier = Modifier.fillMaxWidth().marksTyping())
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button({ send(ClientMessage.SetLowerThird(title, subtitle)) }, Modifier.weight(1f), enabled = title.isNotBlank()) { Text("Mostrar") }
+        OutlinedButton({ send(ClientMessage.SetLowerThird("", "")) }, enabled = state.lowerThird.isNotEmpty()) { Text("Quitar") }
+    }
+    if (state.lowerThird.isNotEmpty()) {
+        Text("En OBS: ${state.lowerThird}" + if (state.lowerThirdSub.isNotEmpty()) " · ${state.lowerThirdSub}" else "", color = MaterialTheme.colorScheme.primary)
     }
 }

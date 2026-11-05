@@ -43,6 +43,7 @@ class Presenter(
             if (msg.minutes !in 0..600) "El tiempo debe ser de 0 a 600 minutos"
             else { _state.update { it.copy(timerStart = clock(), timerMinutes = msg.minutes) }; null }
         }
+        is ClientMessage.SetLowerThird -> { _state.update { it.copy(lowerThird = msg.title.trim(), lowerThirdSub = msg.subtitle.trim()) }; null }
         ClientMessage.StopTimer -> { _state.update { it.copy(timerStart = null, timerMinutes = 0) }; null }
         // Las órdenes de la lista del culto las atiende ServicePlan (ver Commands).
         else -> "Orden no soportada aquí"
@@ -140,6 +141,8 @@ class Presenter(
         countdownText = countdownText,
         timerStart = timerStart,
         timerMinutes = timerMinutes,
+        lowerThird = lowerThird,
+        lowerThirdSub = lowerThirdSub,
         logo = false,
     )
 }

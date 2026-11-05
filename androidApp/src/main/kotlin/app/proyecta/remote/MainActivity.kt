@@ -583,5 +583,6 @@ private fun MoreTab(
             }
         }
         item { PreacherTimer(state, serverOffset, send) }
+        item { LowerThird(state, send) }
     }
 }

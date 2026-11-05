@@ -9,6 +9,8 @@
     pos=bottom|center|top   posición del texto (por defecto bottom)
     size=44                 tamaño de letra en px (por defecto 44)
     bg=1                    franja oscura detrás del texto para que se lea sobre cualquier video
+    nombre=0                no mostrar el nombre (franja "Pastor Juan Pérez · Predicación")
+    letra=0                 no mostrar la letra (por ejemplo, una fuente solo para el nombre)
 -->
 <style>
   html, body { margin:0; height:100%; background:transparent; overflow:hidden; font-family:system-ui, -apple-system, Roboto, sans-serif; }
@@ -19,10 +21,19 @@
   #box.bg { background:rgba(0,0,0,.55); padding:.4em .8em; border-radius:.3em; }
   #ref { display:block; font-size:.6em; font-weight:500; opacity:.9; margin-top:.3em; }
   .hidden { opacity:0; }
+  /* Nombre (abajo a la izquierda), entra deslizándose */
+  #lt { position:absolute; left:5vw; bottom:6vh; display:flex; flex-direction:column; transition:transform .45s ease, opacity .45s; }
+  #lt.off { transform:translateX(-120%); opacity:0; }
+  #ltTitle { background:#4f378b; color:#fff; font-weight:700; font-size:34px; padding:.25em .7em; border-radius:.2em .2em .2em 0; }
+  #ltSub { align-self:flex-start; background:rgba(0,0,0,.75); color:#e8def8; font-size:22px; padding:.2em .8em; border-radius:0 0 .25em .25em; }
+  #ltSub:empty { display:none; }
+  /* Con nombre en pantalla, la letra sube para no taparlo */
+  #wrap.bottom.lifted { bottom:calc(6vh + 110px); }
 </style>
 </head>
 <body>
 <div id="wrap" class="hidden"><div id="box"></div></div>
+<div id="lt" class="off"><div id="ltTitle"></div><div id="ltSub"></div></div>
 <script src="proyecta.js"></script>
 <script>
 "use strict";
@@ -33,10 +44,19 @@ wrap.classList.add(["top", "center"].includes(params.get("pos")) ? params.get("p
 box.style.fontSize = (parseInt(params.get("size"), 10) || 44) + "px";
 if (params.get("bg") === "1") box.classList.add("bg");
 
+const showName = params.get("nombre") !== "0", showLyrics = params.get("letra") !== "0";
+function renderName() {
+  const st = S.state, on = S.connected && showName && !!st.lowerThird;
+  document.getElementById("lt").classList.toggle("off", !on);
+  if (on) { document.getElementById("ltTitle").textContent = st.lowerThird; document.getElementById("ltSub").textContent = st.lowerThirdSub || ""; }
+  wrap.classList.toggle("lifted", on);
+}
+
 function render() {
+  renderName();
   const st = S.state, cur = st.slides[st.index];
   const counting = (P.countdownSeconds(st) || 0) > 0;
-  const visible = S.connected && cur && !st.blank && !st.logo && !counting && !st.media; // un anuncio no es letra
+  const visible = showLyrics && S.connected && cur && !st.blank && !st.logo && !counting && !st.media; // un anuncio no es letra
   wrap.classList.toggle("hidden", !visible);
   if (!visible) return;
   box.replaceChildren(document.createTextNode(cur.text));

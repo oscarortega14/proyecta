@@ -53,6 +53,10 @@ data class PresentationState(
     val timerStart: Long? = null,
     /** Minutos que tiene el predicador (0 = sin límite, solo cuenta hacia arriba). */
     val timerMinutes: Int = 0,
+    /** Nombre para la transmisión (OBS), ej. "Pastor Juan Pérez" ("" = no se muestra). No sale en el videobeam. */
+    val lowerThird: String = "",
+    /** Segunda línea del nombre, ej. "Predicación" o "Alabanza". */
+    val lowerThirdSub: String = "",
 ) {
     /** Segundos que lleva el predicador, o null si el temporizador no está andando. */
     fun timerElapsed(now: Long): Long? = timerStart?.let { ((now - it) / 1000).coerceAtLeast(0) }

@@ -94,14 +94,20 @@ fun ProjectorScreen(state: PresentationState, modifier: Modifier = Modifier, loo
                     val h = maxHeight
                     val bottom = if (state.alert.isNotEmpty()) alertBarHeight(h) else 0.dp
                     // Fundido corto entre diapositivas (el fondo no se toca). En miniaturas y pruebas, sin animación.
-                    val fadeMillis = if (theme.fade && look.frozenTime == null) FADE_MILLIS else 0
-                    androidx.compose.animation.Crossfade(
-                        targetState = ShownSlide(slide.text, slide.label, slide.text2),
-                        animationSpec = androidx.compose.animation.core.tween(fadeMillis),
-                        label = "diapositiva",
-                    ) { shown ->
+                    // (Sin fundido se dibuja directo: un Crossfade de 0 ms deja un cuadro en negro al cambiar.)
+                    if (theme.fade && look.frozenTime == null) {
+                        androidx.compose.animation.Crossfade(
+                            targetState = ShownSlide(slide.text, slide.label, slide.text2),
+                            animationSpec = androidx.compose.animation.core.tween(FADE_MILLIS),
+                            label = "diapositiva",
+                        ) { shown ->
+                            Box(Modifier.fillMaxSize().padding(bottom = bottom)) {
+                                SlideText(state, shown.text, shown.label, theme, w, h - bottom, shown.text2)
+                            }
+                        }
+                    } else {
                         Box(Modifier.fillMaxSize().padding(bottom = bottom)) {
-                            SlideText(state, shown.text, shown.label, theme, w, h - bottom, shown.text2)
+                            SlideText(state, slide.text, slide.label, theme, w, h - bottom, slide.text2)
                         }
                     }
                 }
