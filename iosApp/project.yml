@@ -1,11 +1,12 @@
-# Proyecto de Xcode para Selah Remoto en iPhone/iPad.
+# Proyecto de Xcode para Selah Remoto en iPhone (iPad: más adelante).
 # Se genera con XcodeGen (brew install xcodegen):   cd iosApp && xcodegen
 # Luego abrir SelahRemoto.xcodeproj. Ver docs/IOS.md.
 name: SelahRemoto
 options:
   bundleIdPrefix: app.selah
   deploymentTarget:
-    iOS: "15.0"
+    # 17: una pieza de Compose (libicu) viene hecha para 17.2; casi todos los iPhone en uso tienen 17 o más
+    iOS: "17.0"
   developmentLanguage: es
 settings:
   base:
@@ -25,7 +26,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.selah.remote
         PRODUCT_NAME: SelahRemoto
-        TARGETED_DEVICE_FAMILY: "1,2" # iPhone y iPad
+        TARGETED_DEVICE_FAMILY: "1" # solo iPhone por ahora (iPad exige sus propias capturas y revisión de diseño)
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # El framework de Kotlin lo deja aquí la tarea embedAndSignAppleFrameworkForXcode
         FRAMEWORK_SEARCH_PATHS: ["$(inherited)", "$(SRCROOT)/../remoteUi/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)"]

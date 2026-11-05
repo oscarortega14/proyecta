@@ -44,6 +44,11 @@ módulo compartido `remoteUi/` (Compose Multiplatform). Ya está hecho y probado
    con Selah y el PC con Windows que aún tiene la 2.4 (Proyecta).
 4. Subir fotos/videos a Anuncios desde el iPhone (ver §6). Mientras no esté, el botón no aparece.
 5. Capturas, ficha y envío a App Store Connect / TestFlight (§8).
+   **Primer build en TestFlight (5 nov 2026):** app "Selah Remote" creada en App Store Connect (solo iOS);
+   build 2.4.0 (20400), solo iPhone, mínimo iOS 17, con `PrivacyInfo.xcprivacy`. Se archivó y subió desde la
+   terminal (`xcodebuild archive` + `-exportArchive` con `method=app-store-connect`, `destination=upload`;
+   el ExportOptions.plist con el Team ID queda fuera del repo). Cada subida nueva necesita otro
+   `CURRENT_PROJECT_VERSION` en `project.yml`. Faltan: capturas 6,9", ficha, video para el revisor.
 
 ---
 
