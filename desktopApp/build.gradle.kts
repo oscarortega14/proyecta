@@ -11,7 +11,7 @@ plugins {
 
 kotlin { jvmToolchain(17) }
 
-val ktor = "3.1.3"
+val ktor = "3.6.1"
 
 /** Versión de Proyecta: va al instalador y a la app (para avisar cuando hay una más nueva). */
 val appVersion = providers.gradleProperty("proyecta.version").get() // un solo número para PC y app: gradle.properties
@@ -23,7 +23,7 @@ dependencies {
     implementation("io.ktor:ktor-server-core:$ktor")
     implementation("io.ktor:ktor-server-cio:$ktor")
     implementation("io.ktor:ktor-server-websockets:$ktor")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.10.2")
     implementation("org.slf4j:slf4j-nop:2.0.16")
     // Fondos de video: usa el VLC instalado en el PC (si no está, se ignoran los videos).
     implementation("uk.co.caprica:vlcj:4.8.3")

@@ -293,7 +293,7 @@ private fun SongsTab(
         }
         OutlinedTextField(
             query, { query = it },
-            label = { Text(if (sermons) "Buscar predicación" else "Buscar por título o letra (${catalog.songs.size} canciones)") },
+            label = { Text(if (sermons) "Buscar predicación" else "Buscar por título o letra") },
             singleLine = true, modifier = Modifier.fillMaxWidth().marksTyping(),
         )
         LazyColumn(Modifier.weight(1f).fillMaxWidth()) {

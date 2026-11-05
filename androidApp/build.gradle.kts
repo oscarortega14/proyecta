@@ -54,7 +54,7 @@ android {
     }
 }
 
-val ktor = "3.1.3"
+val ktor = "3.1.3" // cliente; 3.6 trae OkHttp 5, que pide compileSdk 37
 
 dependencies {
     implementation(project(":shared"))
@@ -64,5 +64,5 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("io.ktor:ktor-client-okhttp:$ktor")
     implementation("io.ktor:ktor-client-websockets:$ktor")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 }
