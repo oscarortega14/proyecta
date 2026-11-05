@@ -167,7 +167,12 @@ object Updater {
     /** Ruta del Proyecta.exe instalado (solo existe en la versión instalada, no al probar con Gradle). */
     val installedExe: String? get() = System.getProperty("jpackage.app-path")
 
-    val canInstall: Boolean get() = System.getProperty("os.name").startsWith("Windows") && installedExe != null
+    /** Instalado desde Microsoft Store (MSIX): la tienda lo actualiza, no el actualizador propio. */
+    val fromStore: Boolean get() = isStorePath(installedExe)
+
+    internal fun isStorePath(exe: String?): Boolean = exe?.replace('/', '\\')?.contains("\\WindowsApps\\", ignoreCase = true) == true
+
+    val canInstall: Boolean get() = System.getProperty("os.name").startsWith("Windows") && installedExe != null && !fromStore
 
     /**
      * Instala el .msi con la barra de progreso de Windows (sin preguntas) y vuelve a abrir Proyecta.

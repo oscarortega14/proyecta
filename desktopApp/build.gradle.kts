@@ -1,5 +1,8 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import java.net.URI
+import java.awt.RenderingHints
+import java.awt.image.BufferedImage
+import javax.imageio.ImageIO
 import java.security.MessageDigest
 
 plugins {
@@ -128,5 +131,98 @@ if (System.getProperty("os.name").startsWith("Windows")) {
         dependsOn(prepareVlc)
         systemProperty("compose.application.resources.dir", appResources.get().dir("windows").asFile.absolutePath)
         System.getenv("PROYECTA_VIDEO")?.let { environment("PROYECTA_VIDEO", it) }
+    }
+}
+
+// --- Microsoft Store (MSIX) -------------------------------------------------------------------
+// La tienda vuelve a firmar el MSIX con un certificado de Microsoft: así Windows (incluido el
+// Control inteligente de aplicaciones) confía en Proyecta sin comprar un certificado propio.
+//   gradlew.bat :desktopApp:packageMsix     (solo en Windows; necesita makeappx.exe del SDK de Windows)
+val packageMsix by tasks.registering {
+    group = "distribution"
+    description = "Arma Proyecta-x.y.z.msix para subir a Microsoft Store"
+    dependsOn("createDistributable")
+    val appImage = layout.buildDirectory.dir("compose/binaries/main/app/Proyecta")
+    val out = layout.buildDirectory.dir("msix")
+    val icon = layout.projectDirectory.file("src/main/resources/web/icons/icon-512.png")
+    val props = listOf("msix.identityName", "msix.publisher", "msix.publisherDisplayName", "msix.displayName")
+        .associateWith { providers.gradleProperty(it).get() }
+    inputs.dir(appImage); inputs.file(icon); inputs.property("props", props); inputs.property("version", appVersion)
+    outputs.dir(out)
+    doLast {
+        val root = out.get().asFile.apply { deleteRecursively(); mkdirs() }
+        val layoutDir = File(root, "layout")
+        appImage.get().asFile.copyRecursively(layoutDir)
+
+        // Iconos que pide Windows/la tienda, hechos a partir del ícono de la app
+        val assets = File(layoutDir, "Assets").apply { mkdirs() }
+        val src = ImageIO.read(icon.asFile)
+        fun png(name: String, w: Int, h: Int, iconSize: Int = minOf(w, h)) {
+            val img = BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB)
+            img.createGraphics().apply {
+                setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC)
+                setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY)
+                drawImage(src, (w - iconSize) / 2, (h - iconSize) / 2, iconSize, iconSize, null)
+                dispose()
+            }
+            ImageIO.write(img, "png", File(assets, name))
+        }
+        png("StoreLogo.png", 50, 50)
+        png("Square44x44Logo.png", 44, 44)
+        png("Square44x44Logo.targetsize-256_altform-unplated.png", 256, 256)
+        png("Square150x150Logo.png", 150, 150)
+        png("Wide310x150Logo.png", 310, 150, 120)
+
+        val version = appVersion.split('.').let { (it + listOf("0", "0", "0")).take(3) }.joinToString(".") + ".0"
+        val desc = "Letras de canciones y Biblia en el videobeam, con control desde celulares y tablets"
+        fun esc(s: String) = s.replace("&", "&amp;").replace("\"", "&quot;").replace("<", "&lt;")
+        File(layoutDir, "AppxManifest.xml").writeText(
+            """
+            <?xml version="1.0" encoding="utf-8"?>
+            <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+                     xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+                     xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+                     IgnorableNamespaces="uap rescap">
+              <Identity Name="${esc(props.getValue("msix.identityName"))}" Publisher="${esc(props.getValue("msix.publisher"))}" Version="$version" ProcessorArchitecture="x64" />
+              <Properties>
+                <DisplayName>${esc(props.getValue("msix.displayName"))}</DisplayName>
+                <PublisherDisplayName>${esc(props.getValue("msix.publisherDisplayName"))}</PublisherDisplayName>
+                <Logo>Assets\StoreLogo.png</Logo>
+                <Description>$desc</Description>
+              </Properties>
+              <Dependencies>
+                <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
+              </Dependencies>
+              <Resources>
+                <Resource Language="es-ES" />
+              </Resources>
+              <Applications>
+                <Application Id="Proyecta" Executable="Proyecta.exe" EntryPoint="Windows.FullTrustApplication">
+                  <uap:VisualElements DisplayName="${esc(props.getValue("msix.displayName"))}" Description="$desc" BackgroundColor="transparent"
+                                      Square150x150Logo="Assets\Square150x150Logo.png" Square44x44Logo="Assets\Square44x44Logo.png">
+                    <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
+                  </uap:VisualElements>
+                </Application>
+              </Applications>
+              <Capabilities>
+                <Capability Name="internetClientServer" />
+                <Capability Name="privateNetworkClientServer" />
+                <rescap:Capability Name="runFullTrust" />
+              </Capabilities>
+            </Package>
+            """.trimIndent(),
+        )
+
+        // makeappx.exe: del SDK de Windows, o del paquete NuGet Microsoft.Windows.SDK.BuildTools
+        val makeappx = (listOfNotNull(System.getenv("MAKEAPPX")?.let(::File)) +
+            listOfNotNull(System.getenv("LOCALAPPDATA")?.let { File(it, "proyecta-herramientas") }, File("C:/Program Files (x86)/Windows Kits/10/bin"))
+                .flatMap { d -> d.walkTopDown().filter { it.name.equals("makeappx.exe", true) && it.path.contains("x64") }.toList() })
+            .firstOrNull { it.isFile } ?: error("No encontré makeappx.exe (SDK de Windows). Define MAKEAPPX con su ruta.")
+        val msix = File(root, "Proyecta-$appVersion.msix")
+        val p = ProcessBuilder(makeappx.absolutePath, "pack", "/d", layoutDir.absolutePath, "/p", msix.absolutePath, "/o")
+            .redirectErrorStream(true).start()
+        val log = p.inputStream.bufferedReader().readText()
+        check(p.waitFor() == 0) { "makeappx falló:\n$log" }
+        logger.lifecycle("MSIX listo: $msix")
     }
 }

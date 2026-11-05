@@ -83,7 +83,10 @@ object FirewallSetup {
     fun requestRule(): Boolean {
         if (!isWindows) return true
         val program = ProcessHandle.current().info().command().orElse(null)
-        val script = File.createTempFile("proyecta-firewall", ".cmd").apply {
+        // En la carpeta Proyecta del usuario y no en Temp: instalado desde Microsoft Store (MSIX),
+        // Windows redirige AppData\Temp a una carpeta privada de la app y el cmd con permisos no lo encontraría.
+        val dir = File(System.getProperty("user.home"), "Proyecta").apply { mkdirs() }
+        val script = File(dir, "permiso-firewall.cmd").apply {
             writeText("@echo off\r\n" + commands(program).joinToString("\r\n") + "\r\n", Charsets.UTF_8)
             deleteOnExit()
         }

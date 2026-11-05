@@ -83,6 +83,13 @@ class SignatureTest {
     }
 
     @Test
+    fun recognisesTheMicrosoftStoreInstallFolder() {
+        kotlin.test.assertTrue(Updater.isStorePath("""C:\Program Files\WindowsApps\Proyecta_2.4.0.0_x64__abc123\Proyecta.exe"""))
+        kotlin.test.assertFalse(Updater.isStorePath("""C:\Program Files\Proyecta\Proyecta.exe"""))
+        kotlin.test.assertFalse(Updater.isStorePath(null)) // corriendo desde Gradle
+    }
+
+    @Test
     fun plainHttpOnlyFromThisSameComputer() {
         val local = """{"tag_name":"2.3.1","assets":[{"name":"P.msi","browser_download_url":"http://127.0.0.1:8899/P.msi"}]}"""
         kotlin.test.assertNotNull(Updater.parseRelease(local))

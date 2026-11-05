@@ -108,6 +108,8 @@ fun main() {
         var release by remember { mutableStateOf<Release?>(null) }
         var updateOpen by remember { mutableStateOf(false) }
         LaunchedEffect(Unit) {
+            // Desde Microsoft Store las actualizaciones las da la tienda.
+            if (Updater.fromStore) { Log.info("Instalado desde Microsoft Store: actualiza la tienda"); return@LaunchedEffect }
             kotlinx.coroutines.delay(15_000)
             release = Updater.latest()
             Log.info("Actualizaciones: última publicada ${release?.version ?: "(no se pudo consultar)"}")

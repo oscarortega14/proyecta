@@ -823,7 +823,7 @@ private fun HelpMenu(onShortcuts: () -> Unit, onWelcome: () -> Unit, onBackups: 
                 Modifier.hand(),
             )
             HorizontalDivider()
-            Text("Proyecta ${Updater.currentVersion}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
+            Text("Proyecta ${Updater.currentVersion}" + if (Updater.fromStore) " · Microsoft Store" else "", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
         }
     }
 }
