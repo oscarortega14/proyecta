@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Para instalar la versión nueva de la app cuando el usuario toca "Actualizar" -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- usesCleartextTraffic: la conexión es ws:// dentro de la red local de la iglesia -->
     <application
@@ -27,5 +29,13 @@
                 <data android:scheme="proyecta" android:host="connect" />
             </intent-filter>
         </activity>
+        <!-- Entrega el APK descargado al instalador de Android -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="app.proyecta.remote.archivos"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/archivos" />
+        </provider>
     </application>
 </manifest>

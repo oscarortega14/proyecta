@@ -185,6 +185,7 @@ private fun RemoteApp(client: RemoteClient, savedHost: String, pcName: String, l
 
     Column(Modifier.fillMaxSize()) {
         StatusBar(status, pcName, showSearch = !editingHost, onEdit = { editingHost = true })
+        UpdateBanner()
         // El PC pide clave: se pregunta una vez y queda guardada.
         val auth by client.auth.collectAsState()
         var pinDismissed by remember(auth) { mutableStateOf(false) }
@@ -584,5 +585,49 @@ private fun MoreTab(
         }
         item { PreacherTimer(state, serverOffset, send) }
         item { LowerThird(state, send) }
+    }
+}
+
+/** "Hay una versión nueva de la app": se revisa un rato después de abrir, una vez por apertura. */
+@Composable
+private fun UpdateBanner() {
+    val context = LocalContext.current
+    val updater = remember { AppUpdater(context.applicationContext) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var update by remember { mutableStateOf<AppUpdate?>(null) }
+    var progress by remember { mutableStateOf<Float?>(null) }
+    var message by remember { mutableStateOf<String?>(null) }
+    var hidden by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(5_000)
+        update = updater.check()
+    }
+    val u = update ?: return
+    if (hidden) return
+    Card(
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+    ) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Hay una versión nueva de la app: ${u.version}", fontWeight = FontWeight.Medium)
+            progress?.let { androidx.compose.material3.LinearProgressIndicator(progress = { it }, modifier = Modifier.fillMaxWidth()) }
+            message?.let { Text(it, color = MaterialTheme.colorScheme.onPrimaryContainer) }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button({
+                    message = null
+                    progress = 0f
+                    scope.launch {
+                        runCatching { updater.download(u) { progress = it } }
+                            .onSuccess { apk ->
+                                progress = null
+                                message = if (updater.install(apk)) "Confirma la instalación en la ventana de Android."
+                                else "Permite instalar apps de Proyecta Remoto y vuelve a tocar Actualizar."
+                            }
+                            .onFailure { progress = null; message = it.message ?: "No se pudo descargar" }
+                    }
+                }, enabled = progress == null) { Text("Actualizar") }
+                TextButton({ hidden = true }) { Text("Más tarde") }
+            }
+        }
     }
 }
