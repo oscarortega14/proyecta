@@ -121,7 +121,12 @@ class MainActivity : ComponentActivity() {
 
         // Android 15+ dibuja la app detrás de las barras del sistema: se deja su espacio libre
         // (barra de estado, botones de navegación y teclado) para que nada quede tapado.
-        enableEdgeToEdge()
+        // La app es siempre oscura: barras transparentes con íconos claros (si no, en un teléfono
+        // en modo claro la hora salía oscura sobre el fondo oscuro).
+        enableEdgeToEdge(
+            statusBarStyle = androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+        )
         setContent {
             MaterialTheme(colorScheme = darkColorScheme()) {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
