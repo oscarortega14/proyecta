@@ -11,12 +11,12 @@ val appVersion = providers.gradleProperty("proyecta.version").get()
 
 android {
     namespace = "app.proyecta.remote"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "app.proyecta.remote"
         minSdk = 24 // Android 7: la tablet de la iglesia
-        targetSdk = 34
+        targetSdk = 36 // Google Play exige apuntar a una versión reciente de Android
         // Mismo número que el programa del PC (gradle.properties); 2.3.0 → 20300
         versionName = appVersion
         versionCode = appVersion.split('.').map { it.toInt() }.let { (a, b, c) -> a * 10000 + b * 100 + c }
@@ -48,6 +48,15 @@ android {
     }
 
     buildFeatures { compose = true }
+
+    // Dos variantes de la misma app:
+    //  - github: se actualiza sola desde GitHub Releases (para instalar el APK a mano)
+    //  - play:   para Google Play, sin actualizador propio (las reglas de Play no lo permiten)
+    flavorDimensions += "tienda"
+    productFlavors {
+        create("github") { dimension = "tienda" }
+        create("play") { dimension = "tienda" }
+    }
 
     packaging {
         resources.excludes += setOf("META-INF/INDEX.LIST", "META-INF/io.netty.versions.properties", "META-INF/*.kotlin_module")

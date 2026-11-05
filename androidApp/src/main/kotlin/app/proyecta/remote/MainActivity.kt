@@ -6,6 +6,9 @@ import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -116,9 +119,13 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        // Android 15+ dibuja la app detrás de las barras del sistema: se deja su espacio libre
+        // (barra de estado, botones de navegación y teclado) para que nada quede tapado.
+        enableEdgeToEdge()
         setContent {
             MaterialTheme(colorScheme = darkColorScheme()) {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                  Box(Modifier.fillMaxSize().safeDrawingPadding()) {
                     var pcName by remember { mutableStateOf(prefs.getString("name", "").orEmpty()) }
                     val link by linkHost.collectAsState()
                     val connect: (FoundServer) -> Unit = { server ->
@@ -149,6 +156,7 @@ class MainActivity : ComponentActivity() {
                         linkKey = link,
                         onConnect = connect,
                     )
+                  }
                 }
             }
         }
@@ -585,50 +593,5 @@ private fun MoreTab(
         }
         item { PreacherTimer(state, serverOffset, send) }
         item { LowerThird(state, send) }
-    }
-}
-
-/** "Hay una versión nueva de la app": se revisa un rato después de abrir, una vez por apertura. */
-@Composable
-private fun UpdateBanner() {
-    val context = LocalContext.current
-    val updater = remember { AppUpdater(context.applicationContext) }
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
-    var update by remember { mutableStateOf<AppUpdate?>(null) }
-    var progress by remember { mutableStateOf<Float?>(null) }
-    var message by remember { mutableStateOf<String?>(null) }
-    var hidden by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(5_000)
-        update = updater.check()
-    }
-    val u = update ?: return
-    if (hidden) return
-    Card(
-        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-    ) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Hay una versión nueva de la app: ${u.version}", fontWeight = FontWeight.Medium)
-            progress?.let { androidx.compose.material3.LinearProgressIndicator(progress = { it }, modifier = Modifier.fillMaxWidth()) }
-            // Mensaje corto (como mucho 3 líneas): que nunca tape el botón Actualizar.
-            message?.let { Text(it, color = MaterialTheme.colorScheme.onPrimaryContainer, maxLines = 3, overflow = TextOverflow.Ellipsis) }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button({
-                    message = null
-                    progress = 0f
-                    scope.launch {
-                        runCatching { updater.download(u) { progress = it } }
-                            .onSuccess { apk ->
-                                progress = null
-                                message = if (updater.install(apk)) "Confirma la instalación en la ventana de Android."
-                                else "Permite instalar apps de Proyecta Remoto y vuelve a tocar Actualizar."
-                            }
-                            .onFailure { progress = null; message = (it as? DownloadException)?.message ?: Downloader.friendly(it as? Exception) }
-                    }
-                }, enabled = progress == null) { Text("Actualizar") }
-                TextButton({ hidden = true }) { Text("Más tarde") }
-            }
-        }
     }
 }
