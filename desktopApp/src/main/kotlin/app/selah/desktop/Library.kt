@@ -180,6 +180,8 @@ class Library(val baseDir: File) {
         fun isSongSource(name: String) = name.substringAfterLast('.', "").lowercase() in IMPORT_EXTENSIONS
         for (src in sources) {
             when {
+                // EasyWorship 6/7: Songs.db + SongWords.db, o un respaldo .ewsx
+                EasyWorshipImport.isSource(src.name) -> EasyWorshipImport.read(src).forEach { take(it.title, it.text) }
                 src.isDirectory -> src.listFiles { f -> f.isFile && isSongSource(f.name) }.orEmpty().forEach { takeFile(it.name, it.readBytes()) }
                 src.extension.equals("zip", true) -> java.util.zip.ZipFile(src).use { zip ->
                     zip.entries().asSequence()

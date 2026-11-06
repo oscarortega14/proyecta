@@ -18,6 +18,7 @@ class SongImportTest {
           <properties>
             <titles><title>Cuán Grande Es Él</title></titles>
             <authors><author>Carl Boberg</author></authors>
+            <ccliNo>14181</ccliNo>
             <verseOrder>v1 c1 v2 c1</verseOrder>
           </properties>
           <lyrics>
@@ -34,6 +35,8 @@ class SongImportTest {
         assertEquals("Cuán Grande Es Él", imported.title)
         val song = SongParser.parse("x", imported.text)
         assertEquals("Cuán Grande Es Él", song.title)
+        assertEquals("Carl Boberg", song.author)
+        assertEquals("14181", song.ccli)
         assertEquals(emptyList(), song.unknownOrder)
         // Orden v1 c1 v2 c1: el coro (2 diapositivas) se repite
         assertEquals(

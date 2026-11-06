@@ -34,6 +34,8 @@ dependencies {
     implementation("uk.co.caprica:vlcj:4.8.3")
     // Códigos QR para conectar celulares escaneando (ventana "Conectar dispositivos").
     implementation("com.google.zxing:core:3.5.3")
+    // Leer el cancionero de EasyWorship (bases SQLite)
+    implementation("org.xerial:sqlite-jdbc:3.47.1.0")
 
     testImplementation(kotlin("test"))
     testImplementation("io.ktor:ktor-client-cio:$ktor")

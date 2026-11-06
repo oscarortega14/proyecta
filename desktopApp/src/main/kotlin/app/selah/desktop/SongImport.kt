@@ -47,8 +47,12 @@ object SongImport {
 
         val order = root.descendants("verseOrder").firstOrNull()?.textContent.orEmpty()
             .split(Regex("\\s+")).map { it.lowercase() }.filter { it in verses }
+        val authors = root.descendants("author").map { it.textContent.trim() }.filter { it.isNotEmpty() }.distinct()
+        val ccli = root.descendants("ccliNo").firstOrNull()?.textContent?.trim()?.takeIf { it.matches(Regex("\\d{1,10}")) }
         val text = buildString {
             append("# ").append(title).append('\n')
+            if (authors.isNotEmpty()) append("Autor: ").append(authors.joinToString(", ")).append('\n')
+            if (ccli != null) append("CCLI: ").append(ccli).append('\n')
             if (order.isNotEmpty()) append("Orden: ").append(order.joinToString(", ") { label(it) }).append('\n')
             for ((name, slides) in verses) {
                 slides.forEachIndexed { i, lines ->

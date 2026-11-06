@@ -254,6 +254,12 @@ class ThemeAndBackgroundTest {
         assertEquals("montañas.jpg", song.background)
         assertEquals(2, song.slides.size)
         assertNull(SongParser.parse("x", "# T\n\nletra\n\nFondo: no es la línea\n").background)
+        // Autor y número CCLI: datos de la canción, no se proyectan
+        val withMeta = SongParser.parse("x", "# T\nAutor: Carl Boberg\nCCLI #: 14181\nOrden: Coro, Coro\n\nCoro:\nla la\n\nCCLI: 999\n")
+        assertEquals("Carl Boberg", withMeta.author)
+        assertEquals("14181", withMeta.ccli)
+        assertEquals(listOf("la la", "CCLI: 999", "la la", "CCLI: 999"), withMeta.slides.map { it.text }) // después de la letra, es letra (y es parte del coro)
+        assertNull(SongParser.parse("x", "# T\n\nletra\n").ccli)
     }
 
     @Test

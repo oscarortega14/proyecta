@@ -320,12 +320,18 @@ private fun ApplicationScope.ProjectorWindow(
 
 /** Elegir archivos .txt o .zip (o varios) e importarlos a la biblioteca. */
 private fun importSongs(library: Library): String? {
+    // Si EasyWorship está instalado, se abre directo en su carpeta: basta elegir Songs.db.
+    val easyWorship = runCatching { EasyWorshipImport.findInstalled() }.getOrNull()
     val dialog = java.awt.FileDialog(
-        null as java.awt.Frame?, "Importar canciones: .txt, .zip, OpenLP (.xml) u Holyrics (.json)", java.awt.FileDialog.LOAD,
+        null as java.awt.Frame?,
+        if (easyWorship != null) "Importar canciones de EasyWorship: elige Songs.db (o .txt, .zip, OpenLP, Holyrics)"
+        else "Importar canciones: .txt, .zip, OpenLP (.xml), Holyrics (.json) o EasyWorship (Songs.db, .ewsx)",
+        java.awt.FileDialog.LOAD,
     ).apply {
         isMultipleMode = true
-        setFilenameFilter { _, name -> name.substringAfterLast('.', "").lowercase() in Library.IMPORT_EXTENSIONS + "zip" }
-        file = "*.txt;*.zip;*.xml;*.json"
+        setFilenameFilter { _, name -> name.substringAfterLast('.', "").lowercase() in Library.IMPORT_EXTENSIONS + "zip" || EasyWorshipImport.isSource(name) }
+        easyWorship?.parentFile?.let { directory = it.absolutePath }
+        file = "*.txt;*.zip;*.xml;*.json;*.db;*.ewsx"
         isVisible = true
     }
     val files = dialog.files?.toList().orEmpty()

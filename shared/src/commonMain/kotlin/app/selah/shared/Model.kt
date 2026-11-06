@@ -130,6 +130,10 @@ data class Song(
     val unknownOrder: List<String> = emptyList(),
     /** Línea "Fondo:" de la canción: archivo en Selah/fondos. */
     val background: String? = null,
+    /** Línea "Autor:" (no se proyecta). */
+    val author: String? = null,
+    /** Línea "CCLI:": número de la canción en CCLI, para el reporte de licencias. */
+    val ccli: String? = null,
 ) {
     fun summary() = SongSummary(id, title, slides.firstOrNull()?.text?.lineSequence()?.firstOrNull().orEmpty())
 }
