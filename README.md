@@ -79,6 +79,17 @@ El botón "+ Orden" del editor la agrega con las secciones existentes.
 
 ## Funciones
 
+- **Presentaciones de PowerPoint (.pptx) y PDF** (Anuncios → Presentaciones): cada diapositiva se pasa con
+  Siguiente, igual que una canción; se pueden poner en la lista del culto y el predicador las ve en la vista de
+  escenario. Se convierten una vez a imágenes (sin Office). Si una de PowerPoint se ve distinta, expórtala a PDF.
+- **Importar de EasyWorship 6/7**: "Importar…" abre directo la carpeta de EasyWorship; elige `Songs.db`
+  (o un respaldo `.ewsx`). Trae la letra con sus secciones, el autor y el número CCLI.
+- **Reporte para CCLI** (Historial → "Reporte para CCLI"): canciones proyectadas en el periodo con autor,
+  número CCLI y cuántas veces, en un .csv para Excel. El número va en la canción con una línea `CCLI: 1234567`
+  debajo del título (y `Autor: …`); no se proyectan.
+- **Video por la red (NDI®)** (Conectar dispositivos): la proyección, o solo la letra con fondo transparente, para
+  OBS (complemento DistroAV), vMix, ATEM o Resolume. Necesita NDI Tools (gratis, https://ndi.video/tools/).
+  NDI® es una marca registrada de Vizrt NDI AB.
 - **Logo de la iglesia** (tecla `L` o botón "Logo"): pantalla de espera con el logo sobre el fondo. Se elige en
   "Fondos y letra…" con "Usar de logo" (mejor un PNG con fondo transparente).
 - **Alertas**: aviso en una franja roja abajo, sin tapar la letra (se desplaza si es largo).
