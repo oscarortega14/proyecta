@@ -66,4 +66,5 @@ cuota de 5 GB, `SELAH_UPDATE_URL` solo para localhost.
 
 ## Tiendas (estado)
 Ver §9 de `docs/IOS.md`: Google Play (falta crear la app, 12 probadores × 14 días), Microsoft Store
-(identidad lista: OscarOrtega.SelahRemote, nombre "Selah Remote"; falta enviar el MSIX), App Store (Selah Remote 2.4.0 build 20401 enviada a revisión el 2026-11-05).
+(**publicada** el 2026-11-06: https://apps.microsoft.com/detail/9NP5ZZWWGLFK, Store ID 9NP5ZZWWGLFK,
+identidad OscarOrtega.SelahRemote; las versiones nuevas se suben con "Start update" en Partner Center), App Store (Selah Remote 2.4.0 build 20401 enviada a revisión el 2026-11-05).

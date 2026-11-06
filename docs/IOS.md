@@ -229,6 +229,5 @@ Dos caminos (se pueden hacer los dos):
 - **Microsoft Store** (gratis para personas; Microsoft vuelve a firmar el paquete, así Smart App Control
   de Windows deja de bloquear Selah):
   - `./gradlew :desktopApp:packageMsix` en Windows (usa `makeappx` del NuGet Microsoft.Windows.SDK.BuildTools).
-  - Falta: crear la cuenta en Partner Center, reservar el nombre y copiar *Product identity*
-    (`Package/Identity/Name`, `Publisher`, `PublisherDisplayName`) a `msix.*` en `gradle.properties`
-    (ahora dicen PENDIENTE), volver a generar el MSIX y enviarlo.
+  - **Publicada el 2026-11-06:** https://apps.microsoft.com/detail/9NP5ZZWWGLFK (Store ID 9NP5ZZWWGLFK).
+    Versión nueva: subir `selah.version`, generar el MSIX y en Partner Center → Selah Remote → **Start update**.
