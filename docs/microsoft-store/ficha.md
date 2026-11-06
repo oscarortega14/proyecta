@@ -86,7 +86,7 @@ Oscar Ortega
 
 ## Website / Support contact info
 https://github.com/oscarortega14/selah
-Soporte: https://github.com/oscarortega14/selah/issues (o tu correo)
+Soporte: https://github.com/oscarortega14/selah (la misma dirección que en App Store y Google Play)
 
 ## Privacy policy URL (en Properties)
 https://github.com/oscarortega14/selah/blob/main/docs/privacidad.md
