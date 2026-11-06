@@ -201,7 +201,7 @@ Dos caminos (se pueden hacer los dos):
 5. **Ficha**: reutilizar los textos de `docs/play/ficha.md` (nombre, subtítulo ≤ 30 caracteres:
    "Control de letras y Biblia", descripción, palabras clave: iglesia,proyección,letras,biblia,control
    remoto,videobeam,alabanza). URL de privacidad:
-   https://github.com/oscarortega14/selah/blob/main/docs/privacidad.md ; URL de soporte: la del repositorio.
+   https://oortega14.com/apps/selah/privacy ; URL de soporte: https://oortega14.com/apps/selah/support
 6. **Privacidad de la app**: "No se recopilan datos" (todo va solo al PC del usuario en su red local).
 7. **Clasificación por edad**: todo "Ninguno" → 4+. Categoría: Productividad (secundaria: Estilo de vida).
 8. **Capturas obligatorias**: iPhone 6,9" (1320×2868 o 1290×2796) y, como el proyecto también es para

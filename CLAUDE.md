@@ -56,9 +56,11 @@ Clave (PIN) con bloqueo por IP + límite global (`PinGuard`), comprobación de O
 cuota de 5 GB, `SELAH_UPDATE_URL` solo para localhost.
 
 ## Direcciones públicas (las mismas en las 3 tiendas)
-- Sitio web / soporte / marketing: https://github.com/oscarortega14/selah
-- Política de privacidad: https://github.com/oscarortega14/selah/blob/main/docs/privacidad.md
-  (si se mueve o renombra `docs/privacidad.md`, actualizar las fichas de App Store, Play y Microsoft Store)
+- Soporte: https://oortega14.com/apps/selah/support
+- Sitio web / marketing / código: https://github.com/oscarortega14/selah
+- Política de privacidad: https://oortega14.com/apps/selah/privacy
+  (páginas en el portafolio: `~/projects/portfolio/src/legal/selahContent.ts`, desplegado en Vercel;
+  si cambian de dirección, actualizar las fichas de App Store, Play y Microsoft Store)
 
 ## Tiendas (estado)
 Ver §9 de `docs/IOS.md`: Google Play (falta crear la app, 12 probadores × 14 días), Microsoft Store

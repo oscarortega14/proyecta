@@ -25,7 +25,7 @@ Sin publicidad, sin cuentas y sin recopilar datos: la app solo habla con el comp
 **Categoría:** Productividad (o Estilo de vida)
 **Etiquetas sugeridas:** iglesia, proyección, letras, Biblia, control remoto
 **Correo de contacto:** (el que uses para Play; obligatorio en la ficha)
-**Política de privacidad:** https://github.com/oscarortega14/selah/blob/main/docs/privacidad.md
+**Política de privacidad:** https://oortega14.com/apps/selah/privacy
 
 ---
 
