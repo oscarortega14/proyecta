@@ -19,6 +19,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.Switch
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -80,6 +81,10 @@ fun ConnectWindow(
     onNewPin: (digits: Int) -> Unit,
     onPinOff: (Boolean) -> Unit,
     onClose: () -> Unit,
+    /** Fuentes NDI encendidas, cuántos las reciben, y prender/apagar (devuelve un aviso si falta NDI). */
+    ndiOn: Set<NdiOutput.Kind> = emptySet(),
+    ndiReceivers: Map<NdiOutput.Kind, Int> = emptyMap(),
+    onNdi: (NdiOutput.Kind, Boolean) -> String? = { _, _ -> null },
 ) {
     var selected by remember { mutableStateOf(addresses.firstOrNull()) }
     val host = selected
@@ -154,6 +159,8 @@ fun ConnectWindow(
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                    // 6. NDI
+                    NdiSection(ndiOn, ndiReceivers, onNdi)
                     Text(
                         "Todos los equipos deben estar en el mismo Wi-Fi que este computador. Las redes de \"invitados\" a veces no dejan que los equipos se vean entre sí.",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -195,6 +202,41 @@ private fun PinSection(pin: String?, onNewPin: (Int) -> Unit, onPinOff: (Boolean
             Text("Sin clave: cualquier celular conectado a la misma red puede controlar la proyección.", color = MaterialTheme.colorScheme.error)
             Button({ onPinOff(false) }) { Text("Poner clave") }
         }
+    }
+}
+
+/** Video por la red para OBS, vMix, ATEM… sin captura de pantalla. */
+@Composable
+private fun NdiSection(on: Set<NdiOutput.Kind>, receivers: Map<NdiOutput.Kind, Int>, onNdi: (NdiOutput.Kind, Boolean) -> String?) {
+    var warning by remember { mutableStateOf<String?>(null) }
+    Section("Video por la red (NDI®)") {
+        Text(
+            "Para transmitir o grabar: OBS (con el complemento DistroAV), vMix, Resolume o una consola ATEM reciben la " +
+                "imagen de Selah por la red, sin capturar la pantalla. Solo trabaja mientras algún programa la está recibiendo.",
+        )
+        for (kind in NdiOutput.Kind.entries) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Switch(kind in on, { want -> warning = onNdi(kind, want) }, Modifier.hand())
+                Column(Modifier.weight(1f)) {
+                    Text(kind.label)
+                    val n = receivers[kind] ?: 0
+                    Text(
+                        when {
+                            kind !in on -> "Apagada"
+                            n == 0 -> "Encendida: búscala como \"${kind.sourceName}\" (nadie la está recibiendo todavía)"
+                            n == 1 -> "Encendida: 1 programa la está recibiendo"
+                            else -> "Encendida: $n programas la están recibiendo"
+                        },
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+        warning?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        Text(
+            "Necesita NDI Tools (gratis) instalado en este computador: ${Ndi.TOOLS_URL} · NDI® es una marca registrada de Vizrt NDI AB.",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

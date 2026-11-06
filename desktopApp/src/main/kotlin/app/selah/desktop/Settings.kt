@@ -28,6 +28,8 @@ data class Settings(
     val lastBackup: Long = 0,
     /** Carpeta extra donde copiar cada respaldo (memoria USB, Google Drive…), o null. */
     val backupCopyDir: String? = null,
+    /** Fuentes NDI encendidas (nombres de NdiOutput.Kind). */
+    val ndi: Set<String> = emptySet(),
 ) {
     /** La clave que se exige ahora (null = no se pide). */
     val activePin: String? get() = pin?.takeIf { !pinOff }

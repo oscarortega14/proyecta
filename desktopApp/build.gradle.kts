@@ -40,6 +40,8 @@ dependencies {
     implementation("org.apache.pdfbox:pdfbox:3.0.3")
     implementation("org.apache.poi:poi-ooxml:5.3.0")
     implementation("org.apache.logging.log4j:log4j-to-slf4j:2.24.1") // POI escribe su registro por aquí (en silencio)
+    // Salida NDI: llamar a la librería que instala NDI Tools (no se incluye en Selah)
+    implementation("net.java.dev.jna:jna:5.15.0")
 
     testImplementation(kotlin("test"))
     testImplementation("io.ktor:ktor-client-cio:$ktor")

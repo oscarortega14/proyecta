@@ -140,6 +140,14 @@ fun main() {
             presentationPage = { name, index -> library.presentations.page(name, index) },
             presentationThumb = { name, index -> library.presentations.thumb(name, index) })
 
+        // Salida NDI: dibuja con el mismo aspecto que el videobeam (el último que se armó aquí).
+        val lookNow = remember { java.util.concurrent.atomic.AtomicReference(look) }
+        lookNow.set(look)
+        val ndi = remember { NdiOutput(commands.presenter.state) { lookNow.get() } }
+        val ndiOn = remember(settings.ndi) { settings.ndi.mapNotNull { n -> NdiOutput.Kind.entries.firstOrNull { it.name == n } }.toSet() }
+        LaunchedEffect(ndiOn) { NdiOutput.Kind.entries.forEach { k -> ndi.set(k, k in ndiOn) } }
+        val ndiReceivers by ndi.receivers.collectAsState()
+
         ProvideLook(look) {
         Window(
             onCloseRequest = { confirmExit = true },
@@ -266,6 +274,14 @@ fun main() {
                 onNewPin = { digits -> settingsStore.update { it.copy(pin = Settings.randomPin(digits), pinOff = false) } },
                 onPinOff = { off -> settingsStore.update { it.copy(pinOff = off) } },
                 onClose = { connectOpen = false },
+                ndiOn = ndiOn,
+                ndiReceivers = ndiReceivers,
+                onNdi = { kind, want ->
+                    // Primero se prueba: si falta NDI Tools no queda "encendida" en los ajustes.
+                    val problem = ndi.set(kind, want)
+                    if (problem == null) settingsStore.update { s -> s.copy(ndi = if (want) s.ndi + kind.name else s.ndi - kind.name) }
+                    problem
+                },
             )
         }
 
