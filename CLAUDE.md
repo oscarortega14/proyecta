@@ -68,3 +68,17 @@ cuota de 5 GB, `SELAH_UPDATE_URL` solo para localhost.
 Ver §9 de `docs/IOS.md`: Google Play (falta crear la app, 12 probadores × 14 días), Microsoft Store
 (**publicada** el 2026-11-06: https://apps.microsoft.com/detail/9NP5ZZWWGLFK, Store ID 9NP5ZZWWGLFK,
 identidad OscarOrtega.SelahRemote; las versiones nuevas se suben con "Start update" en Partner Center), App Store (Selah Remote 2.4.0 build 20401 enviada a revisión el 2026-11-05).
+
+## Versión 2.5.0 (2026-11-06): lo nuevo y lo que falta
+Nuevo (hecho y probado en el PC con Windows, 243 pruebas): importar de EasyWorship 6/7 (`EasyWorshipImport.kt`),
+presentaciones PowerPoint/PDF (`Presentations.kt`, carpeta `presentaciones/`, `ClientMessage.ShowPresentation`,
+`PlanKind.PRESENTATION` solo para remotos que dicen `FEATURE_PRESENTATIONS` en Hello), reporte CCLI (Historial;
+líneas `Autor:` y `CCLI:` en las canciones) y salida NDI (`Ndi.kt`/`NdiOutput.kt`, usa la librería de NDI Tools).
+Falta:
+- iPhone: compilar en la Mac (remoteUi cambió: lista "Presentaciones" en Más), probar y subir 2.5.0 (20500).
+- Android: `bundlePlayRelease` 2.5.0 (versionCode 20500) para Google Play.
+- Windows: MSI/MSIX 2.5.0 se arman SOLO en Windows (`packageMsi`, `packageMsix`); el MSI se firma con
+  `java tools/Firma.java firmar <msi> <clave ed25519>` y se publica en GitHub Releases (con permiso del dueño);
+  el MSIX se sube en Partner Center → Selah Remote → "Start update".
+- Sin probar de punta a punta: NDI con un receptor real (instalar NDI Tools) y EasyWorship con una base real.
+

@@ -108,7 +108,7 @@ drogas, apuestas ni compras. No comparte ubicación. **Sí permite intercambiar 
 
 **Pricing and availability**: Gratis (Free) · Todos los mercados · Visibilidad pública.
 
-**Packages**: subir `Selah-2.4.0.msix`. Familia de dispositivos: Windows 10/11 Desktop.
+**Packages**: subir `Selah-<versión>.msix` (la última: 2.5.0). Familia de dispositivos: Windows 10/11 Desktop.
 
 **Submission options → Notes for certification** (en inglés):
 > Selah is a free, open-source (MIT) church projection program: it shows song lyrics and Bible verses on a
