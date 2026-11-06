@@ -19,6 +19,9 @@ data class HistoryEntry(
     enum class Kind(val label: String) { SONG("Canción"), BIBLE("Lectura"), SERMON("Predicación") }
 }
 
+/** Una fila del reporte CCLI. */
+data class CcliRow(val title: String, val author: String, val ccli: String, val times: Int, val dates: List<LocalDate>)
+
 /**
  * Historial de lo que se proyectó, en Selah/historial.csv (se abre con Excel).
  * Cada canción o lectura cuenta una vez por día, aunque se proyecte varias veces.
@@ -61,6 +64,20 @@ class History(
         .map { (_, list) -> list.last().title to list.size }
         .sortedWith(compareByDescending<Pair<String, Int>> { it.second }.thenBy { it.first })
 
+    /**
+     * Reporte para CCLI (licencia de canciones): cada canción proyectada entre [from] y [to]
+     * (inclusive), con autor, número CCLI y cuántas veces (días) se usó. [song] da los datos actuales
+     * de la canción por su id (null si ya no existe: se usa el título guardado).
+     */
+    fun ccliReport(from: LocalDate, to: LocalDate, song: (String) -> app.selah.shared.Song?): List<CcliRow> = _entries.value
+        .filter { it.kind == HistoryEntry.Kind.SONG && !it.date.isBefore(from) && !it.date.isAfter(to) }
+        .groupBy { it.ref }
+        .map { (ref, list) ->
+            val s = song(ref)
+            CcliRow(s?.title ?: list.last().title, s?.author.orEmpty(), s?.ccli.orEmpty(), list.size, list.map { it.date }.sorted())
+        }
+        .sortedWith(compareByDescending<CcliRow> { it.times }.thenBy { it.title.lowercase() })
+
     fun exportCsv(target: File) {
         target.writeText(HEADER + "\n" + _entries.value.joinToString("") { toCsv(it) + "\n" }, Charsets.UTF_8)
     }
@@ -77,6 +94,13 @@ class History(
     companion object {
         const val HEADER = "fecha,hora,tipo,titulo,referencia"
         private val HOUR = DateTimeFormatter.ofPattern("HH:mm")
+
+        const val CCLI_HEADER = "titulo,autor,numero_ccli,veces,fechas"
+
+        /** El reporte en CSV (se abre con Excel). Las canciones sin número CCLI quedan con la columna vacía. */
+        fun ccliCsv(rows: List<CcliRow>): String = CCLI_HEADER + "\n" + rows.joinToString("") { r ->
+            listOf(r.title, r.author, r.ccli, r.times.toString(), r.dates.joinToString(" ")).joinToString(",") { csvField(it) } + "\n"
+        }
 
         internal fun toCsv(e: HistoryEntry) =
             listOf(e.date.toString(), e.time, e.kind.label, e.title, e.ref).joinToString(",") { csvField(it) }

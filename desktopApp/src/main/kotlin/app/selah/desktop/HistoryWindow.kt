@@ -35,7 +35,7 @@ import java.time.LocalDate
 
 /** Qué se cantó y leyó cada día, y las canciones más cantadas (para no repetir o para reportes). */
 @Composable
-fun HistoryWindow(history: History, onClose: () -> Unit) {
+fun HistoryWindow(history: History, song: (String) -> app.selah.shared.Song?, onClose: () -> Unit) {
     val entries by history.entries.collectAsState()
     var months by remember { mutableIntStateOf(3) }
     var message by remember { mutableStateOf<String?>(null) }
@@ -85,6 +85,21 @@ fun HistoryWindow(history: History, onClose: () -> Unit) {
                             }
                         }
                         val top = remember(entries, months) { history.topSongs(LocalDate.now().minusMonths(months.toLong())) }
+                        // Reporte para la licencia CCLI del mismo periodo
+                        val report = remember(entries, months) {
+                            history.ccliReport(LocalDate.now().minusMonths(months.toLong()), LocalDate.now(), song)
+                        }
+                        OutlinedButton(
+                            { message = exportCcli(report, months) }, Modifier.fillMaxWidth(), enabled = report.isNotEmpty(),
+                        ) { Text("Reporte para CCLI (.csv)…") }
+                        val missing = report.count { it.ccli.isEmpty() }
+                        if (missing > 0) {
+                            Text(
+                                "$missing ${if (missing == 1) "canción no tiene" else "canciones no tienen"} número CCLI. " +
+                                    "Agrégalo en la canción con una línea \"CCLI: 1234567\" debajo del título.",
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                         HorizontalDivider()
                         if (top.isEmpty()) Text("Sin canciones en ese tiempo.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         LazyColumn {
@@ -100,6 +115,19 @@ fun HistoryWindow(history: History, onClose: () -> Unit) {
             }
         }
     }
+}
+
+/** Guarda el reporte CCLI (título, autor, número, veces, fechas) para copiarlo en el sitio de CCLI. */
+private fun exportCcli(rows: List<CcliRow>, months: Int): String? {
+    val dialog = java.awt.FileDialog(null as java.awt.Frame?, "Guardar reporte para CCLI", java.awt.FileDialog.SAVE).apply {
+        file = "reporte-ccli-${LocalDate.now()}-${months}m.csv"
+        isVisible = true
+    }
+    val name = dialog.file ?: return null
+    val target = File(dialog.directory, if (name.endsWith(".csv", true)) name else "$name.csv")
+    // Con BOM: Excel en español abre bien las tildes
+    return runCatching { target.writeText("\uFEFF" + History.ccliCsv(rows), Charsets.UTF_8); "Reporte guardado en ${target.absolutePath}" }
+        .getOrElse { "No pude guardar: ${it.message}" }
 }
 
 private fun exportHistory(history: History): String? {

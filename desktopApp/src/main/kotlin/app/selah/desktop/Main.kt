@@ -261,7 +261,7 @@ fun main() {
         }
 
         if (historyOpen) {
-            HistoryWindow(commands.history!!, onClose = { historyOpen = false })
+            HistoryWindow(commands.history!!, song = library::song, onClose = { historyOpen = false })
         }
 
         if (backgroundsOpen) {

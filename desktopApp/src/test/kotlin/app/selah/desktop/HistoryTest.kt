@@ -41,6 +41,32 @@ class HistoryTest {
     }
 
     @Test
+    fun ccliReportCountsSongsInThePeriodWithTheirNumbers() {
+        val h = history()
+        h.record(HistoryEntry.Kind.SONG, "Cuán grande es Él", "cuan")
+        h.record(HistoryEntry.Kind.SONG, "Borrada", "borrada")
+        h.record(HistoryEntry.Kind.BIBLE, "Juan 3:16", "Juan 3:16") // las lecturas no van
+        now = LocalDateTime.of(2026, 11, 15, 10, 0)
+        h.record(HistoryEntry.Kind.SONG, "Cuán grande es Él", "cuan")
+        now = LocalDateTime.of(2026, 12, 6, 10, 0)
+        h.record(HistoryEntry.Kind.SONG, "Cuán grande es Él", "cuan") // fuera del periodo
+        val songs = mapOf("cuan" to app.selah.shared.Song("cuan", "Cuán Grande Es Él", emptyList(), author = "Carl Boberg", ccli = "14181"))
+
+        val rows = h.ccliReport(LocalDate.of(2026, 11, 1), LocalDate.of(2026, 11, 30)) { songs[it] }
+        assertEquals(
+            listOf(
+                CcliRow("Cuán Grande Es Él", "Carl Boberg", "14181", 2, listOf(LocalDate.of(2026, 11, 8), LocalDate.of(2026, 11, 15))),
+                CcliRow("Borrada", "", "", 1, listOf(LocalDate.of(2026, 11, 8))),
+            ),
+            rows,
+        )
+        assertEquals(
+            "titulo,autor,numero_ccli,veces,fechas\nCuán Grande Es Él,Carl Boberg,14181,2,2026-11-08 2026-11-15\nBorrada,,,1,2026-11-08\n",
+            History.ccliCsv(rows),
+        )
+    }
+
+    @Test
     fun topSongsAndCsvWithCommasAndQuotes() {
         val h = history()
         h.record(HistoryEntry.Kind.SONG, "A", "a")
