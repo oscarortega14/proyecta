@@ -55,6 +55,11 @@ Clave (PIN) con bloqueo por IP + límite global (`PinGuard`), comprobación de O
 10 conexiones por IP, 20 mensajes/s, textos recortados (`NetGuard`), subidas solo jpg/png/webp/mp4/mov con
 cuota de 5 GB, `SELAH_UPDATE_URL` solo para localhost.
 
+## Direcciones públicas (las mismas en las 3 tiendas)
+- Sitio web / soporte / marketing: https://github.com/oscarortega14/selah
+- Política de privacidad: https://github.com/oscarortega14/selah/blob/main/docs/privacidad.md
+  (si se mueve o renombra `docs/privacidad.md`, actualizar las fichas de App Store, Play y Microsoft Store)
+
 ## Tiendas (estado)
 Ver §9 de `docs/IOS.md`: Google Play (falta crear la app, 12 probadores × 14 días), Microsoft Store
-(identidad lista: OscarOrtega.SelahRemote, nombre "Selah Remote"; falta enviar el MSIX), App Store (en curso desde la Mac).
+(identidad lista: OscarOrtega.SelahRemote, nombre "Selah Remote"; falta enviar el MSIX), App Store (Selah Remote 2.4.0 build 20401 enviada a revisión el 2026-11-05).
