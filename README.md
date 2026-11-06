@@ -2,6 +2,8 @@
 
 Programa para proyectar letras de canciones y la Biblia en la iglesia, con control remoto desde celulares y tablets en la misma red Wi-Fi.
 
+**Página web:** https://oortega14.com/apps/selah
+
 | Módulo | Qué es | Tecnología |
 |---|---|---|
 | `shared/` | Modelos, protocolo, lector de canciones, búsqueda en la Biblia | Kotlin Multiplatform (JVM + Android + iOS) |

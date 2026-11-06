@@ -57,9 +57,11 @@ cuota de 5 GB, `SELAH_UPDATE_URL` solo para localhost.
 
 ## Direcciones públicas (las mismas en las 3 tiendas)
 - Soporte: https://oortega14.com/apps/selah/support
-- Sitio web / marketing / código: https://github.com/oscarortega14/selah
+- Sitio web / marketing: https://oortega14.com/apps/selah
+- Código: https://github.com/oscarortega14/selah
 - Política de privacidad: https://oortega14.com/apps/selah/privacy
-  (páginas en el portafolio: `~/projects/portfolio/src/legal/selahContent.ts`, desplegado en Vercel;
+  (páginas en el portafolio: `~/projects/portfolio`, en `src/apps/selah/SelahLanding.tsx` y
+  `src/legal/selahContent.ts`, desplegado en Vercel; al aprobarse una tienda, poner su enlace en `STORE`;
   si cambian de dirección, actualizar las fichas de App Store, Play y Microsoft Store)
 
 ## Tiendas (estado)

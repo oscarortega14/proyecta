@@ -85,7 +85,7 @@ Incluye VLC (LGPL) para los fondos de video.
 Oscar Ortega
 
 ## Website / Support contact info
-https://github.com/oscarortega14/selah
+https://oortega14.com/apps/selah
 Soporte: https://oortega14.com/apps/selah/support (la misma dirección que en App Store y Google Play)
 
 ## Privacy policy URL (en Properties)
