@@ -37,6 +37,15 @@ android {
         }
     }
 
+    // Google Play no acepta (y no debe recibir) un paquete firmado con la clave de depuración.
+    if (!releaseKey.isFile) gradle.taskGraph.whenReady {
+        if (allTasks.any { it.project == project && it.name.startsWith("bundle") && it.name.endsWith("Release") }) {
+            throw GradleException(
+                "Falta la clave de firma de Android ($releaseKey). Cópiala del PC antes de generar el .aab para Google Play."
+            )
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
