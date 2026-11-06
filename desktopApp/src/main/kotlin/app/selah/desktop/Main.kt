@@ -136,7 +136,9 @@ fun main() {
             scope.launch { firewallOk = withContext(Dispatchers.IO) { FirewallSetup.requestRule() } }
         }
         val theme by themes.theme.collectAsState()
-        val look = Look(theme, backgroundFile = { name -> library.backgroundFile(name) }, mediaFile = { name -> library.announcementFile(name) })
+        val look = Look(theme, backgroundFile = { name -> library.backgroundFile(name) }, mediaFile = { name -> library.announcementFile(name) },
+            presentationPage = { name, index -> library.presentations.page(name, index) },
+            presentationThumb = { name, index -> library.presentations.thumb(name, index) })
 
         ProvideLook(look) {
         Window(
@@ -149,6 +151,7 @@ fun main() {
             },
         ) {
             MaterialTheme(colorScheme = darkColorScheme()) {
+                val presentationsReady by library.presentations.ready.collectAsState()
                 OperatorScreen(
                     state = state,
                     catalog = catalog,
@@ -187,6 +190,12 @@ fun main() {
                     onExport = { exportSongs(library) },
                     onAddAnnouncements = { addAnnouncements(library) },
                     onOpenAnnouncements = { library.announcementsDir.mkdirs(); runCatching { Desktop.getDesktop().open(library.announcementsDir) } },
+                    onAddPresentations = { addPresentations(library) },
+                    onOpenPresentations = {
+                        library.presentations.dir.mkdirs(); runCatching { Desktop.getDesktop().open(library.presentations.dir) }
+                        library.refreshPresentations()
+                    },
+                    presentationsReady = presentationsReady,
                 )
                 // La primera vez: guía corta. Después del aviso del firewall, para no encimar ventanas.
                 if (!settings.welcomeDone && !askFirewall) {
@@ -356,6 +365,20 @@ private fun addAnnouncements(library: Library): String? {
     if (files.isEmpty()) return null
     val n = runCatching { library.addAnnouncements(files) }.getOrElse { return "No pude agregar: ${it.message}" }
     return if (n == 0) "Esos anuncios ya estaban" else "Agregados $n anuncios"
+}
+
+/** Elegir PowerPoint o PDF y copiarlos a la carpeta de presentaciones (se convierten en segundo plano). */
+private fun addPresentations(library: Library): String? {
+    val dialog = java.awt.FileDialog(null as java.awt.Frame?, "Agregar presentaciones (PowerPoint .pptx o PDF)", java.awt.FileDialog.LOAD).apply {
+        isMultipleMode = true
+        setFilenameFilter { _, name -> Presentations.isPresentation(name) }
+        file = "*.pptx;*.pdf"
+        isVisible = true
+    }
+    val files = dialog.files?.toList().orEmpty()
+    if (files.isEmpty()) return null
+    val n = runCatching { library.addPresentations(files) }.getOrElse { return "No pude agregar: ${it.message}" }
+    return if (n == 0) "Esas presentaciones ya estaban" else "Agregadas $n: se están preparando (unos segundos)"
 }
 
 /** Guardar todas las canciones en un .zip (respaldo o para otro PC). */

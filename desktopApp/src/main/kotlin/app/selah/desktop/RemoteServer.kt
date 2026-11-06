@@ -1,5 +1,7 @@
 package app.selah.desktop
 
+import app.selah.shared.forOldRemotes
+
 import app.selah.shared.ClientMessage
 import app.selah.shared.DEFAULT_PORT
 import app.selah.shared.ServerMessage
@@ -17,6 +19,7 @@ import app.selah.shared.ProtocolJson
 import app.selah.shared.DiscoveryReply
 import io.ktor.http.ContentType
 import io.ktor.server.response.respondText
+import io.ktor.server.response.respondFile
 import io.ktor.server.routing.get
 import io.ktor.utils.io.readAvailable
 import java.io.File
@@ -71,6 +74,18 @@ class RemoteServer(
                     ProtocolJson.encodeToString(DiscoveryReply.serializer(), DiscoveryReply(pcName, port)),
                     ContentType.Application.Json,
                 )
+            }
+            // Imagen de una diapositiva de presentación (ya convertida), para la vista de escenario y el
+            // control web: GET /diapositiva?nombre=x.pdf&n=0[&mini=1]. Solo lectura y solo de esa carpeta.
+            get("/diapositiva") {
+                val name = call.request.queryParameters["nombre"].orEmpty()
+                val n = call.request.queryParameters["n"]?.toIntOrNull()
+                val mini = call.request.queryParameters["mini"] == "1"
+                val file = n?.takeIf { library.presentations.file(name) != null }?.let {
+                    if (mini) library.presentations.thumb(name, it) else library.presentations.page(name, it)
+                }
+                if (file == null) call.respondText("No encontrada", status = HttpStatusCode.NotFound)
+                else call.respondFile(file)
             }
             // Subir un anuncio (foto o video) desde el celular: POST /anuncios?nombre=foto.jpg con la clave en X-Proyecta-Pin.
             post("/anuncios") {
@@ -149,6 +164,8 @@ class RemoteServer(
                 var granted: String? = null
                 // ¿Este remoto entiende State.keepSlides? (lo dice en Hello). Y qué diapositivas tiene ya.
                 val lean = java.util.concurrent.atomic.AtomicBoolean(false)
+                // ¿Entiende las presentaciones en la lista? (las apps anteriores fallarían con un tipo nuevo)
+                val knowsPresentations = kotlinx.coroutines.flow.MutableStateFlow(false)
                 var sentSlides: List<app.selah.shared.Slide>? = null
                 fun auth(message: String? = null) = ServerMessage.Auth(guard.required, guard.allows(granted), message)
                 // Envía biblioteca y estado al conectarse, y luego cada vez que cambien.
@@ -156,11 +173,13 @@ class RemoteServer(
                     launch { pin.collect { send(Frame.Text(auth().encode())) } }
                     launch {
                         library.catalog.collect { c ->
-                            send(Frame.Text(ServerMessage.Library(c.songs, c.bibleName, library.bible?.bookInfos().orEmpty(), c.announcements, c.sermons, c.bibleNames, c.secondBibleName).encode()))
+                            send(Frame.Text(ServerMessage.Library(c.songs, c.bibleName, library.bible?.bookInfos().orEmpty(), c.announcements, c.sermons, c.bibleNames, c.secondBibleName, c.presentations).encode()))
                         }
                     }
                     launch {
-                        kotlinx.coroutines.flow.combine(commands.plan.state, commands.plan.saved) { p, saved -> ServerMessage.Plan(p, saved) }
+                        kotlinx.coroutines.flow.combine(commands.plan.state, commands.plan.saved, knowsPresentations) { p, saved, knows ->
+                            ServerMessage.Plan(if (knows) p else p.forOldRemotes(), saved)
+                        }
                             .collect { m -> send(Frame.Text(m.encode())) }
                     }
                     presenter.state.collect { s ->
@@ -193,6 +212,7 @@ class RemoteServer(
                         }
                         if (msg is ClientMessage.Hello) {
                             lean.set(app.selah.shared.FEATURE_KEEP_SLIDES in msg.features)
+                            knowsPresentations.value = app.selah.shared.FEATURE_PRESENTATIONS in msg.features
                             continue
                         }
                         if (msg is ClientMessage.Login) {

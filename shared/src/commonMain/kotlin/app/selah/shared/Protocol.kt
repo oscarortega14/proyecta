@@ -123,6 +123,13 @@ sealed interface ClientMessage {
     @Serializable @SerialName("plan_add_media")
     data class PlanAddMedia(val name: String) : ClientMessage
 
+    /** Mostrar una presentación (PowerPoint o PDF de la carpeta presentaciones), desde la primera diapositiva. */
+    @Serializable @SerialName("presentation")
+    data class ShowPresentation(val name: String) : ClientMessage
+
+    @Serializable @SerialName("plan_add_presentation")
+    data class PlanAddPresentation(val name: String) : ClientMessage
+
     /** Proyectar una predicación (archivo de la carpeta predicaciones). */
     @Serializable @SerialName("sermon")
     data class ShowSermon(val id: String) : ClientMessage
@@ -148,7 +155,11 @@ sealed interface ClientMessage {
 data class BibleBookInfo(val name: String, val chapters: Int)
 
 @Serializable
-enum class PlanKind { SONG, BIBLE, MEDIA, SERMON }
+enum class PlanKind {
+    SONG, BIBLE, MEDIA, SERMON,
+    /** Solo se envía a remotos que dijeron [FEATURE_PRESENTATIONS]; a los demás les llega como MEDIA. */
+    PRESENTATION,
+}
 
 /** Un elemento de la lista del culto: una canción (ref = id) o una cita (ref = referencia). */
 @Serializable
@@ -177,6 +188,8 @@ sealed interface ServerMessage {
         /** Traducciones disponibles y la segunda elegida (null = ninguna). */
         val bibleNames: List<String> = emptyList(),
         val secondBible: String? = null,
+        /** Presentaciones (PowerPoint y PDF) que se pueden mostrar. */
+        val presentations: List<String> = emptyList(),
     ) : ServerMessage
 
     @Serializable @SerialName("state")
@@ -221,6 +234,14 @@ sealed interface ServerMessage {
 
 /** Capacidad de Hello: entiende State.keepSlides. */
 const val FEATURE_KEEP_SLIDES = "keepSlides"
+
+/** Capacidad de Hello: entiende PlanKind.PRESENTATION (las apps anteriores fallarían con un valor nuevo). */
+const val FEATURE_PRESENTATIONS = "presentations"
+
+/** La lista como la entiende un remoto que no conoce las presentaciones. */
+fun ServicePlanState.forOldRemotes(): ServicePlanState =
+    if (items.none { it.kind == PlanKind.PRESENTATION }) this
+    else copy(items = items.map { if (it.kind == PlanKind.PRESENTATION) it.copy(kind = PlanKind.MEDIA) else it })
 
 /** El remoto arma el estado completo: si [m] trae keepSlides, conserva las diapositivas que ya tenía. */
 fun mergeState(previous: PresentationState, m: ServerMessage.State): PresentationState =

@@ -99,6 +99,10 @@ class RemoteClient(private val scope: CoroutineScope) {
     private val _announcements = MutableStateFlow<List<String>>(emptyList())
     val announcements: StateFlow<List<String>> = _announcements.asStateFlow()
 
+    /** Presentaciones (PowerPoint y PDF) del computador. */
+    private val _presentations = MutableStateFlow<List<String>>(emptyList())
+    val presentations: StateFlow<List<String>> = _presentations.asStateFlow()
+
     private val _bibleBooks = MutableStateFlow<List<BibleBookInfo>>(emptyList())
     val bibleBooks: StateFlow<List<BibleBookInfo>> = _bibleBooks.asStateFlow()
 
@@ -153,7 +157,7 @@ class RemoteClient(private val scope: CoroutineScope) {
                         // descartar órdenes que se acumularon mientras no había conexión
                         while (queue.tryReceive().isSuccess) Unit
                         // Que el PC no repita el texto de todas las diapositivas en cada "Siguiente".
-                        send(Frame.Text(ClientMessage.Hello(listOf(app.selah.shared.FEATURE_KEEP_SLIDES)).encode()))
+                        send(Frame.Text(ClientMessage.Hello(listOf(app.selah.shared.FEATURE_KEEP_SLIDES, app.selah.shared.FEATURE_PRESENTATIONS)).encode()))
                         val sender = launch { for (m in queue) send(Frame.Text(m.encode())) }
                         try {
                             for (frame in incoming) {
@@ -233,6 +237,7 @@ class RemoteClient(private val scope: CoroutineScope) {
                 if (m.bibleName != _bibleName.value) _bibleChapter.value = null
                 _songs.value = m.songs; _bibleName.value = m.bibleName; _bibleBooks.value = m.bibleBooks
                 _announcements.value = m.announcements
+                _presentations.value = m.presentations
                 _sermons.value = m.sermons
                 _bibleNames.value = m.bibleNames
                 _secondBible.value = m.secondBible

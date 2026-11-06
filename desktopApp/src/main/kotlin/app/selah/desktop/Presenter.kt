@@ -33,6 +33,7 @@ class Presenter(
         is ClientMessage.SetBlank -> { _state.update { it.copy(blank = msg.blank) }; null }
         is ClientMessage.ShowBible -> showBible(msg.reference)
         is ClientMessage.ShowMedia -> showMedia(msg.name)
+        is ClientMessage.ShowPresentation -> showPresentation(msg.name)
         is ClientMessage.ShowSermon -> showSermon(msg.id)
         is ClientMessage.StageMessage -> { _state.update { it.copy(stageMessage = msg.text.trim()) }; null }
         is ClientMessage.ShowLogo -> { _state.update { it.copy(logo = msg.show, blank = if (msg.show) false else it.blank) }; null }
@@ -120,6 +121,17 @@ class Presenter(
     private fun showMedia(name: String): String? {
         library.announcementFile(name) ?: return "No encontré el anuncio \"$name\" en la carpeta anuncios"
         _state.update { it.keepingOverlays(PresentationState("Anuncio: ${name.substringBeforeLast('.')}", listOf(app.selah.shared.Slide("Anuncio", name)), 0, media = name)) }
+        return null
+    }
+
+    private fun showPresentation(name: String): String? {
+        val pages = try {
+            library.presentations.pages(name)
+        } catch (e: IllegalArgumentException) {
+            return e.message
+        }
+        val slides = pages.indices.map { app.selah.shared.Slide("", "Diapositiva ${it + 1} de ${pages.size}") }
+        _state.update { it.keepingOverlays(PresentationState(name.substringBeforeLast('.'), slides, 0, presentation = name)) }
         return null
     }
 

@@ -31,6 +31,8 @@ data class Catalog(
     val sermons: List<SongSummary> = emptyList(),
     /** Segunda traducción que sale debajo de la primera, o null. */
     val secondBibleName: String? = null,
+    /** Presentaciones (PowerPoint y PDF) de la carpeta presentaciones. */
+    val presentations: List<String> = emptyList(),
 )
 
 /**
@@ -44,6 +46,7 @@ class Library(val baseDir: File) {
     val backgroundsDir = File(baseDir, "fondos")
     val announcementsDir = File(baseDir, "anuncios")
     val sermonsDir = File(baseDir, "predicaciones")
+    val presentations = Presentations(File(baseDir, "presentaciones"))
     @Volatile private var sermons: Map<String, Song> = emptyMap()
 
     fun sermon(id: String): Song? = sermons[id]
@@ -221,6 +224,8 @@ class Library(val baseDir: File) {
         backgroundsDir.mkdirs()
         announcementsDir.mkdirs()
         sermonsDir.mkdirs()
+        presentations.dir.mkdirs()
+        presentations.prepareAllInBackground()
         if (sermonsDir.listFiles { f -> f.isSongFile() }.isNullOrEmpty()) writeExampleSermon()
         sermons = sermonsDir.listFiles { f -> f.isSongFile() }.orEmpty()
             .map { f -> SongParser.parse(f.nameWithoutExtension, readTextSmart(f), f.nameWithoutExtension) }
@@ -276,6 +281,7 @@ class Library(val baseDir: File) {
             songs, bible?.name, error, names, BIBLE_NOTICES[bible?.name], scanAnnouncements(),
             sermons.values.sortedBy { normalizeText(it.title) }.map { it.summary() },
             secondBible?.name,
+            presentations.list(),
         )
     }
 
@@ -303,6 +309,20 @@ class Library(val baseDir: File) {
 
     /** Lo que ocupa la carpeta de anuncios. */
     fun announcementsBytes(): Long = announcementsDir.listFiles().orEmpty().sumOf { it.length() }
+
+    /** Copia presentaciones a su carpeta y las empieza a convertir. Devuelve cuántas se agregaron. */
+    @Synchronized
+    fun addPresentations(files: List<File>): Int {
+        val n = presentations.add(files)
+        _catalog.value = _catalog.value.copy(presentations = presentations.list())
+        presentations.prepareAllInBackground()
+        return n
+    }
+
+    @Synchronized
+    fun refreshPresentations() {
+        _catalog.value = _catalog.value.copy(presentations = presentations.list())
+    }
 
     @Synchronized
     fun refreshAnnouncements() {

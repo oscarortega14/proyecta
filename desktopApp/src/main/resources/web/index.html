@@ -36,6 +36,7 @@
   .slide { background:var(--card); border-radius:12px; padding:12px; margin-bottom:8px; white-space:pre-line; border:2px solid transparent; }
   .slide.on { background:var(--accent-bg); border-color:var(--accent); }
   .slide .lbl { color:var(--accent); font-size:13px; font-weight:600; display:block; }
+  .slide .thumb { display:block; width:100%; max-width:320px; aspect-ratio:16/9; object-fit:contain; background:#000; border-radius:6px; margin-bottom:6px; }
   input[type=text], input[type=search], input[type=tel] { width:100%; padding:12px; font-size:16px; border-radius:10px; border:1px solid #5a5560; background:#1e1c22; color:var(--text); }
   .row { display:flex; gap:8px; align-items:center; }
   .item { display:flex; align-items:center; gap:8px; padding:10px 0; border-bottom:1px solid #2e2b33; }
@@ -159,6 +160,11 @@
       <h2>Predicaciones</h2>
       <div id="serList"></div>
     </div>
+    <div id="presBox" hidden>
+      <hr>
+      <h2>Presentaciones</h2>
+      <div id="presList"></div>
+    </div>
     <div id="annBox">
       <hr>
       <h2>Anuncios</h2>
@@ -257,6 +263,12 @@ function renderLive() {
   st.slides.forEach((s, i) => {
     const d = P.el("div", "slide" + (i === st.index ? " on" : ""));
     if (s.label) d.appendChild(P.el("span", "lbl", s.label));
+    if (st.presentation) {
+      // Presentación: la miniatura de cada diapositiva
+      const img = P.el("img", "thumb"); img.loading = "lazy"; img.alt = s.text;
+      img.src = "/diapositiva?mini=1&n=" + i + "&nombre=" + encodeURIComponent(st.presentation);
+      d.appendChild(img);
+    }
     d.appendChild(document.createTextNode(s.text));
     d.onclick = () => P.send("goto", { index: i });
     box.appendChild(d);
@@ -339,6 +351,21 @@ function renderAnnouncements() {
     t.onclick = () => { P.send("media", { name }); showTab("live"); };
     const add = P.el("button", "icon", "+ Lista");
     add.onclick = () => { P.send("plan_add_media", { name }); toast("Agregado a la lista"); };
+    row.append(t, add); box.appendChild(row);
+  });
+}
+
+function renderPresentations() {
+  const list = S.presentations || [];
+  $("presBox").hidden = list.length === 0;
+  const box = $("presList"); box.replaceChildren();
+  list.forEach((name) => {
+    const on = name === S.state.presentation;
+    const row = P.el("div", "item" + (on ? " on" : ""));
+    const t = P.el("div", "t"); t.appendChild(P.el("b", null, (on ? "▶ " : "") + name.replace(/\.[^.]+$/, "")));
+    t.onclick = () => { P.send("presentation", { name }); showTab("live"); };
+    const add = P.el("button", "icon", "+ Lista");
+    add.onclick = () => { P.send("plan_add_presentation", { name }); toast("Agregada a la lista"); };
     row.append(t, add); box.appendChild(row);
   });
 }
@@ -495,7 +522,7 @@ function renderPlan() {
     const row = P.el("div", "item" + (i === S.plan.current ? " on" : ""));
     const t = P.el("div", "t");
     t.appendChild(P.el("b", null, (i + 1) + ". " + it.title));
-    t.appendChild(P.el("small", null, it.kind === "BIBLE" ? "Lectura" : it.kind === "MEDIA" ? "Anuncio" : it.kind === "SERMON" ? "Predicación" : "Canción"));
+    t.appendChild(P.el("small", null, it.kind === "BIBLE" ? "Lectura" : it.kind === "MEDIA" ? "Anuncio" : it.kind === "SERMON" ? "Predicación" : it.kind === "PRESENTATION" ? "Presentación" : "Canción"));
     t.onclick = () => { P.send("plan_go", { index: i }); showTab("live"); };
     const up = P.el("button", "icon", "▲"); up.onclick = () => P.send("plan_move", { from: i, to: i - 1 });
     const down = P.el("button", "icon", "▼"); down.onclick = () => P.send("plan_move", { from: i, to: i + 1 });
@@ -624,6 +651,8 @@ P.on("status", renderStatus);
 P.on("state", renderLive);
 P.on("library", renderSongs);
 P.on("library", renderAnnouncements);
+P.on("library", renderPresentations);
+P.on("state", renderPresentations);
 P.on("library", renderSermons);
 P.on("state", renderSermons);
 P.on("state", renderAnnouncements);

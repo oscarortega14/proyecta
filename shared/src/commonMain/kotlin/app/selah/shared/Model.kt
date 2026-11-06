@@ -47,6 +47,11 @@ data class PresentationState(
     val countdownText: String = "",
     /** Anuncio en pantalla: imagen o video (archivo en Selah/anuncios) en vez de letra, o null. */
     val media: String? = null,
+    /**
+     * Presentación en pantalla (archivo en Selah/presentaciones): cada diapositiva es una imagen
+     * y el texto de las diapositivas solo dice "Diapositiva 3 de 10" (para los remotos).
+     */
+    val presentation: String? = null,
     /** Predicación en pantalla (songId es el id de la predicación): las etiquetas salen como encabezado. */
     val sermon: Boolean = false,
     /** Temporizador del predicador: cuándo empezó (hora del PC) o null. Solo se ve en la vista de escenario. */

@@ -25,7 +25,7 @@ const Selah = (() => {
     ws.onopen = () => {
       S.connected = true;
       // Decirle al PC que entendemos "keepSlides": así no repite el texto en cada "Siguiente".
-      ws.send(JSON.stringify({ type: "hello", features: ["keepSlides"] }));
+      ws.send(JSON.stringify({ type: "hello", features: ["keepSlides", "presentations"] }));
       emit("status");
     };
     ws.onclose = () => { S.connected = false; emit("status"); setTimeout(connect, 2000); };
@@ -40,7 +40,7 @@ const Selah = (() => {
       }
       else if (m.type === "bible_results") emit("bibleResults", m);
       else if (m.type === "song_results") emit("songResults", m);
-      else if (m.type === "library") { S.songs = m.songs; S.bibleName = m.bibleName; S.bibleBooks = m.bibleBooks || []; S.announcements = m.announcements || []; S.sermons = m.sermons || []; S.bibleNames = m.bibleNames || []; S.secondBible = m.secondBible || null; emit("library"); }
+      else if (m.type === "library") { S.songs = m.songs; S.bibleName = m.bibleName; S.bibleBooks = m.bibleBooks || []; S.announcements = m.announcements || []; S.sermons = m.sermons || []; S.bibleNames = m.bibleNames || []; S.secondBible = m.secondBible || null; S.presentations = m.presentations || []; emit("library"); }
       else if (m.type === "bible_chapter") emit("bibleChapter", m);
       else if (m.type === "plan") { S.plan = m.plan; S.savedLists = m.saved || []; emit("plan"); }
       else if (m.type === "error") emit("error", m.message);

@@ -36,6 +36,10 @@ dependencies {
     implementation("com.google.zxing:core:3.5.3")
     // Leer el cancionero de EasyWorship (bases SQLite)
     implementation("org.xerial:sqlite-jdbc:3.47.1.0")
+    // Presentaciones: PDF (PDFBox) y PowerPoint .pptx (Apache POI), convertidas a imágenes
+    implementation("org.apache.pdfbox:pdfbox:3.0.3")
+    implementation("org.apache.poi:poi-ooxml:5.3.0")
+    implementation("org.apache.logging.log4j:log4j-to-slf4j:2.24.1") // POI escribe su registro por aquí (en silencio)
 
     testImplementation(kotlin("test"))
     testImplementation("io.ktor:ktor-client-cio:$ktor")

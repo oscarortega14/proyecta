@@ -18,6 +18,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.material3.FilterChip
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,9 +33,41 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.selah.shared.ClientMessage
 
-/** Anuncios: imágenes y videos (cumpleaños, eventos, la ofrenda…) que se muestran a pantalla completa. */
+/**
+ * Anuncios (imágenes y videos: cumpleaños, eventos, la ofrenda…) y presentaciones (PowerPoint o PDF),
+ * a pantalla completa.
+ */
 @Composable
 fun AnnouncementsTab(
+    announcements: List<String>,
+    current: String?,
+    modifier: Modifier,
+    send: (ClientMessage) -> Unit,
+    present: (ClientMessage) -> Unit,
+    onAdd: () -> Unit,
+    onOpenFolder: () -> Unit,
+    presentations: List<String> = emptyList(),
+    currentPresentation: String? = null,
+    onAddPresentations: () -> Unit = {},
+    onOpenPresentationsFolder: () -> Unit = {},
+    presentationsReady: Int = 0,
+) {
+    var showPresentations by rememberSaveable { mutableStateOf(false) }
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            FilterChip(!showPresentations, { showPresentations = false }, { Text("Anuncios (${announcements.size})") }, Modifier.hand())
+            FilterChip(showPresentations, { showPresentations = true }, { Text("Presentaciones (${presentations.size})") }, Modifier.hand())
+        }
+        if (showPresentations) {
+            PresentationsList(presentations, currentPresentation, Modifier.weight(1f), send, present, onAddPresentations, onOpenPresentationsFolder, presentationsReady)
+        } else {
+            AnnouncementsList(announcements, current, Modifier.weight(1f), send, present, onAdd, onOpenFolder)
+        }
+    }
+}
+
+@Composable
+private fun AnnouncementsList(
     announcements: List<String>,
     current: String?,
     modifier: Modifier,
@@ -81,6 +119,61 @@ fun AnnouncementsTab(
         }
         Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
             TextButton(onOpenFolder) { Text("Abrir carpeta de anuncios") }
+        }
+    }
+}
+
+/** PowerPoint y PDF: miniatura de la primera diapositiva; clic para proyectarla desde el principio. */
+@Composable
+private fun PresentationsList(
+    presentations: List<String>,
+    current: String?,
+    modifier: Modifier,
+    send: (ClientMessage) -> Unit,
+    present: (ClientMessage) -> Unit,
+    onAdd: () -> Unit,
+    onOpenFolder: () -> Unit,
+    ready: Int,
+) {
+    val look = LocalLook.current
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (presentations.isEmpty()) {
+            Text(
+                "Agrega presentaciones de PowerPoint (.pptx) o PDF: cada diapositiva se pasa con Siguiente, " +
+                    "igual que una canción. Si una de PowerPoint se ve distinta, guárdala como PDF desde PowerPoint " +
+                    "(Archivo → Exportar → PDF).",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        LazyVerticalGrid(
+            GridCells.Adaptive(140.dp), Modifier.weight(1f).fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(presentations, key = { it }) { name ->
+                // [ready] cambia al terminar cada conversión: así aparece la miniatura sin recargar.
+                val thumb = remember(name, ready) { look.presentationThumb(name, 0) }
+                val selected = name == current
+                Column(
+                    Modifier.clip(RoundedCornerShape(8.dp))
+                        .background(if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant)
+                        .then(if (thumb != null) Modifier.handClickable { present(ClientMessage.ShowPresentation(name)) } else Modifier),
+                ) {
+                    Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black), contentAlignment = Alignment.Center) {
+                        val img = rememberBackground(thumb)
+                        if (img != null) Image(img, contentDescription = name, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                        else Text("Preparando…", color = Color.White, style = MaterialTheme.typography.labelMedium)
+                    }
+                    Text(
+                        name.substringBeforeLast('.'), style = MaterialTheme.typography.labelMedium, maxLines = 1,
+                        overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    )
+                    TextButton({ send(ClientMessage.PlanAddPresentation(name)) }, contentPadding = PaddingValues(horizontal = 6.dp)) { Text("+ Lista") }
+                }
+            }
+        }
+        Button(onAdd, Modifier.fillMaxWidth(), contentPadding = PaddingValues(4.dp)) { Text("+ Agregar PowerPoint o PDF…") }
+        Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
+            TextButton(onOpenFolder) { Text("Abrir carpeta de presentaciones") }
         }
     }
 }

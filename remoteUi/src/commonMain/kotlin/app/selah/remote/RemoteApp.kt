@@ -73,6 +73,7 @@ internal fun RemoteApp(
     val savedLists by client.savedLists.collectAsState()
     val songResults by client.songResults.collectAsState()
     val announcements by client.announcements.collectAsState()
+    val presentations by client.presentations.collectAsState()
     val sermons by client.sermons.collectAsState()
     val bibleNames by client.bibleNames.collectAsState()
     val secondBible by client.secondBible.collectAsState()
@@ -132,7 +133,7 @@ internal fun RemoteApp(
                         },
                     )
                     3 -> PlanTab(plan, savedLists, state.stageMessage, client::send) { tab = 0 }
-                    4 -> MoreTab(state, announcements, sermons, client.serverOffset, client::send, onUpload = client::uploadAnnouncement) { tab = 0 }
+                    4 -> MoreTab(state, announcements, presentations, sermons, client.serverOffset, client::send, onUpload = client::uploadAnnouncement) { tab = 0 }
                 }
             }
             Controls(state, client::send)
@@ -346,7 +347,7 @@ private fun PlanTab(plan: ServicePlanState, saved: List<String>, stageMessage: S
                 Row(Modifier.padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f).padding(vertical = 10.dp)) {
                         Text("${i + 1}. ${item.title}", fontSize = 17.sp, fontWeight = FontWeight.Medium)
-                        Text(when (item.kind) { PlanKind.BIBLE -> "Lectura"; PlanKind.MEDIA -> "Anuncio"; PlanKind.SERMON -> "Predicación"; else -> "Canción" }, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(when (item.kind) { PlanKind.BIBLE -> "Lectura"; PlanKind.MEDIA -> "Anuncio"; PlanKind.SERMON -> "Predicación"; PlanKind.PRESENTATION -> "Presentación"; else -> "Canción" }, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     TextButton({ send(ClientMessage.PlanMove(i, i - 1)) }, enabled = i > 0) { Text("▲") }
                     TextButton({ send(ClientMessage.PlanMove(i, i + 1)) }, enabled = i < plan.items.lastIndex) { Text("▼") }
@@ -379,6 +380,7 @@ private fun PlanTab(plan: ServicePlanState, saved: List<String>, stageMessage: S
 private fun MoreTab(
     state: PresentationState,
     announcements: List<String>,
+    presentations: List<String>,
     sermons: List<SongSummary>,
     serverOffset: Long,
     send: (ClientMessage) -> Unit,
@@ -419,6 +421,24 @@ private fun MoreTab(
                     }
                     TextButton({
                         send(ClientMessage.PlanAddSermon(s.id))
+                        notices.show("Agregada a la lista")
+                    }) { Text("+ Lista") }
+                }
+            }
+        }
+        if (presentations.isNotEmpty()) {
+            item { Text("Presentaciones", style = MaterialTheme.typography.titleMedium) }
+            items(presentations, key = { "presentacion:$it" }) { name ->
+                val on = name == state.presentation
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        (if (on) "▶ " else "") + name.substringBeforeLast('.'),
+                        Modifier.weight(1f).clickable { send(ClientMessage.ShowPresentation(name)); onShown() }.padding(vertical = 10.dp),
+                        color = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        fontSize = 17.sp,
+                    )
+                    TextButton({
+                        send(ClientMessage.PlanAddPresentation(name))
                         notices.show("Agregada a la lista")
                     }) { Text("+ Lista") }
                 }

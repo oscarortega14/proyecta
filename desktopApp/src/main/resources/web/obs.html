@@ -56,7 +56,7 @@ function render() {
   renderName();
   const st = S.state, cur = st.slides[st.index];
   const counting = (P.countdownSeconds(st) || 0) > 0;
-  const visible = showLyrics && S.connected && cur && !st.blank && !st.logo && !counting && !st.media; // un anuncio no es letra
+  const visible = showLyrics && S.connected && cur && !st.blank && !st.logo && !counting && !st.media && !st.presentation; // un anuncio o una presentación no son letra
   wrap.classList.toggle("hidden", !visible);
   if (!visible) return;
   box.replaceChildren(document.createTextNode(cur.text));

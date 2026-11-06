@@ -23,6 +23,7 @@
   #msg { display:none; background:#ffd54f; color:#000; font-size:5vh; font-weight:700; text-align:center; padding:1vh 2vw; border-radius:10px; }
   #current { flex:3; display:flex; align-items:center; justify-content:center; text-align:center; white-space:pre-line; font-weight:600; line-height:1.2; }
   #next { flex:1.4; display:flex; align-items:center; justify-content:center; text-align:center; white-space:pre-line; color:#8a8a8a; border-top:2px solid #333; line-height:1.2; }
+  .pres { max-width:100%; max-height:100%; object-fit:contain; }
   #nextLbl { color:#555; font-size:2.4vh; text-transform:uppercase; letter-spacing:.1em; }
   #cd { display:none; text-align:center; font-size:12vh; font-weight:700; font-variant-numeric:tabular-nums; color:#80deea; }
   #alert { display:none; background:#b71c1c; color:#fff; font-size:3.5vh; text-align:center; padding:.6vh 1vw; border-radius:8px; }
@@ -102,6 +103,17 @@ $("chordsBtn").onclick = () => { showChords = !showChords; store.set("acordes", 
 $("up").onclick = () => { const id = S.state.songId; transpose[id] = (transpose[id] || 0) + 1; render(); };
 $("down").onclick = () => { const id = S.state.songId; transpose[id] = (transpose[id] || 0) - 1; render(); };
 function setSlide(box, slide) {
+  // Presentación: la diapositiva misma (la actual grande, la siguiente en miniatura)
+  const st = S.state;
+  if (st.presentation && slide) {
+    const i = st.slides.indexOf(slide);
+    const src = "/diapositiva?" + (box.id === "next" ? "mini=1&" : "") + "n=" + i + "&nombre=" + encodeURIComponent(st.presentation);
+    const old = box.querySelector("img.pres");
+    if (old && old.getAttribute("src") === src) return;
+    const img = document.createElement("img"); img.className = "pres"; img.src = src; img.alt = slide.text;
+    box.replaceChildren(img);
+    return;
+  }
   if (showChords && slide && slide.chords) box.innerHTML = chordHtml(slide.chords, transpose[S.state.songId] || 0);
   else box.textContent = slide ? slide.text : "";
 }

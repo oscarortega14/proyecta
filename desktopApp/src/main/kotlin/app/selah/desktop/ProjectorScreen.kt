@@ -16,6 +16,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
@@ -56,6 +59,10 @@ data class Look(
     val preview: Boolean = false,
     /** Archivo de un anuncio (carpeta anuncios). */
     val mediaFile: (String) -> File? = { null },
+    /** Imagen de la diapositiva N (desde 0) de una presentación, ya convertida. */
+    val presentationPage: (String, Int) -> File? = { _, _ -> null },
+    /** Miniatura de esa diapositiva (para las listas). */
+    val presentationThumb: (String, Int) -> File? = { _, _ -> null },
 )
 
 val LocalLook = staticCompositionLocalOf { Look() }
@@ -77,17 +84,22 @@ fun ProjectorScreen(state: PresentationState, modifier: Modifier = Modifier, loo
     val now = rememberClock(active = state.countdownEnd != null)
     val seconds = state.countdownSeconds(now)
     val media = state.media?.let(look.mediaFile)
+    val page = state.presentation?.let { look.presentationPage(it, state.index) }
+    val nextPage = state.presentation?.let { look.presentationPage(it, state.index + 1) }
 
     BoxWithConstraints(modifier.fillMaxSize().background(Color.Black)) {
         val slide = state.current
         if (!state.blank) {
             // Un anuncio ocupa toda la pantalla (sin fondo ni letra); la cuenta regresiva y el logo van primero.
             val showMedia = media != null && !state.logo && (seconds == null || seconds <= 0)
-            if (!showMedia) Background(theme, image, video, look.frozenTime, look.preview)
+            // Una presentación también ocupa toda la pantalla, igual que un anuncio de imagen.
+            val showPage = state.presentation != null && !state.logo && (seconds == null || seconds <= 0)
+            if (!showMedia && !showPage) Background(theme, image, video, look.frozenTime, look.preview)
             when {
                 seconds != null && seconds > 0 -> Countdown(state.countdownText, seconds, theme, maxWidth, maxHeight)
                 state.logo -> if (logo != null) Logo(logo, maxHeight)
                 showMedia -> Announcement(media!!, look.preview, theme.light)
+                showPage -> if (page != null) PresentationPage(page, nextPage)
                 slide != null -> {
                     // Con alerta, la letra deja libre la franja de abajo.
                     val w = maxWidth
@@ -131,6 +143,42 @@ private fun Announcement(file: File, preview: Boolean, light: Boolean) {
     } else {
         val img = rememberBackground(file)
         if (img != null) Image(img, contentDescription = "Anuncio", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+    }
+}
+
+/**
+ * Una diapositiva de PowerPoint o PDF, entera y centrada (con franjas negras si no es 16:9).
+ * Mientras carga la siguiente se sigue viendo la anterior (sin parpadeo en negro).
+ */
+@Composable
+private fun PresentationPage(file: File, next: File?) {
+    var shown by remember { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(file) {
+        PresentationImages.cached(file)?.let { shown = it }
+        withContext(Dispatchers.IO) { PresentationImages.load(file) }?.let { shown = it }
+        // La siguiente queda lista para cuando se pase
+        next?.let { withContext(Dispatchers.IO) { PresentationImages.load(it) } }
+    }
+    shown?.let { Image(it, contentDescription = "Diapositiva", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit) }
+}
+
+/** Pocas diapositivas en memoria (cada una ocupa ~8 MB): las últimas usadas. */
+object PresentationImages {
+    private const val MAX = 6
+    private val cache = object : LinkedHashMap<String, ImageBitmap>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ImageBitmap>?) = size > MAX
+    }
+
+    private fun key(file: File) = file.absolutePath + "|" + file.lastModified()
+
+    @Synchronized
+    fun cached(file: File): ImageBitmap? = cache[key(file)]
+
+    fun load(file: File): ImageBitmap? {
+        cached(file)?.let { return it }
+        val img = runCatching { org.jetbrains.skia.Image.makeFromEncoded(file.readBytes()).toComposeImageBitmap() }.getOrNull() ?: return null
+        synchronized(this) { cache[key(file)] = img }
+        return img
     }
 }
 

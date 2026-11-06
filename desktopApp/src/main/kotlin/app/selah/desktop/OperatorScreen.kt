@@ -6,6 +6,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -103,6 +107,10 @@ fun OperatorScreen(
     onExport: () -> String?,
     onAddAnnouncements: () -> String? = { null },
     onOpenAnnouncements: () -> Unit = {},
+    onAddPresentations: () -> String? = { null },
+    onOpenPresentations: () -> Unit = {},
+    /** Cambia cuando termina de convertirse una presentación (para refrescar las miniaturas). */
+    presentationsReady: Int = 0,
 ) {
     var message by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(message) { if (message != null) { delay(6000); message = null } }
@@ -141,6 +149,10 @@ fun OperatorScreen(
                     currentMedia = state.media,
                     onAddAnnouncements = { onAddAnnouncements()?.let { message = it } },
                     onOpenAnnouncements = onOpenAnnouncements,
+                    currentPresentation = state.presentation,
+                    onAddPresentations = { onAddPresentations()?.let { message = it } },
+                    onOpenPresentations = onOpenPresentations,
+                    presentationsReady = presentationsReady,
                     onEditSermon = onEditSermon,
                     searchSongs = searchSongs,
                 )
@@ -232,6 +244,10 @@ private fun LeftPanel(
     currentMedia: String?,
     onAddAnnouncements: () -> Unit,
     onOpenAnnouncements: () -> Unit,
+    currentPresentation: String?,
+    onAddPresentations: () -> Unit,
+    onOpenPresentations: () -> Unit,
+    presentationsReady: Int,
     onEditSermon: (String?) -> Unit,
     searchSongs: (String) -> List<app.selah.shared.SongHit>,
 ) {
@@ -257,7 +273,10 @@ private fun LeftPanel(
         when (tab) {
             0 -> SongsTab(catalog, lastSung, Modifier.weight(1f), send, present, onReload, onOpenFolder, onEdit, onImport, onExport, onEditSermon, searchSongs)
             1 -> BibleTab(catalog, bible, onSelectBible, onSelectSecondBible, Modifier.weight(1f), send, present, searchBible)
-            2 -> AnnouncementsTab(catalog.announcements, currentMedia, Modifier.weight(1f), send, present, onAddAnnouncements, onOpenAnnouncements)
+            2 -> AnnouncementsTab(
+                catalog.announcements, currentMedia, Modifier.weight(1f), send, present, onAddAnnouncements, onOpenAnnouncements,
+                catalog.presentations, currentPresentation, onAddPresentations, onOpenPresentations, presentationsReady,
+            )
             else -> PlanPanel(plan, savedLists, onDeleteSavedList, Modifier.weight(1f).fillMaxWidth(), send)
         }
     }
@@ -415,6 +434,7 @@ private fun SlidesPanel(
     onEdit: (songId: String?) -> Unit,
 ) {
     val listState = rememberLazyListState()
+    val look = LocalLook.current
     LaunchedEffect(state.index, state.title) { if (state.index >= 0) listState.animateScrollToItem(state.index) }
 
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -437,7 +457,17 @@ private fun SlidesPanel(
                     ),
                     border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
                 ) {
-                    Column(Modifier.padding(14.dp)) {
+                    val presentation = state.presentation
+                    if (presentation != null) {
+                        // Presentación: la miniatura de cada diapositiva
+                        Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                            val thumb = rememberBackground(remember(presentation, i) { look.presentationThumb(presentation, i) })
+                            Box(Modifier.width(192.dp).aspectRatio(16f / 9f).background(Color.Black), contentAlignment = Alignment.Center) {
+                                if (thumb != null) Image(thumb, contentDescription = slide.text, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                            }
+                            Text(slide.text, style = MaterialTheme.typography.bodyLarge)
+                        }
+                    } else Column(Modifier.padding(14.dp)) {
                         if (slide.label.isNotEmpty()) {
                             Text(slide.label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                         }
@@ -576,7 +606,7 @@ private fun PlanPanel(
                         Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
                             Text("${i + 1}. ${item.title}", maxLines = 2, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
                             Text(
-                                when (item.kind) { PlanKind.BIBLE -> "Lectura"; PlanKind.MEDIA -> "Anuncio"; PlanKind.SERMON -> "Predicación"; else -> "Canción" },
+                                when (item.kind) { PlanKind.BIBLE -> "Lectura"; PlanKind.MEDIA -> "Anuncio"; PlanKind.SERMON -> "Predicación"; PlanKind.PRESENTATION -> "Presentación"; else -> "Canción" },
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
