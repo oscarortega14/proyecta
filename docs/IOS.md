@@ -219,13 +219,16 @@ Dos caminos (se pueden hacer los dos):
 
 ## 9. Otras tiendas (estado al pasar a la Mac)
 
+- **App Store: publicada el 2026-11-06** → https://apps.apple.com/app/id6831222748 (Apple ID 6831222748).
+
 - **Google Play** (cuenta personal creada después de nov. 2023 → prueba cerrada con **12 probadores
   durante 14 días** antes de producción):
   - Ficha, gráfico y capturas: `docs/play/`. App bundle: `./gradlew :androidApp:bundlePlayRelease`
     (variante `play`, sin actualizador propio).
   - Al crear la app en Play Console elegir **"usar mi propia clave de firma"** (la clave está en
     `~/.config/selah` del PC, fuera del repositorio) y subir con PEPK.
-  - Falta: crear la app en Play Console, juntar 12 Gmail de probadores, subir el `.aab`.
+  - Hecho (2026-11-06): app creada, clave propia subida con PEPK, prueba cerrada "Alpha" activa.
+    Falta: llegar a 12 probadores con la app instalada, esperar 14 días y pedir acceso a producción.
 - **Microsoft Store** (gratis para personas; Microsoft vuelve a firmar el paquete, así Smart App Control
   de Windows deja de bloquear Selah):
   - `./gradlew :desktopApp:packageMsix` en Windows (usa `makeappx` del NuGet Microsoft.Windows.SDK.BuildTools).

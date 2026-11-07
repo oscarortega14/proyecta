@@ -4,6 +4,8 @@ Programa para proyectar letras de canciones y la Biblia en la iglesia, con contr
 
 **Página web:** https://oortega14.com/apps/selah
 
+**Descargar:** [Windows (Microsoft Store)](https://apps.microsoft.com/detail/9NP5ZZWWGLFK) · [iPhone (App Store)](https://apps.apple.com/app/id6831222748) · [Android (APK)](https://github.com/oscarortega14/selah/releases/latest)
+
 | Módulo | Qué es | Tecnología |
 |---|---|---|
 | `shared/` | Modelos, protocolo, lector de canciones, búsqueda en la Biblia | Kotlin Multiplatform (JVM + Android + iOS) |

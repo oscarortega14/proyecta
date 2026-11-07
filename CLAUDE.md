@@ -65,9 +65,11 @@ cuota de 5 GB, `SELAH_UPDATE_URL` solo para localhost.
   si cambian de dirección, actualizar las fichas de App Store, Play y Microsoft Store)
 
 ## Tiendas (estado)
-Ver §9 de `docs/IOS.md`: Google Play (falta crear la app, 12 probadores × 14 días), Microsoft Store
+Ver §9 de `docs/IOS.md`. Google Play: app `app.selah.remote` creada, firma propia (misma clave que el APK
+de GitHub), prueba cerrada "Alpha" activa desde el 2026-11-06 (12 probadores × 14 días antes de producción). Microsoft Store
 (**publicada** el 2026-11-06: https://apps.microsoft.com/detail/9NP5ZZWWGLFK, Store ID 9NP5ZZWWGLFK,
-identidad OscarOrtega.SelahRemote; las versiones nuevas se suben con "Start update" en Partner Center), App Store (Selah Remote 2.4.0 build 20401 enviada a revisión el 2026-11-05).
+identidad OscarOrtega.SelahRemote; las versiones nuevas se suben con "Start update" en Partner Center), App Store (**publicada** el 2026-11-06: Selah Remote, https://apps.apple.com/app/id6831222748, Apple ID 6831222748;
+las versiones nuevas: nuevo build en App Store Connect → nueva versión → revisión).
 
 ## Versión 2.5.0 (2026-11-06): lo nuevo y lo que falta
 Nuevo (hecho y probado en el PC con Windows, 243 pruebas): importar de EasyWorship 6/7 (`EasyWorshipImport.kt`),
